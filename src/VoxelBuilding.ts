@@ -6,7 +6,13 @@ export class VoxelBuilding extends VoxelObject {
   public id: string;
   public name: string;
 
-  constructor(id: string, name: string, voxels: { id: number, x: number, y: number, z: number, c: string }[], variation?: number | string) {
+  constructor(
+    id: string,
+    name: string,
+    voxels: { id: number, x: number, y: number, z: number, c: string }[],
+    variation?: number | string,
+    applyVariation: boolean = true
+  ) {
     // Convert building voxels to VoxelData format
     // Generator uses Z for height, but engine uses Y
     let convertedVoxels: VoxelData[] = voxels.map(v => ({
@@ -16,7 +22,7 @@ export class VoxelBuilding extends VoxelObject {
       color: parseInt(v.c.replace('#', '0x'), 16)
     }));
 
-    if (variation !== undefined && name !== 'Your Apartment') {
+    if (applyVariation && variation !== undefined && name !== 'Your House') {
         convertedVoxels = VoxelBuilding.applyVariation(convertedVoxels, variation);
     }
 

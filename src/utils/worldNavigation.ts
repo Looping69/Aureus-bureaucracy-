@@ -1,4 +1,5 @@
 import { Building, WorldPosition } from '../types';
+import { CONFIG } from './voxelConstants';
 
 export interface BuildingFootprint {
   minX: number;
@@ -6,6 +7,12 @@ export interface BuildingFootprint {
   minY: number;
   maxY: number;
 }
+
+const INFRASTRUCTURE_SURFACE_OFFSETS: Partial<Record<Building['type'], number>> = {
+  ROAD: 0.015,
+  SIDEWALK: 0.04,
+  PARK: 0.03,
+};
 
 const WALKABLE_BUILDING_TYPES = new Set<Building['type']>([
   'ROAD',
@@ -92,4 +99,39 @@ export const getBuildingAccessPosition = (
     default:
       return clampWorldPosition({ x: centerX, y: footprint.maxY + 1 }, mapSize);
   }
+};
+
+export const getStructureBaseHeight = (type: Building['type']) => {
+  return CONFIG.FLOOR_Y + 1.0 + (INFRASTRUCTURE_SURFACE_OFFSETS[type] ?? 0);
+};
+
+export const getWorldSurfaceHeight = (
+  position: WorldPosition,
+  buildings: Building[]
+) => {
+  let surfaceHeight = CONFIG.FLOOR_Y + 0.5;
+
+  buildings.forEach((building) => {
+    if (!WALKABLE_BUILDING_TYPES.has(building.type)) {
+      return;
+    }
+
+    const footprint = getBuildingFootprint(building) ?? {
+      minX: building.pos.x,
+      maxX: building.pos.x,
+      minY: building.pos.y,
+      maxY: building.pos.y,
+    };
+
+    if (
+      position.x >= footprint.minX &&
+      position.x <= footprint.maxX &&
+      position.y >= footprint.minY &&
+      position.y <= footprint.maxY
+    ) {
+      surfaceHeight = Math.max(surfaceHeight, getStructureBaseHeight(building.type) + 0.5);
+    }
+  });
+
+  return surfaceHeight;
 };

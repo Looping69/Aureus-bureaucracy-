@@ -308,8 +308,16 @@ export class VoxelEngine {
     }
   }
 
-  public setPlayerPosition(x: number, z: number, isMoving: boolean, targetX?: number, targetZ?: number, path?: {x: number, y: number}[]) {
-    this.targetPlayerPos.set(x, CONFIG.FLOOR_Y + 0.5, z);
+  public setPlayerPosition(
+    x: number,
+    z: number,
+    surfaceY: number,
+    isMoving: boolean,
+    targetX?: number,
+    targetZ?: number,
+    path?: {x: number, y: number}[]
+  ) {
+    this.targetPlayerPos.set(x, surfaceY, z);
     
     if (!this.firstPositionSet) {
       this.currentPlayerPos.copy(this.targetPlayerPos);

@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { VoxelEngine } from '../VoxelEngine';
 import { Building, NPC, AppState, VoxelData } from '../types';
 import { useCameraControls } from '../hooks/useCameraControls';
+import { getWorldSurfaceHeight } from '../utils/worldNavigation';
 
 interface VoxelWorldProps {
   voxels: VoxelData[];
@@ -38,6 +39,10 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<VoxelEngine | null>(null);
+  const playerSurfaceY = React.useMemo(
+    () => getWorldSurfaceHeight(playerPos, buildings),
+    [buildings, playerPos]
+  );
 
   useCameraControls(engineRef);
 
@@ -74,6 +79,7 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
       engineRef.current.setPlayerPosition(
         playerPos.x - 80, 
         playerPos.y - 80, 
+        playerSurfaceY,
         isMoving, 
         targetPos ? targetPos.x - 80 : undefined, 
         targetPos ? targetPos.y - 80 : undefined,
@@ -132,13 +138,14 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
       engineRef.current.setPlayerPosition(
         playerPos.x - 80, 
         playerPos.y - 80, 
+        playerSurfaceY,
         isMoving, 
         targetPos ? targetPos.x - 80 : undefined, 
         targetPos ? targetPos.y - 80 : undefined,
         path
       );
     }
-  }, [playerPos, isMoving, targetPos, path]);
+  }, [playerPos, playerSurfaceY, isMoving, targetPos, path]);
 
   useEffect(() => {
     if (engineRef.current) {

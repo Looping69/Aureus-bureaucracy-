@@ -3,6 +3,7 @@ import { VoxelCharacter } from './VoxelCharacter';
 import { VoxelBuilding } from './VoxelBuilding';
 import { Building, NPC } from './types';
 import { CONFIG } from './utils/voxelConstants';
+import { getStructureBaseHeight } from './utils/worldNavigation';
 
 export class EntityManager {
   private scene: THREE.Scene;
@@ -35,13 +36,21 @@ export class EntityManager {
     if (this.buildings.has(buildingData.id)) return;
     
     if (buildingData.voxels) {
-      const building = new VoxelBuilding(buildingData.id, buildingData.name, buildingData.voxels, buildingData.id);
+      const shouldVaryPalette = !['ROAD', 'SIDEWALK', 'PARK', 'HOTLINE', 'MINE_ENTRANCE'].includes(buildingData.type);
+      const building = new VoxelBuilding(
+        buildingData.id,
+        buildingData.name,
+        buildingData.voxels,
+        buildingData.id,
+        shouldVaryPalette
+      );
       
-      // Position Y at ground level + offset
+      // Give flat infrastructure a tiny height separation from the terrain
+      // to prevent z-fighting and create a readable street stack.
       const worldX = buildingData.pos.x - 80;
       const worldZ = buildingData.pos.y - 80;
-      
-      building.setPosition(worldX, CONFIG.FLOOR_Y + 1.0, worldZ);
+
+      building.setPosition(worldX, getStructureBaseHeight(buildingData.type), worldZ);
       this.buildings.set(buildingData.id, building);
       this.entityGroup.add(building.group);
 
