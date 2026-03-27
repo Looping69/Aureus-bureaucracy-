@@ -1,0 +1,1 @@
+export { getBuildingAccessPosition } from './worldNavigation';

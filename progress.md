@@ -1,0 +1,309 @@
+Original prompt: Okay so there are still so many gaps in the gameplay we need to fix please lets find them
+
+- Initialized gameplay gap audit using develop-web-game skill.
+- Automated probes run against http://localhost:4173 using web_game_playwright_client.
+- Observed via screenshots:
+  - Start Journey advances tutorial to step 2 (works).
+  - Clicking Mine can produce a blank gameplay view (no visible mine UI), indicating unresolved activeMineId scene-entry path.
+- Pending: Deliver prioritized gameplay gap list (observed + code-traced causes).
+- Implemented permit progression centralization via applyPermitApproval() in src/App.tsx.
+- Added objective helper functions and wired objective completion into discovery/tutorial transitions.
+- Added mine-entry hardening:
+  - enterMineById() single entry path
+  - openMineScene() now validates active mine and shows selector when multiple discovered mines exist
+  - mine picker modal UI added
+  - safe fallback UI when currentScene=MINE but activeMineId is missing
+- Validation: npm run lint (pass), npm run build (pass)
+- Remaining TODOs:
+  - Convert mine picker selection to optionally apply travel time/energy cost mode
+  - Add deterministic gameplay smoke tests for tutorial + permit chain + mining loop
+  - Reduce App.tsx monolith by extracting objective/permit/mining reducers
+- Refactor completed to split App.tsx into focused modules/components.
+- New game helpers:
+  - src/game/objectives.ts
+  - src/game/permitProgression.ts
+- New game loop/progression hooks:
+  - src/hooks/game/useBuildingDiscovery.ts
+  - src/hooks/game/useFeedbackCleanup.ts
+  - src/hooks/game/useTimeAndCurfewLoop.ts
+  - src/hooks/game/usePermitProcessingLoop.ts
+  - src/hooks/game/useMovementLoop.ts
+  - src/hooks/game/useTutorialProgression.ts
+- New UI components extracted from App:
+  - src/components/TutorialOverlay.tsx
+  - src/components/BottomNav.tsx
+  - src/components/MinePickerModal.tsx
+  - src/components/MineSceneFallback.tsx
+- App.tsx reduced to orchestration + handlers; verified with npm run lint and npm run build.
+- Next-part refactor pass (2026-03-10):
+  - Added src/game/actions/dialogueActions.ts and moved dialogue social-consequence logic there.
+  - Switched feedback creation to queued feedback (no nested setState during dialogue action resolution).
+  - Mine picker now routes through travel rules (energy/time/unknown checks) instead of direct scene jump.
+  - Extracted scene orchestration JSX from App.tsx into src/components/GameSceneRouter.tsx.
+- Validation:
+  - npm run lint (pass)
+  - npm run build (pass)
+  - Runtime smoke: app served on http://127.0.0.1:5173 and loaded in browser.
+  - Observed console error: missing favicon.ico (non-gameplay).
+- Remaining TODOs:
+  - Split dialogue option construction out of DialogueOverlay.tsx (still very large).
+  - Address bundle size warning by code-splitting heavy world/three modules.
+- Next-part refactor pass (2026-03-10, continued):
+  - Extracted dialogue status helpers to src/game/dialogue/status.ts.
+  - Extracted special dialogue option construction to src/game/dialogue/specialOptions.ts.
+  - Simplified src/components/DialogueOverlay.tsx to consume shared helpers/modules.
+- Validation:
+  - npm run lint (pass)
+  - npm run build (pass)
+  - Dev server restarted on http://127.0.0.1:5173 and browser load verified.
+- Improvement 1 (frame-time spike reduction) completed:
+  - Removed per-frame world console logging callbacks.
+  - Replaced App pointer drag state with refs to avoid re-rendering on every pointer move.
+  - Stopped wheel/recenter from mutating unused App camera state.
+  - Throttled world hover-position state updates to requestAnimationFrame.
+  - Stabilized VoxelWorldContainer callback props with useCallback.
+- Validation:
+  - npm run lint (pass)
+  - npm run build (pass)
+  - Browser runtime check shows no repeated world logs and no console errors.
+- Improvement 2 (bundle + load splitting) completed:
+  - Added lazy scene loading in src/components/GameSceneRouter.tsx for WorldScene, MineScene, OfficeScene, and CityPlanner with Suspense fallback.
+  - Added Vite manual chunking in vite.config.ts to split vendor-react, vendor-motion, vendor-ui, and vendor-three.
+- Validation:
+  - npm run lint (pass)
+  - npm run build (pass)
+  - Browser runtime check shows scene-loading fallback then world scene renders normally.
+- Build output after split:
+  - Main app chunk reduced to ~82 KB (from ~1.48 MB monolith previously).
+  - Large remaining chunk: vendor-three ~798 KB (still flagged, expected next optimization target).
+- Improvement 3 (core loop guidance) completed:
+  - Added deterministic progression guidance engine in src/game/progressionGuide.ts.
+  - Added UI guidance strip component src/components/ProgressGuide.tsx.
+  - Wired ProgressGuide into App under Header for always-visible next-step/blocker messaging.
+- Validation:
+  - npm run lint (pass)
+  - npm run build (pass)
+  - Browser check: guidance updates from "Start Your Journey" to "Go To The Bureau" after tutorial start.
+- Improvement 4 (mine gameplay depth) completed:
+  - Added tile stability variation at generation time (data.ts) to create meaningful weak/strong pockets.
+  - Extended mine interaction rules (mineActions.ts):
+    - Unstable tile warnings during prospecting.
+    - Stability-based hazard chance in operational mining.
+    - Rich vein bonus payouts/ore on high-stability ore or scanner-assisted finds.
+    - Safety Kit reduces baseline and hazard energy penalties.
+    - Ore Scanner can reveal adjacent tiles during prospecting and improves rich-vein find chance.
+  - Added mine equipment progression actions (mineActions.ts):
+    - BUY_SAFETY_KIT ($450)
+    - BUY_ORE_SCANNER ($700)
+  - Updated MineScene UI (MineScene.tsx):
+    - Equipment purchase/installed controls.
+    - Revealed-tile visual cues for unstable tiles and rich ore.
+    - Tile legend strip for player clarity.
+- Validation:
+  - npm run lint (pass)
+  - npm run build (pass)
+  - Browser smoke test confirms mine view renders new equipment buttons and tile legend.
+- Improvement 5 (strategic dialogue) completed:
+  - Added NPC social profiles in dialogue logic (cost/success/risk bias per NPC).
+  - Added high-impact dialogue cooldown system using absolute in-game hour tracking.
+  - Added dialogueCooldowns to GameState and initialized in App state.
+  - Updated special dialogue option labels to show explicit tradeoffs and cooldown status.
+  - High-impact actions now set cooldowns (negotiation, bribe, vulnerability plays, hotline leaks, authority reports, fast-track).
+- Validation:
+  - npm run lint (pass)
+  - npm run build (pass)
+  - Runtime smoke load on http://127.0.0.1:5173 successful.
+- Improvement 6 (economy balance) completed:
+  - Added shared economy module src/game/economy.ts for:
+    - dynamic ore pricing by export license + influence,
+    - export exposure rules,
+    - daily upkeep + random audit/subsidy events.
+  - Rebalanced mining payout in src/game/actions/mineActions.ts:
+    - extraction now yields ore primarily (no direct tile cash injection),
+    - mine export action now uses shared economy export flow.
+  - Updated App export action to use shared economy export flow (licensed export vs black-market fallback behavior).
+  - Updated day-cycle processing:
+    - src/hooks/game/useTimeAndCurfewLoop.ts now applies daily economy tick at dawn and emits notifications,
+    - src/App.tsx rest action also applies daily economy tick for consistent day advancement costs.
+- Validation:
+  - npm run lint (pass)
+  - npm run build (pass)
+  - Browser smoke load and console check pass (no runtime errors).
+- Improvement 7 (QoL + UI clarity) completed:
+  - Added autosave/load support via localStorage in src/game/save.ts.
+  - Wired autosave/load in App:
+    - load previous save on boot with notification,
+    - debounce autosave on state changes.
+  - Added action history panel UI in src/components/ActionLogPanel.tsx and integrated into App.
+  - Notification messages now append to in-game action log (max 40 entries).
+  - Added action/tooltips for clarity:
+    - Permit filing and fast-track buttons,
+    - Mine extraction/equipment/action buttons,
+    - Office permit/travel actions,
+    - Bottom export action.
+- Validation:
+  - npm run lint (pass)
+  - npm run build (pass)
+  - Browser smoke test confirms:
+    - save-load banner,
+    - log panel open/entries/clear controls render,
+    - no runtime console errors.
+- Improvement 8 (telemetry/debug panel) completed:
+  - Added FPS hook in src/hooks/useFps.ts.
+  - Added on-screen telemetry panel in src/components/DebugPanel.tsx with toggle and reset.
+  - Wired telemetry into App state flow:
+    - state update counter,
+    - last action name + measured commit duration,
+    - state summary (scene/day-time/energy/money).
+  - Added tracked action timing markers for key gameplay actions (travel, mining, permits, dialogue, rest, exploration, export, etc.).
+- Validation:
+  - npm run lint (pass)
+  - npm run build (pass)
+  - Browser smoke test confirms debug panel renders and updates live.
+  - Verified last action/timing updates after Mine travel action (e.g., travel:iron-vein ~20ms).
+- Improvement 9 (regression automation) completed:
+  - Added automated smoke regression runner at scripts/smoke-regression.mjs.
+  - Added npm script: "smoke:regression".
+  - Added Playwright dev dependency for automated browser checks.
+- Regression scenarios covered:
+  - Scenario 1: tutorial start -> progression guidance changes -> mine travel reaches Iron Vein scene.
+  - Scenario 2: seeded save with ore/export license -> export action -> ore decreases to zero and money increases.
+- Validation:
+  - npm run smoke:regression (pass)
+  - npm run lint (pass)
+  - npm run build (pass)
+- Improvement 10 (content expansion) completed:
+  - Added alternate ending system:
+    - src/game/endings.ts with 3 ending conditions (Bureau Tycoon, People's Champion, Shadow Broker).
+    - src/components/EndingOverlay.tsx to present unlocked endings.
+    - App wiring to detect and unlock endings during play.
+  - Added random city events loop:
+    - src/hooks/game/useCityEventLoop.ts.
+    - Hourly-ish random event outcomes affecting energy/money/trust/exposure/evidence/influence with notifications.
+  - Expanded NPC narrative arcs in dialogue trees (src/data.ts):
+    - New Inspector arc (safety sweep + Sector 4 records outcomes).
+    - New Fixer arc (courier job + market rumor outcomes).
+  - Save compatibility updates in App load path:
+    - Hydrates missing new fields on older saves (dialogueCooldowns, lastCityEventHour, unlockedEndings, activeEndingId, etc.).
+- Validation:
+  - npm run lint (pass)
+  - npm run build (pass)
+  - npm run smoke:regression (pass)
+  - Browser runtime smoke load pass (only favicon 404 remains).
+- Improvement 11 (deeper dialogue consequences) completed:
+  - Added persistent world-effects system in src/game/dialogue/worldEffects.ts and threaded it into GameState (types.ts/App.tsx save hydration).
+  - Added visible effect chips in src/components/Header.tsx so dialogue fallout is readable in the main HUD.
+  - Integrated dialogue fallout into core systems:
+    - usePermitProcessingLoop.ts: Bureau Pull speeds permit processing/approval; Media Heat slows approvals.
+    - economy.ts: Market Window boosts export price and reduces exposure; Community Backing lowers upkeep and improves subsidy odds; Media Heat increases audits/fines.
+    - mineActions.ts: Community Backing reduces mine hazard/strain; Media Heat adds operational exposure.
+  - Upgraded dialogue content/actions in src/data.ts and src/game/dialogue/specialOptions.ts:
+    - Licensing/Inspector interactions can grant Bureau Pull.
+    - Union/Chief/Inspector support actions can grant Community Backing.
+    - Fixer intel/evidence actions can grant Market Window.
+    - Journalist leaks and authority reports now create Media Heat.
+    - Fixed the journalist tree's previously no-op "Leak everything" choice so it now has real consequences.
+- Validation:
+  - npm run lint (pass)
+  - npm run build (pass)
+  - npm run smoke:regression (pass, expanded with Market Window export scenario)
+  - develop-web-game Playwright client run against isolated local Vite server on http://127.0.0.1:4173
+  - Screenshot inspection:
+    - output/web-game-dialogue-4173/shot-0.png shows correct game start screen.
+    - output/web-game-dialogue-click/shot-0.png confirms Start Journey advances onboarding to step 2.
+- Residual note:
+  - Screenshot pass still shows "GRID POSITION OUT OF BOUNDS" in the top-left during world view; pre-existing UI issue worth cleaning next.
+- Improvement 12 (world HUD fix + longer dialogue route chains) completed:
+  - Fixed misleading world HUD coordinate fallback in src/components/WorldScene.tsx:
+    - no more false "Out of bounds" label on world load,
+    - HUD now falls back to player position,
+    - displayed coordinates are converted back into actual grid space instead of raw centered engine space.
+  - Added persistent story-route flags to GameState in src/types.ts with helpers in src/game/dialogue/storyFlags.ts.
+  - App save hydration now preserves storyFlags for older/newer saves.
+  - Added route-opening/route-closing dialogue chains in src/data.ts:
+    - Chief water quest unlocks confrontation route with Licensing.
+    - Licensing confrontation now branches into Vane backchannel vs public exposure.
+    - Community pact opens support routes and closes fixer smuggling access.
+    - Fixer courier work opens smuggling-tie routes and closes clean community access.
+    - Union worker testimony can publicly burn Vane.
+    - Inspector reform alliance unlocks after scandal/exposure and reopens compliance route after smuggling fallout.
+  - Updated src/game/dialogue/specialOptions.ts so route flags affect special actions:
+    - Vane exposure closes licensing bribe/quiet negotiation.
+    - Vane backchannel unlocks a quiet permit-approval action.
+    - Fixer smuggling convoy unlocks only if you chose that side and did not commit to the community pact.
+    - Journalist leaks and authority reports now persist public-scandal/vane-exposed state.
+- Validation:
+  - npm run lint (pass)
+  - npm run build (pass)
+  - npm run smoke:regression (pass; now also asserts no misleading out-of-bounds label on load)
+  - develop-web-game Playwright client run against isolated Vite server on http://127.0.0.1:4173
+  - Screenshot inspection confirms corrected HUD fallback:
+    - output/web-game-routes/shot-0.png shows "Player X: 8 Y: 8" instead of "Out of bounds".
+- Improvement 13 (political position panel + harder Vox/Krell forks) completed:
+  - Added a collapsible route-state UI panel in src/components/PoliticalPositionPanel.tsx and wired it into App under the progress guide.
+  - Expanded story flag metadata in src/game/dialogue/storyFlags.ts to compute:
+    - current political positions / active deals,
+    - locked-route warnings caused by prior decisions.
+  - Added new irreversible journalist forks in src/data.ts:
+    - Vox Exclusive (go loud, burns quiet Bureau routes)
+    - Vox Embargo (buy silence, cools press escalation)
+  - Added new irreversible inspector forks in src/data.ts:
+    - Inspector Deputized (internal witness / clean route)
+    - Inspector Blacklist (dirty route / compliance favors burned)
+  - Updated special dialogue actions in src/game/dialogue/specialOptions.ts so these route flags actually close or open quiet licensing, leak, convoy, and inspector evidence actions.
+  - Regression coverage expanded in scripts/smoke-regression.mjs to assert the Political Position panel renders Current Deals and Locked Routes when seeded with story flags.
+- Validation:
+  - npm run lint (pass)
+  - npm run build (pass)
+  - npm run smoke:regression (pass; includes route panel scenario)
+  - develop-web-game Playwright client run against isolated Vite server on http://127.0.0.1:4173
+  - Screenshot inspection:
+    - output/web-game-political/shot-0.png confirms world HUD and onboarding render cleanly after the panel wiring changes.
+- Improvement 14 (route-gated endings + run ledger) completed:
+  - Updated src/game/endings.ts so endings now require route-specific political outcomes, not just numeric thresholds:
+    - Bureau Tycoon now favors quiet-route play (Vane backchannel / Vox embargo) and is blocked by loud reform/public routes.
+    - People's Champion now requires community/reform alignment and rejects blacklist/smuggling play.
+    - Shadow Broker now requires dirty-network alignment and is blocked by clean civic routes.
+  - Updated src/components/EndingOverlay.tsx to show route hints so unlocked endings explain the kind of run that produced them.
+  - Expanded src/game/dialogue/storyFlags.ts with:
+    - caused-by metadata for locked routes,
+    - getRunLedger() for a compact decision->consequence summary.
+  - Expanded src/components/PoliticalPositionPanel.tsx to render a one-screen Run Ledger and exact causes under locked routes.
+- Validation:
+  - npm run lint (pass)
+  - npm run build (pass)
+  - npm run smoke:regression (pass; includes route-panel and route-gated ending scenarios)
+  - develop-web-game Playwright client run against isolated Vite server on http://127.0.0.1:4173
+  - Screenshot inspection:
+    - output/web-game-endings/shot-0.png confirms world UI remains clean after panel/endings changes.
+
+- Camera/world cleanup (2026-03-15): clamped orbit camera into a stable isometric band, removed procedural filler buildings, recentered player home at world center, and migrated saved building layouts onto the curated landmark set. Validation: npm run lint, npm run build, develop-web-game screenshot run to output/web-game-camera-home.
+
+- UI cleanup (2026-03-15): removed global ProgressGuide from app shell and world overlay objectives from WorldScene; moved progression guidance into OfficeScene and MineScene. Reworked MineScene action rows from horizontally clipped scrollers into responsive button grids so controls stay visible on mobile-sized layouts. Validation: npm run lint, npm run build, develop-web-game screenshot confirming world screen no longer carries the global guide.
+
+- Start screen/bootstrap (2026-03-15): added a dedicated title screen with New Game and Continue flows, styled to match the dossier/bureau aesthetic. Gated simulation hooks and autosave until the player starts a run. Added save helpers in src/game/save.ts and created src/components/StartScreen.tsx. Validation: npm run lint, npm run build, develop-web-game screenshot of the title screen, direct DOM verification that Continue enables when a save exists after reload.
+
+- Building access fix (2026-03-15): player/world transitions no longer place the character at building centers. Added src/utils/buildingAccess.ts and routed initial spawn, home return, office travel, and office->world return through outdoor access tiles. Validation: npm run lint, npm run build, direct Playwright check confirmed fresh spawn at grid 80,86 instead of inside the home footprint.
+- Pathfinding overhaul (2026-03-16): replaced the naive 4-way A* and fake 10x10 building blockers.
+  - Added src/utils/worldNavigation.ts for shared world footprint/access math derived from actual building voxel footprints.
+  - Updated src/utils/buildingAccess.ts to use real building extents instead of a hardcoded offset.
+  - Rebuilt src/utils/pathfinding.ts with:
+    - real obstacle footprints,
+    - 8-direction movement,
+    - octile heuristic,
+    - anti-corner-cutting checks,
+    - nearby fallback target search when a click lands on blocked/unreachable ground.
+  - Updated src/hooks/game/useMovementLoop.ts to consume path distance budget at 70ms ticks so movement uses shorter, smoother advances and respects movementSpeed.
+- Validation:
+  - npm run lint (pass)
+  - npm run build (pass)
+  - develop-web-game client run against isolated Vite server using output/pathfinding-actions.json (no console errors; screenshot artifact at output/web-game-pathfinding-validation/shot-0.png)
+  - Direct route probe via npx tsx confirmed valid non-blocking paths across world landmarks:
+    - player_home -> licensing_office (27 steps, 2 diagonals)
+    - player_home -> hotline_booth (19 steps, 7 diagonals)
+    - hotline_booth -> chief_hut (37 steps, 10 diagonals)
+    - licensing_office -> mine_entrance (43 steps, 24 diagonals)
+    - chief_hut -> fixer_den (83 steps, 67 diagonals)
+    - all sampled routes avoided blocked building footprints.
+- Validation caveat:
+  - Headless click-to-move probes from the initial spawn camera still tend to hit the oversized home model and open the office scene, so browser screenshots were not a clean instrument for long-path click validation from spawn. The routing logic itself was verified directly against the live world/building layout.
