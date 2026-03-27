@@ -27,6 +27,7 @@ import { applyMiniGameCompletion, applyPermitOverlayAction } from './game/action
 import { applyFoundItem, applyTakePhoto } from './game/actions/evidenceActions';
 import { applyDialogueSocialConsequences, queueFeedback } from './game/actions/dialogueActions';
 import { applyDailyEconomyTick, applyOreExport } from './game/economy';
+import { applyExhaustionCollapse } from './game/exhaustion';
 import { clearSavedGameState, hasSavedGameState, loadSavedGameState, saveGameState } from './game/save';
 import { useBuildingDiscovery } from './hooks/game/useBuildingDiscovery';
 import { useFeedbackCleanup } from './hooks/game/useFeedbackCleanup';
@@ -371,15 +372,29 @@ export default function App() {
 
     beginTrackedAction(`travel:${mineId}`);
     setState(prev => ({
-      ...prev,
-      currentScene: 'MINE',
-      activeMineId: mineId,
-      energy: Math.max(0, prev.energy - energyCost),
-      time: (prev.time + mine.travelTime) % 24
+      ...(prev.energy - energyCost <= 0
+        ? (() => {
+            const collapsed = applyExhaustionCollapse({
+              ...prev,
+              energy: prev.energy - energyCost,
+              time: (prev.time + mine.travelTime) % 24
+            });
+            setNotification(collapsed.notification);
+            return collapsed.nextState;
+          })()
+        : {
+            ...prev,
+            currentScene: 'MINE',
+            activeMineId: mineId,
+            energy: prev.energy - energyCost,
+            time: (prev.time + mine.travelTime) % 24
+          })
     }));
     setShowMinePicker(false);
 
-    setNotification({ title: "Travel Complete", msg: `You arrived at ${mine.name} after ${mine.travelTime} hours.` });
+    if (state.energy - energyCost > 0) {
+      setNotification({ title: "Travel Complete", msg: `You arrived at ${mine.name} after ${mine.travelTime} hours.` });
+    }
   };
 
   const openMineScene = () => {

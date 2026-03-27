@@ -8,10 +8,10 @@ export interface BuildingFootprint {
   maxY: number;
 }
 
-const INFRASTRUCTURE_SURFACE_OFFSETS: Partial<Record<Building['type'], number>> = {
-  ROAD: 0.015,
-  SIDEWALK: 0.04,
-  PARK: 0.03,
+const INFRASTRUCTURE_BASE_HEIGHTS: Partial<Record<Building['type'], number>> = {
+  ROAD: CONFIG.FLOOR_Y + 0.05,
+  SIDEWALK: CONFIG.FLOOR_Y + 0.12,
+  PARK: CONFIG.FLOOR_Y + 0.08,
 };
 
 const WALKABLE_BUILDING_TYPES = new Set<Building['type']>([
@@ -102,7 +102,7 @@ export const getBuildingAccessPosition = (
 };
 
 export const getStructureBaseHeight = (type: Building['type']) => {
-  return CONFIG.FLOOR_Y + 1.0 + (INFRASTRUCTURE_SURFACE_OFFSETS[type] ?? 0);
+  return INFRASTRUCTURE_BASE_HEIGHTS[type] ?? CONFIG.FLOOR_Y + 1.0;
 };
 
 export const getWorldSurfaceHeight = (

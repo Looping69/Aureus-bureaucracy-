@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import React from 'react';
 import { GameState } from '../../types';
+import { applyExhaustionCollapse } from '../../game/exhaustion';
 
 interface UseMovementLoopArgs {
   setState: React.Dispatch<React.SetStateAction<GameState>>;
@@ -41,12 +42,6 @@ export const useMovementLoop = ({ setState, setNotification, homePos, enabled = 
           const energyCost = 0.35 * segmentDistance;
           const timeCost = 0.08 * segmentDistance;
 
-          if (newEnergy < energyCost) {
-            movementBudget = 0;
-            setNotification({ title: 'Exhausted', msg: "You're too tired to keep walking. Rest at home." });
-            return { ...prev, path: [] };
-          }
-
           movementBudget -= segmentDistance;
           newEnergy -= energyCost;
           newTime = (newTime + timeCost) % 24;
@@ -61,22 +56,15 @@ export const useMovementLoop = ({ setState, setNotification, homePos, enabled = 
 
         if (newEnergy <= 0) {
           movementBudget = 0;
-          setNotification({ title: 'Exhausted', msg: "You're too tired to keep walking. Rest at home." });
-          return { ...prev, path: [] };
-        }
-
-        if (newEnergy <= 0) {
-          movementBudget = 0;
-          setNotification({ title: 'Collapse', msg: "You collapsed from exhaustion. The Bureau 'helped' you home for a fee." });
-          return {
+          const collapsed = applyExhaustionCollapse({
             ...prev,
-            energy: 20,
-            money: Math.max(0, prev.money - 200),
-            playerPos: homePos,
-            day: prev.day + 1,
-            time: 6,
-            path: []
-          };
+            energy: newEnergy,
+            playerPos: currentPos,
+            time: newTime,
+            path: remainingPath,
+          });
+          setNotification(collapsed.notification);
+          return collapsed.nextState;
         }
 
         return {

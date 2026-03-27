@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import React from 'react';
 import { GameState } from '../../types';
 import { applyDailyEconomyTick } from '../../game/economy';
+import { applyExhaustionCollapse } from '../../game/exhaustion';
 
 const DAY_NIGHT_TIME_SCALE = 0.2;
 
@@ -51,6 +52,21 @@ export const useTimeAndCurfewLoop = ({ setState, setNotification, homePos, enabl
         if (isNight && !isAtHome) {
           newExposure = Math.min(100, newExposure + 0.2);
           newEnergy = Math.max(0, newEnergy - 0.1);
+        }
+
+        if (newEnergy <= 0) {
+          const collapsed = applyExhaustionCollapse({
+            ...prev,
+            time: newTime,
+            day: newDay,
+            energy: newEnergy,
+            meters: {
+              ...prev.meters,
+              exposure: newExposure
+            }
+          });
+          setNotification(collapsed.notification);
+          return collapsed.nextState;
         }
 
         return {

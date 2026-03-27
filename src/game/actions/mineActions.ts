@@ -1,6 +1,7 @@
 import { GameState, Tile } from '../../types';
 import { applyOreExport } from '../economy';
 import { isWorldEffectActive } from '../dialogue/worldEffects';
+import { applyExhaustionCollapse } from '../exhaustion';
 
 export interface GameNotification {
   title: string;
@@ -196,18 +197,38 @@ export const applyMineTileInteraction = (
   }
 
   return {
-    nextState: {
-      ...prev,
-      mines: newMines,
-      energy: prev.energy - energyCost,
-      ore: prev.ore + oreGain,
-      money: prev.money + moneyGain,
-      meters: {
-        ...prev.meters,
-        exposure: Math.min(100, prev.meters.exposure + (activeMine.danger * 0.1) + (hasMediaHeat ? 2 : 0))
-      }
-    },
-    notifications
+    ...(prev.energy - energyCost <= 0
+      ? (() => {
+          const collapsed = applyExhaustionCollapse({
+            ...prev,
+            mines: newMines,
+            energy: prev.energy - energyCost,
+            ore: prev.ore + oreGain,
+            money: prev.money + moneyGain,
+            meters: {
+              ...prev.meters,
+              exposure: Math.min(100, prev.meters.exposure + (activeMine.danger * 0.1) + (hasMediaHeat ? 2 : 0))
+            }
+          });
+          return {
+            nextState: collapsed.nextState,
+            notifications: [...notifications, collapsed.notification]
+          };
+        })()
+      : {
+          nextState: {
+            ...prev,
+            mines: newMines,
+            energy: prev.energy - energyCost,
+            ore: prev.ore + oreGain,
+            money: prev.money + moneyGain,
+            meters: {
+              ...prev.meters,
+              exposure: Math.min(100, prev.meters.exposure + (activeMine.danger * 0.1) + (hasMediaHeat ? 2 : 0))
+            }
+          },
+          notifications
+        })
   };
 };
 

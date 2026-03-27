@@ -1,6 +1,7 @@
 import { OFFICE_ITEMS } from '../../data';
 import { DirtItem, DirtType, GameState } from '../../types';
 import { GameNotification } from './mineActions';
+import { applyExhaustionCollapse } from '../exhaustion';
 
 export const applyTakePhoto = (
   prev: GameState,
@@ -35,7 +36,20 @@ export const applyTakePhoto = (
     value: 15
   };
 
-  return {
+  const exhaustedResult = applyExhaustionCollapse({
+    ...prev,
+    energy: prev.energy - 2,
+    dirtItems: [...prev.dirtItems, newDirt],
+    meters: { ...prev.meters, exposure: Math.min(100, prev.meters.exposure + 2) }
+  });
+
+  return prev.energy - 2 <= 0 ? {
+    nextState: exhaustedResult.nextState,
+    notifications: [
+      { title: 'Evidence Secured', msg: 'Photo added to leverage.' },
+      exhaustedResult.notification
+    ]
+  } : {
     nextState: {
       ...prev,
       energy: prev.energy - 2,
@@ -79,4 +93,3 @@ export const applyFoundItem = (
 
   return { nextState, notifications };
 };
-
