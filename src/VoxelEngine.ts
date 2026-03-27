@@ -6,10 +6,11 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { AppState, SimulationVoxel, RebuildTarget, VoxelData, SymmetryMode, EditTool } from './types';
+import { AppState, SimulationVoxel, RebuildTarget, VoxelData, SymmetryMode, EditTool, WorldHoverInfo } from './types';
 import { CONFIG, COLORS } from './utils/voxelConstants';
 import { EntityManager } from './EntityManager';
 import { GreedyMesher } from './utils/GreedyMesher';
+import { BuildingFootprint } from './utils/worldNavigation';
 
 export class VoxelEngine {
   private static readonly MIN_CAMERA_POLAR = Math.PI / 5;
@@ -40,6 +41,7 @@ export class VoxelEngine {
   private pointer = new THREE.Vector2();
   private ghostVoxel: THREE.Mesh;
   private ghostSymmetryVoxel: THREE.Mesh;
+  private hoverSelector: THREE.Mesh;
   
   private voxels: SimulationVoxel[] = [];
   private currentVoxelData: VoxelData[] = [];
@@ -50,9 +52,8 @@ export class VoxelEngine {
   private onStateChange: (state: AppState) => void;
   private onCountChange: (count: number) => void;
   private onVoxelEdit?: (newData: VoxelData[]) => void;
-  private onHoverPosition?: (pos: { x: number, y: number, z: number } | null) => void;
-  private onClick?: (x: number, y: number, z: number) => void;
-  private onInteract?: (type: 'NPC' | 'BUILDING', id: string) => void;
+  private onHoverPosition?: (pos: WorldHoverInfo | null) => void;
+  private onSelect?: (target: WorldHoverInfo, tapCount: number) => void;
   
   private animationId: number = 0;
   private lastTime: number = 0;
@@ -74,17 +75,15 @@ export class VoxelEngine {
     onStateChange: (state: AppState) => void,
     onCountChange: (count: number) => void,
     onVoxelEdit?: (newData: VoxelData[]) => void,
-    onHoverPosition?: (pos: { x: number, y: number, z: number } | null) => void,
-    onClick?: (x: number, y: number, z: number) => void,
-    onInteract?: (type: 'NPC' | 'BUILDING', id: string) => void
+    onHoverPosition?: (pos: WorldHoverInfo | null) => void,
+    onSelect?: (target: WorldHoverInfo, tapCount: number) => void
   ) {
     this.container = container;
     this.onStateChange = onStateChange;
     this.onCountChange = onCountChange;
     this.onVoxelEdit = onVoxelEdit;
     this.onHoverPosition = onHoverPosition;
-    this.onClick = onClick;
-    this.onInteract = onInteract;
+    this.onSelect = onSelect;
 
     // Init Three.js
     this.scene = new THREE.Scene();
@@ -205,12 +204,29 @@ export class VoxelEngine {
     this.ghostSymmetryVoxel.visible = false;
     this.scene.add(this.ghostSymmetryVoxel);
 
+    const hoverSelectorGeometry = new THREE.PlaneGeometry(0.9, 0.9);
+    const hoverSelectorMaterial = new THREE.MeshBasicMaterial({
+      color: 0x60a5fa,
+      transparent: true,
+      opacity: 0.35,
+      side: THREE.DoubleSide,
+      depthWrite: false
+    });
+    this.hoverSelector = new THREE.Mesh(hoverSelectorGeometry, hoverSelectorMaterial);
+    this.hoverSelector.rotation.x = -Math.PI / 2;
+    this.hoverSelector.visible = false;
+    this.scene.add(this.hoverSelector);
+
     // Entities (Player, Buildings, etc)
     this.entities = new EntityManager(this.scene);
 
     // Events
     this.container.addEventListener('pointermove', this.onPointerMove.bind(this));
     this.container.addEventListener('pointerdown', this.onPointerDown.bind(this));
+    this.container.addEventListener('pointerleave', () => {
+      this.updateHoverSelector(null);
+      this.onHoverPosition?.(null);
+    });
 
     this.animate = this.animate.bind(this);
     this.updateTime(this.time);
@@ -220,15 +236,13 @@ export class VoxelEngine {
   public setCallbacks(
     onStateChange: (state: AppState) => void,
     onCountChange: (count: number) => void,
-    onHoverPosition?: (pos: { x: number, y: number, z: number } | null) => void,
-    onClick?: (x: number, y: number, z: number) => void,
-    onInteract?: (type: 'NPC' | 'BUILDING', id: string) => void
+    onHoverPosition?: (pos: WorldHoverInfo | null) => void,
+    onSelect?: (target: WorldHoverInfo, tapCount: number) => void
   ) {
     this.onStateChange = onStateChange;
     this.onCountChange = onCountChange;
     this.onHoverPosition = onHoverPosition;
-    this.onClick = onClick;
-    this.onInteract = onInteract;
+    this.onSelect = onSelect;
   }
 
   public moveCamera(dx: number, dz: number) {
@@ -399,6 +413,195 @@ export class VoxelEngine {
     }
   }
 
+  private collectTerrainObjects() {
+    const objectsToCheck: THREE.Object3D[] = [this.floor];
+    if (this.instanceMesh) objectsToCheck.push(this.instanceMesh);
+    this.terrainGroup.children.forEach((child) => {
+      if (child instanceof THREE.Mesh) {
+        objectsToCheck.push(child);
+      } else if (child instanceof THREE.LOD) {
+        child.levels.forEach((level) => {
+          if (level.object instanceof THREE.Mesh) {
+            objectsToCheck.push(level.object);
+          }
+        });
+      }
+    });
+    return objectsToCheck;
+  }
+
+  private getSnappedWorldPoint(intersect: THREE.Intersection) {
+    const pos = new THREE.Vector3();
+    if (intersect.object === this.floor) {
+      pos.copy(intersect.point).add(new THREE.Vector3(0, 0.5, 0));
+    } else {
+      pos.copy(intersect.point).add(intersect.face!.normal.clone().multiplyScalar(0.5));
+    }
+
+    return {
+      x: Math.round(pos.x + 80),
+      y: Math.round(pos.z + 80),
+      z: Math.round(pos.y),
+      renderX: Math.round(pos.x),
+      renderZ: Math.round(pos.z),
+      renderY: Math.round(pos.y),
+    };
+  }
+
+  private resolveEntityTarget(
+    intersect: THREE.Intersection,
+    kind: 'NPC' | 'BUILDING'
+  ): WorldHoverInfo | null {
+    let obj: THREE.Object3D | null = intersect.object;
+
+    if (kind === 'NPC') {
+      const entries = Array.from(this.entities.npcs.entries());
+
+      while (obj && !(obj instanceof THREE.Scene)) {
+        for (const [id, entity] of entries) {
+          if (entity.group === obj) {
+            const snapped = this.getSnappedWorldPoint(intersect);
+            return {
+              x: snapped.x,
+              y: snapped.y,
+              z: snapped.z,
+              kind: 'NPC',
+              id,
+              label: id,
+            };
+          }
+        }
+        obj = obj.parent;
+      }
+
+      return null;
+    }
+
+    const entries = Array.from(this.entities.buildings.entries());
+
+    while (obj && !(obj instanceof THREE.Scene)) {
+      for (const [id, entity] of entries) {
+        if (entity.group === obj) {
+          const snapped = this.getSnappedWorldPoint(intersect);
+          return {
+            x: snapped.x,
+            y: snapped.y,
+            z: snapped.z,
+            kind: 'BUILDING',
+            id,
+            label: entity.name,
+          };
+        }
+      }
+      obj = obj.parent;
+    }
+
+    return null;
+  }
+
+  private resolveWorldTarget() {
+    this.raycaster.setFromCamera(this.pointer, this.camera);
+
+    const groundTarget = this.getGroundPlaneTarget();
+    const npcGroups = Array.from(this.entities.npcs.values()).map((n) => n.group);
+    const buildingGroups = Array.from(this.entities.buildings.values()).map((b) => b.group);
+    const terrainObjects = this.collectTerrainObjects();
+    const npcIntersects = this.raycaster.intersectObjects(npcGroups, true);
+    if (npcIntersects.length > 0) {
+      const npcTarget = this.resolveEntityTarget(npcIntersects[0], 'NPC');
+      if (npcTarget) {
+        return npcTarget;
+      }
+    }
+
+    const buildingIntersects = this.raycaster.intersectObjects(buildingGroups, true);
+    if (buildingIntersects.length > 0) {
+      const buildingIntersect = buildingIntersects[0];
+      const buildingTarget = this.resolveEntityTarget(buildingIntersect, 'BUILDING');
+      const buildingFootprint = this.findBuildingFootprint(buildingIntersect.object);
+      const hitTopSurface = Math.abs(buildingIntersect.face?.normal.y ?? 0) > 0.5;
+
+      if (buildingTarget) {
+        if (groundTarget && buildingFootprint) {
+          const distance = this.distanceToFootprint(groundTarget.x, groundTarget.y, buildingFootprint);
+          if (distance > 1.5 && !hitTopSurface) {
+            return groundTarget;
+          }
+        }
+
+        return buildingTarget;
+      }
+    }
+
+    const terrainIntersects = this.raycaster.intersectObjects(terrainObjects, true);
+    if (terrainIntersects.length > 0) {
+      const snapped = this.getSnappedWorldPoint(terrainIntersects[0]);
+      return {
+        x: snapped.x,
+        y: snapped.y,
+        z: snapped.z,
+        kind: 'GROUND' as const,
+        label: 'Ground',
+      };
+    }
+
+    return groundTarget;
+  }
+
+  private updateHoverSelector(target: WorldHoverInfo | null) {
+    if (!target) {
+      this.hoverSelector.visible = false;
+      return;
+    }
+
+    this.hoverSelector.position.set(target.x - 80, target.z + 0.03, target.y - 80);
+    this.hoverSelector.visible = true;
+  }
+
+  private getGroundPlaneTarget(): WorldHoverInfo | null {
+    const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -(CONFIG.FLOOR_Y + 0.5));
+    const point = new THREE.Vector3();
+    const hit = this.raycaster.ray.intersectPlane(plane, point);
+
+    if (!hit) {
+      return null;
+    }
+
+    return {
+      x: Math.round(point.x + 80),
+      y: Math.round(point.z + 80),
+      z: Math.round(point.y),
+      kind: 'GROUND',
+      label: 'Ground',
+    };
+  }
+
+  private findBuildingFootprint(object: THREE.Object3D): BuildingFootprint | null {
+    let obj: THREE.Object3D | null = object;
+
+    while (obj && !(obj instanceof THREE.Scene)) {
+      if (obj.userData.worldFootprint) {
+        return obj.userData.worldFootprint as BuildingFootprint;
+      }
+      obj = obj.parent;
+    }
+
+    return null;
+  }
+
+  private distanceToFootprint(x: number, y: number, footprint: BuildingFootprint) {
+    const dx =
+      x < footprint.minX ? footprint.minX - x :
+      x > footprint.maxX ? x - footprint.maxX :
+      0;
+    const dy =
+      y < footprint.minY ? footprint.minY - y :
+      y > footprint.maxY ? y - footprint.maxY :
+      0;
+
+    return Math.hypot(dx, dy);
+  }
+
   public setEditParams(isEdit: boolean, tool: EditTool, color: number, symmetry: SymmetryMode) {
     this.isEditMode = isEdit;
     this.activeTool = tool;
@@ -423,39 +626,9 @@ export class VoxelEngine {
     this.pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     this.pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
-    // Calculate snapped position for hover display
-    this.raycaster.setFromCamera(this.pointer, this.camera);
-    
-    // Check against instanceMesh and terrainGroup children
-    const objectsToCheck: THREE.Object3D[] = [this.floor];
-    if (this.instanceMesh) objectsToCheck.push(this.instanceMesh);
-    this.terrainGroup.children.forEach(child => {
-        if (child instanceof THREE.Mesh) objectsToCheck.push(child);
-        else if (child instanceof THREE.LOD) {
-            child.levels.forEach(level => {
-                if (level.object instanceof THREE.Mesh) objectsToCheck.push(level.object);
-            });
-        }
-    });
-    
-    const intersects = this.raycaster.intersectObjects(objectsToCheck);
-    
-    if (intersects.length > 0) {
-      const intersect = intersects[0];
-      const pos = new THREE.Vector3();
-      if (intersect.object === this.floor) {
-        pos.copy(intersect.point).add(new THREE.Vector3(0, 0.5, 0));
-      } else {
-        pos.copy(intersect.point).add(intersect.face!.normal.clone().multiplyScalar(0.5));
-      }
-      this.onHoverPosition?.({ 
-        x: Math.round(pos.x), 
-        y: Math.round(pos.y), 
-        z: Math.round(pos.z) 
-      });
-    } else {
-      this.onHoverPosition?.(null);
-    }
+    const hoverTarget = this.resolveWorldTarget();
+    this.updateHoverSelector(hoverTarget);
+    this.onHoverPosition?.(hoverTarget);
 
     if (this.isEditMode && this.state === AppState.STABLE) {
       this.updateGhost();
@@ -549,45 +722,13 @@ export class VoxelEngine {
 
     // World Interaction (Click to Move / Interact)
     if (!this.isEditMode && this.state === AppState.STABLE) {
-      this.raycaster.setFromCamera(this.pointer, this.camera);
-      
-      // Check NPCs
-      const npcGroups = Array.from(this.entities.npcs.values()).map(n => n.group);
-      const npcIntersects = this.raycaster.intersectObjects(npcGroups, true);
-      if (npcIntersects.length > 0) {
-        let obj = npcIntersects[0].object;
-        while (obj.parent && !(obj.parent instanceof THREE.Scene)) {
-          for (const [id, npc] of this.entities.npcs.entries()) {
-            if (npc.group === obj) {
-              this.onInteract?.('NPC', id);
-              return;
-            }
-          }
-          obj = obj.parent;
-        }
+      if (event.button !== 0) {
+        return;
       }
 
-      // Check Buildings
-      const buildingGroups = Array.from(this.entities.buildings.values()).map(b => b.group);
-      const buildingIntersects = this.raycaster.intersectObjects(buildingGroups, true);
-      if (buildingIntersects.length > 0) {
-        let obj = buildingIntersects[0].object;
-        while (obj.parent && !(obj.parent instanceof THREE.Scene)) {
-          for (const [id, b] of this.entities.buildings.entries()) {
-            if (b.group === obj) {
-              this.onInteract?.('BUILDING', id);
-              return;
-            }
-          }
-          obj = obj.parent;
-        }
-      }
-
-      // Check Floor for movement
-      const floorIntersects = this.raycaster.intersectObject(this.floor);
-      if (floorIntersects.length > 0) {
-        const p = floorIntersects[0].point;
-        this.onClick?.(Math.round(p.x + 80), Math.round(p.z + 80), 0);
+      const selectedTarget = this.resolveWorldTarget();
+      if (selectedTarget) {
+        this.onSelect?.(selectedTarget, event.detail);
       }
       return;
     }

@@ -139,7 +139,7 @@ export const getProgressGuidance = (state: GameState): ProgressGuidance => {
   if (state.ore > 0 && exportLicense?.status === 'APPROVED') {
     return {
       title: 'Cash Out Ore',
-      detail: `You have ${state.ore} ore ready. Export now to convert it into funds.`,
+      detail: `You have ${state.ore} ore ready. Open Market and sell it through the legal channel.`,
       tone: 'SUCCESS'
     };
   }
@@ -147,14 +147,14 @@ export const getProgressGuidance = (state: GameState): ProgressGuidance => {
   if (state.ore > 0 && exportLicense?.status !== 'APPROVED') {
     if (exportLicense?.status === 'PENDING') {
       return {
-        title: 'Export License Pending',
-        detail: 'Hold ore for now. License approval will unlock profitable exports.',
+        title: 'Sell Ore Or Wait',
+        detail: 'You can sell ore right now through the Market, or wait for the export license for safer, higher-value sales.',
         tone: 'INFO'
       };
     }
     return withMoneyBlocker(state, exportLicense, {
-      title: 'Apply For Export License',
-      detail: 'Get EX-99 approved to sell ore at full value.',
+      title: 'Use The Market',
+      detail: 'Sell ore now through off-book buyers, or apply for EX-99 to improve payout and reduce exposure.',
       tone: 'INFO'
     });
   }
@@ -173,4 +173,3 @@ export const getProgressGuidance = (state: GameState): ProgressGuidance => {
     tone: 'INFO'
   };
 };
-

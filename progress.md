@@ -307,3 +307,23 @@ Original prompt: Okay so there are still so many gaps in the gameplay we need to
     - all sampled routes avoided blocked building footprints.
 - Validation caveat:
   - Headless click-to-move probes from the initial spawn camera still tend to hit the oversized home model and open the office scene, so browser screenshots were not a clean instrument for long-path click validation from spawn. The routing logic itself was verified directly against the live world/building layout.
+
+- 2026-03-27 world input + pathfinding pass completed:
+  - Added clearance-aware collision blocking in src/utils/worldNavigation.ts so only structures taller than the character block routing.
+  - Updated src/utils/pathfinding.ts to route around actual blocking footprints and approach blocked building targets via perimeter candidates.
+  - Added hover selector + hover metadata in src/VoxelEngine.ts and threaded WorldHoverInfo through src/components/VoxelWorldContainer.tsx and src/components/WorldScene.tsx.
+  - World interaction now separates move from enter: ground movement requires double tap, interactable building taps open a Move Here / Enter prompt, and selected target debug text is visible in the HUD.
+  - Validation: npm run lint (pass), npm run build (pending/pass after latest run), direct Playwright check saved output/world-building-prompt-direct.png confirming prompt + selector render.
+  - Follow-up: scripts/smoke-regression.mjs is stale against the newer title/onboarding flow and should be updated before trusting regression automation again.
+
+- 2026-03-27 tap-mapping correction:
+  - Changed world selection in src/VoxelEngine.ts to resolve against the ground plane first and only keep building hits when they remain spatially plausible relative to the building footprint or top surface.
+  - Interactable buildings in src/components/WorldScene.tsx no longer open prompts on a single ambiguous tap; the bad case now stays a ground selection.
+  - Direct Playwright screenshots: output/world-building-singletap-after-fix.png and output/world-building-doubletap-after-fix.png both show the formerly bad tap resolving to GROUND instead of player_home.
+
+- 2026-03-28 world stripped back for reliability:
+  - WorldScene now renders only player_home and no world NPCs, removing all other landmarks from the visible world map.
+  - App handleMove now pathfinds against only the visible world-map buildings, so only the house blocks movement.
+  - World taps were simplified: ground taps move immediately, house taps open the Move Here / Enter prompt.
+  - Validation: npm run lint (pass), npm run build (pass), direct Playwright screenshots output/world-ground-move-only-home.png and output/world-home-prompt-only-home.png confirm both behaviors.
+

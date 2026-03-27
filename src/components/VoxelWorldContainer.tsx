@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { VoxelEngine } from '../VoxelEngine';
-import { Building, NPC, AppState, VoxelData } from '../types';
+import { Building, NPC, AppState, VoxelData, WorldHoverInfo } from '../types';
 import { useCameraControls } from '../hooks/useCameraControls';
 import { getWorldSurfaceHeight } from '../utils/worldNavigation';
 
@@ -16,9 +16,8 @@ interface VoxelWorldProps {
   recenterTrigger?: number;
   onStateChange: (state: AppState) => void;
   onCountChange: (count: number) => void;
-  onHoverPosition?: (pos: { x: number, y: number, z: number } | null) => void;
-  onClick?: (x: number, y: number, z: number) => void;
-  onInteract?: (type: 'NPC' | 'BUILDING', id: string) => void;
+  onHoverPosition?: (pos: WorldHoverInfo | null) => void;
+  onSelect?: (target: WorldHoverInfo, tapCount: number) => void;
 }
 
 export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({ 
@@ -34,8 +33,7 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
   onStateChange, 
   onCountChange,
   onHoverPosition,
-  onClick,
-  onInteract
+  onSelect
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<VoxelEngine | null>(null);
@@ -60,8 +58,7 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
         onCountChange,
         undefined, // onVoxelEdit
         onHoverPosition,
-        onClick,
-        onInteract
+        onSelect
       );
       engineRef.current.loadInitialModel(voxels);
       
@@ -153,11 +150,10 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
         onStateChange,
         onCountChange,
         onHoverPosition,
-        onClick,
-        onInteract
+        onSelect
       );
     }
-  }, [onStateChange, onCountChange, onHoverPosition, onClick, onInteract]);
+  }, [onStateChange, onCountChange, onHoverPosition, onSelect]);
 
   return <div ref={containerRef} className="w-full h-full" />;
 };

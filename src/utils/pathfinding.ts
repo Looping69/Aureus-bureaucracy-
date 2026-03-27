@@ -1,7 +1,7 @@
 import { WorldPosition, Building } from '../types';
 import {
   clampWorldPosition,
-  getBuildingFootprint,
+  getBlockingFootprint,
 } from './worldNavigation';
 
 export interface PathNode {
@@ -40,7 +40,7 @@ const buildBlockedTiles = (buildings: Record<string, Building>) => {
   const blocked = new Set<string>();
 
   Object.values(buildings).forEach((building) => {
-    const footprint = getBuildingFootprint(building);
+    const footprint = getBlockingFootprint(building);
     if (!footprint) return;
 
     for (let x = footprint.minX; x <= footprint.maxX; x++) {
@@ -51,6 +51,39 @@ const buildBlockedTiles = (buildings: Record<string, Building>) => {
   });
 
   return blocked;
+};
+
+const getFootprintApproachTargets = (
+  building: Building,
+  blocked: Set<string>,
+  mapSize: number
+) => {
+  const footprint = getBlockingFootprint(building);
+  if (!footprint) return [];
+
+  const candidates: WorldPosition[] = [];
+  const seen = new Set<string>();
+  const pushCandidate = (candidate: WorldPosition) => {
+    const clamped = clampWorldPosition(candidate, mapSize);
+    const candidateKey = keyFor(clamped.x, clamped.y);
+    if (seen.has(candidateKey) || blocked.has(candidateKey)) {
+      return;
+    }
+    seen.add(candidateKey);
+    candidates.push(clamped);
+  };
+
+  for (let x = footprint.minX - 1; x <= footprint.maxX + 1; x++) {
+    pushCandidate({ x, y: footprint.minY - 1 });
+    pushCandidate({ x, y: footprint.maxY + 1 });
+  }
+
+  for (let y = footprint.minY; y <= footprint.maxY; y++) {
+    pushCandidate({ x: footprint.minX - 1, y });
+    pushCandidate({ x: footprint.maxX + 1, y });
+  }
+
+  return candidates;
 };
 
 const isInBounds = (x: number, y: number, mapSize: number) =>
@@ -159,7 +192,8 @@ const findPathOnGrid = (
 const getCandidateTargets = (
   target: WorldPosition,
   blocked: Set<string>,
-  mapSize: number
+  mapSize: number,
+  buildings: Record<string, Building>
 ) => {
   const candidates: WorldPosition[] = [];
   const seen = new Set<string>();
@@ -175,6 +209,21 @@ const getCandidateTargets = (
   };
 
   pushCandidate(target);
+
+  Object.values(buildings).forEach((building) => {
+    const footprint = getBlockingFootprint(building);
+    if (!footprint) return;
+
+    const withinFootprint =
+      target.x >= footprint.minX &&
+      target.x <= footprint.maxX &&
+      target.y >= footprint.minY &&
+      target.y <= footprint.maxY;
+
+    if (!withinFootprint) return;
+
+    getFootprintApproachTargets(building, blocked, mapSize).forEach(pushCandidate);
+  });
 
   for (let radius = 1; radius <= SEARCH_RADIUS; radius++) {
     const ring: WorldPosition[] = [];
@@ -211,7 +260,7 @@ export const findPath = (
   const blocked = buildBlockedTiles(buildings);
   blocked.delete(keyFor(startTile.x, startTile.y));
 
-  for (const candidate of getCandidateTargets(endTile, blocked, mapSize)) {
+  for (const candidate of getCandidateTargets(endTile, blocked, mapSize, buildings)) {
     const path = findPathOnGrid(startTile, candidate, blocked, mapSize);
     if (path.length > 0) {
       return path;

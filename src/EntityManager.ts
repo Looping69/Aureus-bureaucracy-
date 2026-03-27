@@ -3,7 +3,7 @@ import { VoxelCharacter } from './VoxelCharacter';
 import { VoxelBuilding } from './VoxelBuilding';
 import { Building, NPC } from './types';
 import { CONFIG } from './utils/voxelConstants';
-import { getStructureBaseHeight } from './utils/worldNavigation';
+import { getBuildingFootprint, getStructureBaseHeight } from './utils/worldNavigation';
 
 export class EntityManager {
   private scene: THREE.Scene;
@@ -51,6 +51,9 @@ export class EntityManager {
       const worldZ = buildingData.pos.y - 80;
 
       building.setPosition(worldX, getStructureBaseHeight(buildingData.type), worldZ);
+      building.group.userData.buildingId = buildingData.id;
+      building.group.userData.buildingType = buildingData.type;
+      building.group.userData.worldFootprint = getBuildingFootprint(buildingData);
       this.buildings.set(buildingData.id, building);
       this.entityGroup.add(building.group);
 
@@ -71,6 +74,7 @@ export class EntityManager {
     const worldZ = position.y - 80;
     
     npc.group.position.set(worldX, CONFIG.FLOOR_Y + 0.5, worldZ);
+    npc.group.userData.npcId = npcData.id;
     this.npcs.set(npcData.id, npc);
     this.entityGroup.add(npc.group);
   }

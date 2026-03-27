@@ -19,6 +19,7 @@ import { GameSceneRouter } from './components/GameSceneRouter';
 import { ActionLogEntry, ActionLogPanel } from './components/ActionLogPanel';
 import { DebugPanel } from './components/DebugPanel';
 import { EndingOverlay } from './components/EndingOverlay';
+import { MarketOverlay } from './components/MarketOverlay';
 import { UtilityDrawer } from './components/UtilityDrawer';
 import { getBuildingAccessPosition } from './utils/buildingAccess';
 import { findPath } from './utils/pathfinding';
@@ -26,7 +27,7 @@ import { applyMineSceneAction, applyMineTileInteraction } from './game/actions/m
 import { applyMiniGameCompletion, applyPermitOverlayAction } from './game/actions/permitActions';
 import { applyFoundItem, applyTakePhoto } from './game/actions/evidenceActions';
 import { applyDialogueSocialConsequences, queueFeedback } from './game/actions/dialogueActions';
-import { applyDailyEconomyTick, applyOreExport } from './game/economy';
+import { applyDailyEconomyTick, applyOreExport, getExportExposureIncrease, getOreUnitPrice, hasExportLicense } from './game/economy';
 import { applyExhaustionCollapse } from './game/exhaustion';
 import { clearSavedGameState, hasSavedGameState, loadSavedGameState, saveGameState } from './game/save';
 import { useBuildingDiscovery } from './hooks/game/useBuildingDiscovery';
@@ -54,6 +55,12 @@ const buildHydratedBuildings = (savedBuildings?: GameState['buildings']): GameSt
   ) as GameState['buildings'];
 
 const cloneSerializable = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
+const WORLD_MAP_BUILDING_IDS = new Set(['player_home']);
+
+const getWorldMapBuildings = (buildings: GameState['buildings']) =>
+  Object.fromEntries(
+    Object.entries(buildings).filter(([id]) => WORLD_MAP_BUILDING_IDS.has(id))
+  ) as GameState['buildings'];
 
 const buildInitialGameState = (): GameState => {
   const homePos = getBuildingAccessPosition(BUILDINGS.player_home);
@@ -123,6 +130,7 @@ export default function App() {
 
   const [notification, setNotification] = useState<{title: string, msg: string} | null>(null);
   const [showMinePicker, setShowMinePicker] = useState(false);
+  const [showMarket, setShowMarket] = useState(false);
   const [actionLog, setActionLog] = useState<ActionLogEntry[]>([]);
   const [showActionLog, setShowActionLog] = useState(false);
   const [showDebugPanel, setShowDebugPanel] = useState(false);
@@ -256,6 +264,7 @@ export default function App() {
     setLastActionName('none');
     setLastActionMs(0);
     setShowMinePicker(false);
+    setShowMarket(false);
     setHasSave(false);
     setSavePreview(null);
     setGameStarted(true);
@@ -304,7 +313,7 @@ export default function App() {
     setState(prev => {
       if (prev.playerPos.x === pos.x && prev.playerPos.y === pos.y) return prev;
       
-      const path = findPath(prev.playerPos, pos, prev.buildings);
+      const path = findPath(prev.playerPos, pos, getWorldMapBuildings(prev.buildings));
       if (path.length > 0) {
         return { ...prev, path, targetPos: pos };
       }
@@ -482,6 +491,16 @@ export default function App() {
     [state.activePermitId, state.permits]
   );
 
+  const marketSnapshot = useMemo(() => {
+    const unitPrice = getOreUnitPrice(state);
+    return {
+      unitPrice,
+      exposureIncrease: getExportExposureIncrease(state),
+      payout: state.ore * unitPrice,
+      licensed: hasExportLicense(state)
+    };
+  }, [state]);
+
   if (!gameStarted) {
     return (
       <StartScreen
@@ -609,15 +628,7 @@ export default function App() {
           setState(s => ({ ...s, currentScene: 'OFFICE' }));
         }}
         onExport={() => {
-          if (state.ore <= 0) return;
-          beginTrackedAction('export_ore');
-          setState(s => {
-            const exported = applyOreExport(s, s.ore);
-            if (exported.notification) {
-              setNotification(exported.notification);
-            }
-            return exported.nextState;
-          });
+          setShowMarket(true);
         }}
       />
 
@@ -689,6 +700,28 @@ export default function App() {
           <EndingOverlay
             endingId={state.activeEndingId}
             onClose={() => setState(s => ({ ...s, activeEndingId: null }))}
+          />
+        )}
+        {showMarket && (
+          <MarketOverlay
+            key="market-overlay"
+            ore={state.ore}
+            unitPrice={marketSnapshot.unitPrice}
+            payout={marketSnapshot.payout}
+            exposureIncrease={marketSnapshot.exposureIncrease}
+            licensed={marketSnapshot.licensed}
+            onClose={() => setShowMarket(false)}
+            onSellAll={() => {
+              beginTrackedAction('export_ore');
+              setState(s => {
+                const exported = applyOreExport(s, s.ore);
+                if (exported.notification) {
+                  setNotification(exported.notification);
+                }
+                return exported.nextState;
+              });
+              setShowMarket(false);
+            }}
           />
         )}
         {notification && (

@@ -91,6 +91,15 @@ export interface WorldPosition {
   y: number;
 }
 
+export interface WorldHoverInfo {
+  x: number;
+  y: number;
+  z: number;
+  kind: 'GROUND' | 'BUILDING' | 'NPC';
+  id?: string;
+  label?: string;
+}
+
 export interface Building {
   id: string;
   npcId: string;

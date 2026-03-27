@@ -21,6 +21,8 @@ const WALKABLE_BUILDING_TYPES = new Set<Building['type']>([
   'MINE_ENTRANCE',
 ]);
 
+export const PLAYER_CLEARANCE_HEIGHT = 2.25;
+
 const FALLBACK_HALF_EXTENTS: Partial<Record<Building['type'], number>> = {
   HOME: 3,
   OFFICE: 3,
@@ -45,6 +47,38 @@ export const clampWorldPosition = (
 });
 
 export const isSolidBuilding = (building: Building) => !WALKABLE_BUILDING_TYPES.has(building.type);
+
+export const getBuildingHeight = (building: Building) => {
+  if (building.voxels && building.voxels.length > 0) {
+    const maxHeight = building.voxels.reduce((highest, voxel) => Math.max(highest, voxel.z + 1), 0);
+    return maxHeight;
+  }
+
+  switch (building.type) {
+    case 'HOTLINE':
+    case 'MINE_ENTRANCE':
+    case 'ROAD':
+    case 'SIDEWALK':
+    case 'PARK':
+      return 1;
+    case 'HOME':
+    case 'RESIDENTIAL':
+      return 4;
+    case 'OFFICE':
+    case 'INDUSTRIAL':
+    case 'LANDMARK':
+      return 6;
+    case 'PUB':
+      return 5;
+    default:
+      return 4;
+  }
+};
+
+export const isBlockingBuilding = (
+  building: Building,
+  clearanceHeight: number = PLAYER_CLEARANCE_HEIGHT
+) => isSolidBuilding(building) && getBuildingHeight(building) > clearanceHeight;
 
 export const getBuildingFootprint = (building: Building): BuildingFootprint | null => {
   if (!isSolidBuilding(building)) {
@@ -79,6 +113,17 @@ export const getBuildingFootprint = (building: Building): BuildingFootprint | nu
     minY: building.pos.y - halfExtent,
     maxY: building.pos.y + halfExtent,
   };
+};
+
+export const getBlockingFootprint = (
+  building: Building,
+  clearanceHeight: number = PLAYER_CLEARANCE_HEIGHT
+) => {
+  if (!isBlockingBuilding(building, clearanceHeight)) {
+    return null;
+  }
+
+  return getBuildingFootprint(building);
 };
 
 export const getBuildingAccessPosition = (

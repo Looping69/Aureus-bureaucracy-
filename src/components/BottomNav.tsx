@@ -1,5 +1,5 @@
 import React from 'react';
-import { Briefcase, Pickaxe, TrendingUp, Users } from 'lucide-react';
+import { Briefcase, Pickaxe, Store, Users } from 'lucide-react';
 import { GameState } from '../types';
 
 interface BottomNavProps {
@@ -44,11 +44,13 @@ export const BottomNav: React.FC<BottomNavProps> = ({
       )}
       <button
         onClick={onExport}
-        title="Export all ore. Price and exposure depend on your license and influence."
-        className="flex flex-col items-center gap-1 text-black/30 hover:text-emerald-600 active:scale-90 transition-all"
+        title="Open the market. You can always sell ore here, with or without a license."
+        className={`flex flex-col items-center gap-1 active:scale-90 transition-all ${
+          state.ore > 0 ? 'text-emerald-700' : 'text-black/35 hover:text-black/60'
+        }`}
       >
-        <TrendingUp size={22} />
-        <span className="text-[9px] font-black uppercase tracking-widest">Export</span>
+        <Store size={22} />
+        <span className="text-[9px] font-black uppercase tracking-widest">Market</span>
       </button>
     </nav>
   );

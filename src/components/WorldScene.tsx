@@ -1,9 +1,10 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { MapPin } from 'lucide-react';
-import { GameState, WorldPosition, VoxelData } from '../types';
+import { DoorOpen, MapPin, MoveDiagonal2, X } from 'lucide-react';
+import { GameState, WorldHoverInfo, WorldPosition, VoxelData } from '../types';
 import { COLORS, CONFIG } from '../utils/voxelConstants';
 import { VoxelWorldContainer } from './VoxelWorldContainer';
+import { getBuildingAccessPosition } from '../utils/buildingAccess';
 
 export const WorldScene = ({ 
   state, 
@@ -23,12 +24,13 @@ export const WorldScene = ({
   onTravel: (mineId: string) => void
 }) => {
   const [showTravelMenu, setShowTravelMenu] = React.useState(false);
-  const [hoverPos, setHoverPos] = React.useState<{ x: number, y: number, z: number } | null>(null);
+  const [hoverInfo, setHoverInfo] = React.useState<WorldHoverInfo | null>(null);
+  const [pendingSelection, setPendingSelection] = React.useState<WorldHoverInfo | null>(null);
+  const [buildingPromptId, setBuildingPromptId] = React.useState<string | null>(null);
   const [recenterTrigger, setRecenterTrigger] = React.useState(0);
-  const pendingHoverPosRef = React.useRef<{ x: number, y: number, z: number } | null>(null);
+  const pendingHoverPosRef = React.useRef<WorldHoverInfo | null>(null);
   const hoverRafRef = React.useRef<number | null>(null);
   const isNight = state.time >= 20 || state.time < 6;
-  const WORLD_GRID_SIZE = 160;
   const playerGridPos = React.useMemo(
     () => ({
       x: Math.round(state.playerPos.x),
@@ -36,14 +38,6 @@ export const WorldScene = ({
     }),
     [state.playerPos.x, state.playerPos.y]
   );
-  const displayedGridPos = React.useMemo(() => {
-    if (!hoverPos) return null;
-    return {
-      x: hoverPos.x + WORLD_GRID_SIZE / 2,
-      y: hoverPos.z + WORLD_GRID_SIZE / 2,
-      z: hoverPos.y
-    };
-  }, [hoverPos]);
 
   const allVoxels = React.useMemo(() => {
     const voxels: VoxelData[] = [];
@@ -95,31 +89,61 @@ export const WorldScene = ({
     return voxels;
   }, []);
 
-  const worldBuildings = React.useMemo(() => Object.values(state.buildings), [state.buildings]);
+  const worldBuildings = React.useMemo(() => {
+    const home = state.buildings.player_home;
+    return home ? [home] : [];
+  }, [state.buildings]);
   const noopStateChange = React.useCallback(() => {}, []);
   const noopCountChange = React.useCallback(() => {}, []);
-  const handleVoxelClick = React.useCallback((x: number, z: number) => {
-    onMove({ x, y: z });
+  const confirmGroundMove = React.useCallback((target: WorldHoverInfo) => {
+    onMove({ x: target.x, y: target.y });
   }, [onMove]);
-  const handleVoxelInteract = React.useCallback((type: 'NPC' | 'BUILDING', id: string) => {
-    if (type === 'NPC') onInteract(id, 'none');
-    else onInteract('none', id);
-  }, [onInteract]);
+  const handleWorldSelect = React.useCallback((target: WorldHoverInfo) => {
+    setPendingSelection(target);
+
+    if (target.kind === 'GROUND') {
+      confirmGroundMove(target);
+      return;
+    }
+
+    if (target.kind === 'NPC' && target.id) {
+      onInteract(target.id, 'none');
+      return;
+    }
+
+    if (target.kind === 'BUILDING' && target.id) {
+      const building = state.buildings[target.id];
+      if (building?.id === 'player_home') {
+        setBuildingPromptId(target.id);
+        return;
+      }
+
+      confirmGroundMove(target);
+    }
+  }, [confirmGroundMove, onInteract, state.buildings]);
   const flushHoverPosition = React.useCallback(() => {
     hoverRafRef.current = null;
     const pending = pendingHoverPosRef.current;
-    setHoverPos(prev => {
+    setHoverInfo(prev => {
       if (!pending && !prev) return prev;
       if (!pending || !prev) return pending;
-      if (pending.x === prev.x && pending.y === prev.y && pending.z === prev.z) return prev;
+      if (
+        pending.x === prev.x &&
+        pending.y === prev.y &&
+        pending.z === prev.z &&
+        pending.kind === prev.kind &&
+        pending.id === prev.id
+      ) return prev;
       return pending;
     });
   }, []);
-  const handleHoverPosition = React.useCallback((pos: { x: number, y: number, z: number } | null) => {
+  const handleHoverPosition = React.useCallback((pos: WorldHoverInfo | null) => {
     pendingHoverPosRef.current = pos;
     if (hoverRafRef.current !== null) return;
     hoverRafRef.current = requestAnimationFrame(flushHoverPosition);
   }, [flushHoverPosition]);
+
+  const promptedBuilding = buildingPromptId ? state.buildings[buildingPromptId] : null;
 
   React.useEffect(() => {
     return () => {
@@ -134,7 +158,7 @@ export const WorldScene = ({
       <VoxelWorldContainer 
         voxels={allVoxels}
         buildings={worldBuildings}
-        npcs={state.npcs}
+        npcs={{}}
         time={state.time}
         playerPos={state.playerPos}
         isMoving={state.path.length > 0}
@@ -144,8 +168,7 @@ export const WorldScene = ({
         onStateChange={noopStateChange}
         onCountChange={noopCountChange}
         onHoverPosition={handleHoverPosition}
-        onClick={handleVoxelClick}
-        onInteract={handleVoxelInteract}
+        onSelect={handleWorldSelect}
       />
 
       {/* Coordinate Display */}
@@ -153,9 +176,9 @@ export const WorldScene = ({
         <div className={`backdrop-blur-md px-3 py-1.5 border border-black/10 rounded-lg shadow-sm transition-all ${isNight ? 'bg-slate-900/40 text-slate-400' : 'bg-white/40 text-slate-600'}`}>
           <p className="text-[10px] font-mono uppercase tracking-widest flex items-center gap-2">
             <span className="opacity-50">Grid Position</span>
-            {hoverPos ? (
+            {hoverInfo ? (
               <span className={`font-bold ${isNight ? 'text-white' : 'text-black'}`}>
-                X: {displayedGridPos?.x} Y: {displayedGridPos?.y} Z: {displayedGridPos?.z}
+                X: {hoverInfo.x} Y: {hoverInfo.y} Z: {hoverInfo.z}
               </span>
             ) : (
               <span className="italic opacity-50">
@@ -163,6 +186,16 @@ export const WorldScene = ({
               </span>
             )}
           </p>
+          {hoverInfo && (
+            <p className="mt-1 text-[10px] font-mono uppercase tracking-widest opacity-55">
+              {hoverInfo.kind}{hoverInfo.id ? ` • ${hoverInfo.id}` : ''}
+            </p>
+          )}
+          {pendingSelection && (
+            <p className="mt-1 text-[10px] font-mono uppercase tracking-widest opacity-55">
+              Selected: {pendingSelection.kind}{pendingSelection.id ? ` • ${pendingSelection.id}` : ` • ${pendingSelection.x},${pendingSelection.y}`}
+            </p>
+          )}
         </div>
       </div>
 
@@ -187,6 +220,54 @@ export const WorldScene = ({
           <div className="absolute inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-6" onClick={() => setShowTravelMenu(false)}>
             <div className="bg-white p-4 rounded-2xl">Travel Menu</div>
           </div>
+        )}
+        {promptedBuilding && (
+          <motion.div
+            key="building-entry-prompt"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className="absolute inset-x-4 bottom-20 z-[110] rounded-3xl border-2 border-black bg-white/95 p-5 shadow-2xl backdrop-blur-sm"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.24em] text-black/40">Building</p>
+                <h3 className="mt-1 text-lg font-black leading-none">{promptedBuilding.name}</h3>
+                <p className="mt-2 text-sm font-medium text-black/65">
+                  Enter it, or stay outside and move to the access point.
+                </p>
+              </div>
+              <button
+                onClick={() => setBuildingPromptId(null)}
+                className="rounded-full p-2 transition-colors hover:bg-black/5"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <button
+                onClick={() => {
+                  onMove(getBuildingAccessPosition(promptedBuilding));
+                  setBuildingPromptId(null);
+                }}
+                className="flex items-center justify-center gap-2 rounded-2xl border-2 border-black px-4 py-3 text-xs font-black uppercase tracking-[0.22em] transition-all hover:bg-black hover:text-white active:scale-95"
+              >
+                <MoveDiagonal2 size={16} />
+                Move Here
+              </button>
+              <button
+                onClick={() => {
+                  onInteract('none', promptedBuilding.id);
+                  setBuildingPromptId(null);
+                }}
+                className="flex items-center justify-center gap-2 rounded-2xl bg-black px-4 py-3 text-xs font-black uppercase tracking-[0.22em] text-white transition-all hover:bg-zinc-800 active:scale-95"
+              >
+                <DoorOpen size={16} />
+                Enter
+              </button>
+            </div>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>
