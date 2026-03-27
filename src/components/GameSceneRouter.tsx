@@ -1,6 +1,5 @@
 import React from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { Pickaxe } from 'lucide-react';
 import { GameState, WorldPosition } from '../types';
 import { MinePickerModal } from './MinePickerModal';
 import { MineSceneFallback } from './MineSceneFallback';
@@ -177,16 +176,6 @@ export const GameSceneRouter: React.FC<GameSceneRouterProps> = ({
           </motion.div>
         )}
       </AnimatePresence>
-
-      {state.currentScene === 'WORLD' && (
-        <button
-          onClick={onOpenPlanner}
-          className="fixed bottom-24 right-4 bg-slate-800 text-white p-3 rounded-full shadow-lg z-50 hover:bg-slate-700 border border-slate-600"
-          title="Open City Planner"
-        >
-          <Pickaxe size={24} />
-        </button>
-      )}
 
       <MinePickerModal
         show={showMinePicker}

@@ -1,10 +1,10 @@
 import React from 'react';
-import { DollarSign, AlertTriangle, Megaphone, Database, Briefcase } from 'lucide-react';
+import { DollarSign, AlertTriangle, Megaphone, Database, Briefcase, Wrench } from 'lucide-react';
 import { GameState } from '../types';
 import { Meter } from './Meter';
 import { getActiveWorldEffects } from '../game/dialogue/worldEffects';
 
-export const Header = ({ state }: { state: GameState }) => {
+export const Header = ({ state, onOpenUtilities }: { state: GameState; onOpenUtilities: () => void }) => {
   const formatTime = (t: number) => {
     const hours = Math.floor(t);
     const minutes = Math.floor((t % 1) * 60);
@@ -46,6 +46,17 @@ export const Header = ({ state }: { state: GameState }) => {
             <Database size={14} className="text-amber-600" />
             {state.ore}
           </div>
+          <button
+            onClick={onOpenUtilities}
+            className={`w-9 h-9 rounded-full flex items-center justify-center border transition-colors ${
+              isNight
+                ? 'bg-white/5 border-white/10 text-white hover:bg-white/10'
+                : 'bg-black/5 border-black/10 text-black hover:bg-black/10'
+            }`}
+            title="Open utilities"
+          >
+            <Wrench size={14} />
+          </button>
         </div>
       </div>
       <div className="grid grid-cols-3 gap-4">

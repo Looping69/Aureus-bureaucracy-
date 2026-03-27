@@ -13,24 +13,28 @@ interface ActionLogPanelProps {
   isOpen: boolean;
   onToggle: () => void;
   onClear: () => void;
+  showToggle?: boolean;
 }
 
 export const ActionLogPanel: React.FC<ActionLogPanelProps> = ({
   entries,
   isOpen,
   onToggle,
-  onClear
+  onClear,
+  showToggle = true
 }) => {
   return (
     <div className="fixed right-3 bottom-24 z-[90] w-72 max-w-[80vw]">
-      <button
-        onClick={onToggle}
-        className="ml-auto mb-2 flex items-center gap-2 bg-black text-white px-3 py-2 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg hover:bg-zinc-800"
-        title="Open action history"
-      >
-        <ScrollText size={12} />
-        Log ({entries.length})
-      </button>
+      {showToggle && (
+        <button
+          onClick={onToggle}
+          className="ml-auto mb-2 flex items-center gap-2 bg-black text-white px-3 py-2 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg hover:bg-zinc-800"
+          title="Open action history"
+        >
+          <ScrollText size={12} />
+          Log ({entries.length})
+        </button>
+      )}
 
       {isOpen && (
         <div className="bg-white/95 backdrop-blur-md border border-black/10 rounded-2xl shadow-xl overflow-hidden">
@@ -64,4 +68,3 @@ export const ActionLogPanel: React.FC<ActionLogPanelProps> = ({
     </div>
   );
 };
-

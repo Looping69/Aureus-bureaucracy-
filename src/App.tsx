@@ -19,6 +19,7 @@ import { GameSceneRouter } from './components/GameSceneRouter';
 import { ActionLogEntry, ActionLogPanel } from './components/ActionLogPanel';
 import { DebugPanel } from './components/DebugPanel';
 import { EndingOverlay } from './components/EndingOverlay';
+import { UtilityDrawer } from './components/UtilityDrawer';
 import { getBuildingAccessPosition } from './utils/buildingAccess';
 import { findPath } from './utils/pathfinding';
 import { applyMineSceneAction, applyMineTileInteraction } from './game/actions/mineActions';
@@ -123,6 +124,8 @@ export default function App() {
   const [showMinePicker, setShowMinePicker] = useState(false);
   const [actionLog, setActionLog] = useState<ActionLogEntry[]>([]);
   const [showActionLog, setShowActionLog] = useState(false);
+  const [showDebugPanel, setShowDebugPanel] = useState(false);
+  const [showUtilityDrawer, setShowUtilityDrawer] = useState(false);
   const [stateUpdateCount, setStateUpdateCount] = useState(0);
   const [lastActionName, setLastActionName] = useState('none');
   const [lastActionMs, setLastActionMs] = useState(0);
@@ -246,6 +249,8 @@ export default function App() {
     setNotification(null);
     setActionLog([]);
     setShowActionLog(false);
+    setShowDebugPanel(false);
+    setShowUtilityDrawer(false);
     setStateUpdateCount(0);
     setLastActionName('none');
     setLastActionMs(0);
@@ -521,7 +526,7 @@ export default function App() {
 
   return (
     <div className="h-[100dvh] flex flex-col max-w-md mx-auto bg-bureau-bg shadow-2xl relative overflow-hidden">
-      <Header state={state} />
+      <Header state={state} onOpenUtilities={() => setShowUtilityDrawer(true)} />
 
       <GameSceneRouter
         state={state}
@@ -606,6 +611,7 @@ export default function App() {
         isOpen={showActionLog}
         onToggle={() => setShowActionLog(v => !v)}
         onClear={() => setActionLog([])}
+        showToggle={false}
       />
 
       <DebugPanel
@@ -614,6 +620,26 @@ export default function App() {
         lastAction={lastActionName}
         lastActionMs={lastActionMs}
         onResetStateCounter={() => setStateUpdateCount(0)}
+        isOpen={showDebugPanel}
+        onToggle={() => setShowDebugPanel(v => !v)}
+        showToggle={false}
+      />
+
+      <UtilityDrawer
+        isOpen={showUtilityDrawer}
+        onClose={() => setShowUtilityDrawer(false)}
+        onOpenActionLog={() => {
+          setShowActionLog(true);
+          setShowUtilityDrawer(false);
+        }}
+        onOpenDebug={() => {
+          setShowDebugPanel(true);
+          setShowUtilityDrawer(false);
+        }}
+        onOpenPlanner={() => {
+          setState(s => ({ ...s, currentScene: 'CITY_PLANNER' }));
+          setShowUtilityDrawer(false);
+        }}
       />
 
       {/* Overlays */}

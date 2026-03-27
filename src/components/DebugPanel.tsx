@@ -9,6 +9,9 @@ interface DebugPanelProps {
   lastAction: string;
   lastActionMs: number;
   onResetStateCounter: () => void;
+  isOpen: boolean;
+  onToggle: () => void;
+  showToggle?: boolean;
 }
 
 export const DebugPanel: React.FC<DebugPanelProps> = ({
@@ -16,23 +19,27 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({
   stateUpdates,
   lastAction,
   lastActionMs,
-  onResetStateCounter
+  onResetStateCounter,
+  isOpen,
+  onToggle,
+  showToggle = true
 }) => {
   const fps = useFps();
-  const [open, setOpen] = React.useState(false);
 
   return (
     <div className="fixed left-3 bottom-24 z-[95] w-72 max-w-[80vw]">
-      <button
-        onClick={() => setOpen(v => !v)}
-        className="mb-2 flex items-center gap-2 bg-slate-900 text-lime-300 px-3 py-2 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg hover:bg-black"
-        title="Toggle telemetry panel"
-      >
-        <Bug size={12} />
-        Debug
-      </button>
+      {showToggle && (
+        <button
+          onClick={onToggle}
+          className="mb-2 flex items-center gap-2 bg-slate-900 text-lime-300 px-3 py-2 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg hover:bg-black"
+          title="Toggle telemetry panel"
+        >
+          <Bug size={12} />
+          Debug
+        </button>
+      )}
 
-      {open && (
+      {isOpen && (
         <div className="bg-slate-950/95 text-lime-300 border border-lime-500/30 rounded-2xl p-3 shadow-2xl font-mono">
           <div className="text-[10px] uppercase tracking-widest font-black mb-2 opacity-80">Telemetry</div>
 
@@ -72,4 +79,3 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({
     </div>
   );
 };
-
