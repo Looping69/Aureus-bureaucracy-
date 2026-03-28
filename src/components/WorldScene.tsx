@@ -2,9 +2,10 @@ import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { DoorOpen, MapPin, MoveDiagonal2, X } from 'lucide-react';
 import { GameState, WorldHoverInfo, WorldPosition, VoxelData } from '../types';
-import { COLORS, CONFIG } from '../utils/voxelConstants';
+import { COLORS, CONFIG, WORLD_SIZE } from '../utils/voxelConstants';
 import { VoxelWorldContainer } from './VoxelWorldContainer';
 import { getBuildingAccessPosition } from '../utils/buildingAccess';
+import { getBuildingFootprint } from '../utils/worldNavigation';
 
 export const WorldScene = ({ 
   state, 
@@ -38,10 +39,24 @@ export const WorldScene = ({
     }),
     [state.playerPos.x, state.playerPos.y]
   );
+  const homeFootprint = React.useMemo(
+    () => state.buildings.player_home ? getBuildingFootprint(state.buildings.player_home) : null,
+    [state.buildings]
+  );
+  const miniMapScale = 144 / WORLD_SIZE;
+  const toMiniMapStyle = React.useCallback(
+    (x: number, y: number, width: number = 1, height: number = 1) => ({
+      left: `${x * miniMapScale}px`,
+      top: `${y * miniMapScale}px`,
+      width: `${Math.max(width * miniMapScale, 2)}px`,
+      height: `${Math.max(height * miniMapScale, 2)}px`,
+    }),
+    [miniMapScale]
+  );
 
   const allVoxels = React.useMemo(() => {
     const voxels: VoxelData[] = [];
-    const size = 160; // Increased to match data.ts
+    const size = WORLD_SIZE;
     for (let x = 0; x < size; x++) {
       for (let z = 0; z < size; z++) {
         const worldX = x - size / 2;
@@ -89,10 +104,10 @@ export const WorldScene = ({
     return voxels;
   }, []);
 
-  const worldBuildings = React.useMemo(() => {
-    const home = state.buildings.player_home;
-    return home ? [home] : [];
-  }, [state.buildings]);
+  const worldBuildings = React.useMemo(
+    () => Object.values(state.buildings),
+    [state.buildings]
+  );
   const noopStateChange = React.useCallback(() => {}, []);
   const noopCountChange = React.useCallback(() => {}, []);
   const confirmGroundMove = React.useCallback((target: WorldHoverInfo) => {
@@ -172,7 +187,7 @@ export const WorldScene = ({
       />
 
       {/* Coordinate Display */}
-      <div className="absolute top-4 left-4 pointer-events-none">
+      <div className="absolute top-4 left-4 pointer-events-none flex flex-col gap-3">
         <div className={`backdrop-blur-md px-3 py-1.5 border border-black/10 rounded-lg shadow-sm transition-all ${isNight ? 'bg-slate-900/40 text-slate-400' : 'bg-white/40 text-slate-600'}`}>
           <p className="text-[10px] font-mono uppercase tracking-widest flex items-center gap-2">
             <span className="opacity-50">Grid Position</span>
@@ -196,6 +211,61 @@ export const WorldScene = ({
               Selected: {pendingSelection.kind}{pendingSelection.id ? ` • ${pendingSelection.id}` : ` • ${pendingSelection.x},${pendingSelection.y}`}
             </p>
           )}
+        </div>
+
+        <div className={`w-[176px] rounded-xl border border-black/10 shadow-sm backdrop-blur-md p-3 ${isNight ? 'bg-slate-900/45 text-slate-300' : 'bg-white/45 text-slate-700'}`}>
+          <p className="text-[10px] font-mono uppercase tracking-widest opacity-60">World Debug Grid</p>
+          <div className="mt-2 flex items-start gap-3">
+            <div
+              className="relative h-36 w-36 overflow-hidden rounded-lg border border-black/10"
+              style={{
+                backgroundColor: isNight ? 'rgba(15,23,42,0.45)' : 'rgba(248,250,252,0.55)',
+                backgroundImage: `
+                  linear-gradient(to right, rgba(100,116,139,0.18) 1px, transparent 1px),
+                  linear-gradient(to bottom, rgba(100,116,139,0.18) 1px, transparent 1px)
+                `,
+                backgroundSize: `${Math.max(4 * miniMapScale, 2)}px ${Math.max(4 * miniMapScale, 2)}px`
+              }}
+            >
+              {homeFootprint && (
+                <div
+                  className="absolute rounded-sm border border-amber-500/80 bg-amber-400/25"
+                  style={toMiniMapStyle(
+                    homeFootprint.minX,
+                    homeFootprint.minY,
+                    homeFootprint.maxX - homeFootprint.minX + 1,
+                    homeFootprint.maxY - homeFootprint.minY + 1
+                  )}
+                />
+              )}
+              <div
+                className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full border border-white bg-sky-500 shadow"
+                style={{
+                  left: `${playerGridPos.x * miniMapScale}px`,
+                  top: `${playerGridPos.y * miniMapScale}px`,
+                  width: '8px',
+                  height: '8px'
+                }}
+              />
+              {hoverInfo && (
+                <div
+                  className="absolute -translate-x-1/2 -translate-y-1/2 rounded-sm border border-emerald-300 bg-emerald-400/55"
+                  style={{
+                    left: `${hoverInfo.x * miniMapScale}px`,
+                    top: `${hoverInfo.y * miniMapScale}px`,
+                    width: '7px',
+                    height: '7px'
+                  }}
+                />
+              )}
+            </div>
+            <div className="space-y-1 text-[10px] font-mono uppercase tracking-widest opacity-70">
+              <p>World {WORLD_SIZE} x {WORLD_SIZE}</p>
+              <p>Player {playerGridPos.x},{playerGridPos.y}</p>
+              <p>Hover {hoverInfo ? `${hoverInfo.x},${hoverInfo.y},${hoverInfo.z}` : '--'}</p>
+              <p>House {homeFootprint ? `${homeFootprint.minX}-${homeFootprint.maxX} / ${homeFootprint.minY}-${homeFootprint.maxY}` : '--'}</p>
+            </div>
+          </div>
         </div>
       </div>
 

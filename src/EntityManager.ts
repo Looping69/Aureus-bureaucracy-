@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { VoxelCharacter } from './VoxelCharacter';
 import { VoxelBuilding } from './VoxelBuilding';
 import { Building, NPC } from './types';
-import { CONFIG } from './utils/voxelConstants';
+import { CONFIG, WORLD_HALF_SIZE } from './utils/voxelConstants';
 import { getBuildingFootprint, getStructureBaseHeight } from './utils/worldNavigation';
 
 export class EntityManager {
@@ -47,8 +47,8 @@ export class EntityManager {
       
       // Give flat infrastructure a tiny height separation from the terrain
       // to prevent z-fighting and create a readable street stack.
-      const worldX = buildingData.pos.x - 80;
-      const worldZ = buildingData.pos.y - 80;
+      const worldX = buildingData.pos.x - WORLD_HALF_SIZE;
+      const worldZ = buildingData.pos.y - WORLD_HALF_SIZE;
 
       building.setPosition(worldX, getStructureBaseHeight(buildingData.type), worldZ);
       building.group.userData.buildingId = buildingData.id;
@@ -70,8 +70,8 @@ export class EntityManager {
     if (this.npcs.has(npcData.id)) return;
     
     const npc = new VoxelCharacter();
-    const worldX = position.x - 80;
-    const worldZ = position.y - 80;
+    const worldX = position.x - WORLD_HALF_SIZE;
+    const worldZ = position.y - WORLD_HALF_SIZE;
     
     npc.group.position.set(worldX, CONFIG.FLOOR_Y + 0.5, worldZ);
     npc.group.userData.npcId = npcData.id;

@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { AppState, SimulationVoxel, RebuildTarget, VoxelData, SymmetryMode, EditTool, WorldHoverInfo } from './types';
-import { CONFIG, COLORS } from './utils/voxelConstants';
+import { CONFIG, COLORS, WORLD_HALF_SIZE, WORLD_SIZE } from './utils/voxelConstants';
 import { EntityManager } from './EntityManager';
 import { GreedyMesher } from './utils/GreedyMesher';
 import { BuildingFootprint } from './utils/worldNavigation';
@@ -32,6 +32,7 @@ export class VoxelEngine {
   private playerLight: THREE.PointLight;
   private targetIndicator: THREE.Mesh;
   private pathLine: THREE.Line;
+  private worldGrid: THREE.GridHelper;
   private skyDome: THREE.Mesh;
   public entities: EntityManager;
   private dummy = new THREE.Object3D();
@@ -179,11 +180,29 @@ export class VoxelEngine {
 
     // Floor
     const planeMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 1 });
-    this.floor = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), planeMat);
+    this.floor = new THREE.Mesh(new THREE.PlaneGeometry(WORLD_SIZE + 12, WORLD_SIZE + 12), planeMat);
     this.floor.rotation.x = -Math.PI / 2;
     this.floor.position.y = CONFIG.FLOOR_Y - 5.51; // Below the sand layer
     this.floor.receiveShadow = true;
     this.scene.add(this.floor);
+
+    this.worldGrid = new THREE.GridHelper(
+      WORLD_SIZE,
+      WORLD_SIZE,
+      0x94a3b8,
+      0x64748b
+    );
+    this.worldGrid.position.y = CONFIG.FLOOR_Y + 0.02;
+    const gridMaterial = this.worldGrid.material as THREE.Material | THREE.Material[];
+    const materials = Array.isArray(gridMaterial) ? gridMaterial : [gridMaterial];
+    materials.forEach((material) => {
+      if (material instanceof THREE.LineBasicMaterial) {
+        material.transparent = true;
+        material.opacity = 0.22;
+        material.depthWrite = false;
+      }
+    });
+    this.scene.add(this.worldGrid);
 
     const floorBody = new CANNON.Body({
       type: CANNON.Body.STATIC,
@@ -353,7 +372,7 @@ export class VoxelEngine {
 
       if (path && path.length > 0) {
         const points = [new THREE.Vector3(x, CONFIG.FLOOR_Y + 0.1, z)];
-        path.forEach(p => points.push(new THREE.Vector3(p.x - 80, CONFIG.FLOOR_Y + 0.1, p.y - 80)));
+        path.forEach(p => points.push(new THREE.Vector3(p.x - WORLD_HALF_SIZE, CONFIG.FLOOR_Y + 0.1, p.y - WORLD_HALF_SIZE)));
         
         // Dispose old geometry and create new one to avoid "Buffer size too small" warning
         this.pathLine.geometry.dispose();
@@ -439,8 +458,8 @@ export class VoxelEngine {
     }
 
     return {
-      x: Math.round(pos.x + 80),
-      y: Math.round(pos.z + 80),
+      x: Math.round(pos.x + WORLD_HALF_SIZE),
+      y: Math.round(pos.z + WORLD_HALF_SIZE),
       z: Math.round(pos.y),
       renderX: Math.round(pos.x),
       renderZ: Math.round(pos.z),
@@ -554,7 +573,7 @@ export class VoxelEngine {
       return;
     }
 
-    this.hoverSelector.position.set(target.x - 80, target.z + 0.03, target.y - 80);
+    this.hoverSelector.position.set(target.x - WORLD_HALF_SIZE, target.z + 0.03, target.y - WORLD_HALF_SIZE);
     this.hoverSelector.visible = true;
   }
 
@@ -568,8 +587,8 @@ export class VoxelEngine {
     }
 
     return {
-      x: Math.round(point.x + 80),
-      y: Math.round(point.z + 80),
+      x: Math.round(point.x + WORLD_HALF_SIZE),
+      y: Math.round(point.z + WORLD_HALF_SIZE),
       z: Math.round(point.y),
       kind: 'GROUND',
       label: 'Ground',

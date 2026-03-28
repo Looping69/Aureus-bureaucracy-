@@ -1,5 +1,5 @@
 import { Building, WorldPosition } from '../types';
-import { CONFIG } from './voxelConstants';
+import { CONFIG, WORLD_SIZE } from './voxelConstants';
 
 export interface BuildingFootprint {
   minX: number;
@@ -33,14 +33,14 @@ const FALLBACK_HALF_EXTENTS: Partial<Record<Building['type'], number>> = {
   INDUSTRIAL: 4,
 };
 
-export const clampWorldCoordinate = (value: number, mapSize: number = 160) => {
+export const clampWorldCoordinate = (value: number, mapSize: number = WORLD_SIZE) => {
   const rounded = Math.round(value);
   return Math.max(0, Math.min(mapSize - 1, rounded));
 };
 
 export const clampWorldPosition = (
   pos: WorldPosition,
-  mapSize: number = 160
+  mapSize: number = WORLD_SIZE
 ): WorldPosition => ({
   x: clampWorldCoordinate(pos.x, mapSize),
   y: clampWorldCoordinate(pos.y, mapSize),
@@ -128,7 +128,7 @@ export const getBlockingFootprint = (
 
 export const getBuildingAccessPosition = (
   building: Building,
-  mapSize: number = 160
+  mapSize: number = WORLD_SIZE
 ): WorldPosition => {
   const footprint = getBuildingFootprint(building);
 

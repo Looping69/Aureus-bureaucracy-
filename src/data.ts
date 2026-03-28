@@ -2,6 +2,7 @@ import { NPC, Permit, Tile, Building, Mine, DialogueNode, OfficeItem, WorldPosit
 import { extendWorldEffect } from './game/dialogue/worldEffects';
 import { addStoryFlag, addStoryFlags, hasStoryFlag } from './game/dialogue/storyFlags';
 import { PLAYER_HOUSE_VOXELS } from './voxelData';
+import { WORLD_SIZE as SHARED_WORLD_SIZE } from './utils/voxelConstants';
 import { 
   LICENSING_OFFICE_VOXELS, 
   UNION_HALL_VOXELS, 
@@ -284,7 +285,7 @@ export const REJECTION_REASONS = [
   "The paper weight was 0.5g too light, suggesting a lack of gravitas."
 ];
 
-export const WORLD_SIZE = 160;
+export const WORLD_SIZE = SHARED_WORLD_SIZE;
 export const WORLD_CENTER = WORLD_SIZE / 2;
 
 export const INITIAL_MINES: Mine[] = [
@@ -1228,178 +1229,307 @@ export const OFFICE_ITEMS: Record<string, OfficeItem> = {
   }
 };
 
-const createLinearTiles = (
-  prefix: string,
-  type: 'ROAD' | 'SIDEWALK',
-  start: WorldPosition,
-  end: WorldPosition,
-  voxels: { id: number, x: number, y: number, z: number, c: string }[],
-  discovered: boolean = true
-): Record<string, Building> => {
-  const tiles: Record<string, Building> = {};
+const CITY_CELL_SIZE = 14;
+const CITY_GRID_WIDTH = 11;
+const CITY_GRID_HEIGHT = 11;
+const CITY_ORIGIN = {
+  x: WORLD_CENTER - Math.floor((CITY_GRID_WIDTH - 1) * CITY_CELL_SIZE / 2),
+  y: WORLD_CENTER - Math.floor((CITY_GRID_HEIGHT - 1) * CITY_CELL_SIZE / 2),
+};
+
+type CityCell = { x: number; y: number };
+
+const toWorldFromCityCell = ({ x, y }: CityCell): WorldPosition => ({
+  x: CITY_ORIGIN.x + x * CITY_CELL_SIZE,
+  y: CITY_ORIGIN.y + y * CITY_CELL_SIZE,
+});
+
+const createCityLine = (start: CityCell, end: CityCell): CityCell[] => {
   const dx = Math.sign(end.x - start.x);
   const dy = Math.sign(end.y - start.y);
   const steps = Math.max(Math.abs(end.x - start.x), Math.abs(end.y - start.y));
+  return Array.from({ length: steps + 1 }, (_, index) => ({
+    x: start.x + dx * index,
+    y: start.y + dy * index,
+  }));
+};
 
-  for (let i = 0; i <= steps; i++) {
-    const x = start.x + dx * i;
-    const y = start.y + dy * i;
-    const id = `${prefix}_${i}`;
+const createPlacedTiles = (
+  prefix: string,
+  type: 'ROAD' | 'SIDEWALK',
+  cells: CityCell[],
+  voxels: { id: number, x: number, y: number, z: number, c: string }[],
+  occupiedCells: Set<string>,
+  discovered: boolean = true
+): Record<string, Building> => {
+  const tiles: Record<string, Building> = {};
 
+  cells.forEach((cell, index) => {
+    const key = `${cell.x},${cell.y}`;
+    if (occupiedCells.has(key)) {
+      throw new Error(`City layout overlap at cell ${key} while placing ${prefix}`);
+    }
+    occupiedCells.add(key);
+
+    const id = `${prefix}_${index}`;
     tiles[id] = {
       id,
       npcId: 'none',
       name: type === 'ROAD' ? 'Road' : 'Sidewalk',
-      pos: { x, y },
+      pos: toWorldFromCityCell(cell),
       type,
       isDiscovered: discovered,
-      voxels
+      voxels,
     };
-  }
+  });
 
   return tiles;
 };
 
-const centralHub = { x: WORLD_CENTER, y: WORLD_CENTER + 10 };
+const createPlacedBuilding = (
+  cell: CityCell,
+  building: Omit<Building, 'pos'>,
+  occupiedCells: Set<string>
+): Building => {
+  const key = `${cell.x},${cell.y}`;
+  if (occupiedCells.has(key)) {
+    throw new Error(`City layout overlap at cell ${key} while placing ${building.id}`);
+  }
+  occupiedCells.add(key);
 
-const cityScape: Record<string, Building> = {
-  ...createLinearTiles(
+  return {
+    ...building,
+    pos: toWorldFromCityCell(cell),
+  };
+};
+
+const occupiedCityCells = new Set<string>();
+
+const cityRoads: Record<string, Building> = {
+  ...createPlacedTiles(
     'main_avenue',
     'ROAD',
-    { x: centralHub.x, y: WORLD_CENTER - 6 },
-    { x: centralHub.x, y: WORLD_CENTER + 44 },
-    ROAD_VOXELS
+    createCityLine({ x: 5, y: 2 }, { x: 5, y: 10 }),
+    ROAD_VOXELS,
+    occupiedCityCells
   ),
-  ...createLinearTiles(
-    'civic_east',
+  ...createPlacedTiles(
+    'bureau_road',
     'ROAD',
-    { x: centralHub.x, y: centralHub.y },
-    { x: WORLD_CENTER + 32, y: centralHub.y },
-    ROAD_VOXELS
+    createCityLine({ x: 6, y: 4 }, { x: 8, y: 4 }),
+    ROAD_VOXELS,
+    occupiedCityCells
   ),
-  ...createLinearTiles(
-    'market_west',
+  ...createPlacedTiles(
+    'market_road',
     'ROAD',
-    { x: WORLD_CENTER - 28, y: centralHub.y },
-    { x: centralHub.x, y: centralHub.y },
-    ROAD_VOXELS
+    createCityLine({ x: 2, y: 6 }, { x: 4, y: 6 }),
+    ROAD_VOXELS,
+    occupiedCityCells
   ),
-  ...createLinearTiles(
-    'plaza_north_walk',
-    'SIDEWALK',
-    { x: WORLD_CENTER - 10, y: centralHub.y - 10 },
-    { x: WORLD_CENTER + 10, y: centralHub.y - 10 },
-    SIDEWALK_VOXELS
+  ...createPlacedTiles(
+    'tower_link',
+    'ROAD',
+    createCityLine({ x: 9, y: 2 }, { x: 9, y: 4 }),
+    ROAD_VOXELS,
+    occupiedCityCells
   ),
-  ...createLinearTiles(
-    'plaza_south_walk',
-    'SIDEWALK',
-    { x: WORLD_CENTER - 10, y: centralHub.y + 10 },
-    { x: WORLD_CENTER + 10, y: centralHub.y + 10 },
-    SIDEWALK_VOXELS
+  ...createPlacedTiles(
+    'union_link',
+    'ROAD',
+    createCityLine({ x: 9, y: 6 }, { x: 9, y: 8 }),
+    ROAD_VOXELS,
+    occupiedCityCells
   ),
-  ...createLinearTiles(
-    'bureau_walk',
-    'SIDEWALK',
-    { x: WORLD_CENTER + 12, y: centralHub.y - 8 },
-    { x: WORLD_CENTER + 28, y: centralHub.y - 8 },
-    SIDEWALK_VOXELS
+  ...createPlacedTiles(
+    'fixer_link',
+    'ROAD',
+    [{ x: 10, y: 8 }],
+    ROAD_VOXELS,
+    occupiedCityCells
   ),
-  ...createLinearTiles(
-    'union_walk',
+};
+
+const cityWalks: Record<string, Building> = {
+  ...createPlacedTiles(
+    'main_walk_west_upper',
     'SIDEWALK',
-    { x: WORLD_CENTER + 10, y: centralHub.y + 12 },
-    { x: WORLD_CENTER + 24, y: centralHub.y + 12 },
-    SIDEWALK_VOXELS
+    createCityLine({ x: 4, y: 2 }, { x: 4, y: 3 }),
+    SIDEWALK_VOXELS,
+    occupiedCityCells
+  ),
+  ...createPlacedTiles(
+    'main_walk_west_lower',
+    'SIDEWALK',
+    createCityLine({ x: 4, y: 8 }, { x: 4, y: 10 }),
+    SIDEWALK_VOXELS,
+    occupiedCityCells
+  ),
+  ...createPlacedTiles(
+    'main_walk_east_upper',
+    'SIDEWALK',
+    createCityLine({ x: 6, y: 2 }, { x: 6, y: 3 }),
+    SIDEWALK_VOXELS,
+    occupiedCityCells
+  ),
+  ...createPlacedTiles(
+    'main_walk_east_lower',
+    'SIDEWALK',
+    createCityLine({ x: 6, y: 7 }, { x: 6, y: 10 }),
+    SIDEWALK_VOXELS,
+    occupiedCityCells
+  ),
+  ...createPlacedTiles(
+    'market_walk_north',
+    'SIDEWALK',
+    createCityLine({ x: 2, y: 5 }, { x: 4, y: 5 }),
+    SIDEWALK_VOXELS,
+    occupiedCityCells
+  ),
+  ...createPlacedTiles(
+    'market_walk_south',
+    'SIDEWALK',
+    createCityLine({ x: 2, y: 7 }, { x: 4, y: 7 }),
+    SIDEWALK_VOXELS,
+    occupiedCityCells
+  ),
+  ...createPlacedTiles(
+    'bureau_walk_south',
+    'SIDEWALK',
+    createCityLine({ x: 6, y: 5 }, { x: 7, y: 5 }),
+    SIDEWALK_VOXELS,
+    occupiedCityCells
+  ),
+  ...createPlacedTiles(
+    'tower_walk_east',
+    'SIDEWALK',
+    createCityLine({ x: 10, y: 2 }, { x: 10, y: 3 }),
+    SIDEWALK_VOXELS,
+    occupiedCityCells
+  ),
+  ...createPlacedTiles(
+    'union_walk_east',
+    'SIDEWALK',
+    createCityLine({ x: 10, y: 6 }, { x: 10, y: 7 }),
+    SIDEWALK_VOXELS,
+    occupiedCityCells
   ),
 };
 
 const baseBuildings: Record<string, Building> = {
-  'player_home': {
-    id: 'player_home',
-    npcId: 'none',
-    name: 'Your House',
-    pos: { x: WORLD_CENTER, y: WORLD_CENTER - 4 },
-    type: 'HOME',
-    isDiscovered: true,
-    voxels: PLAYER_HOUSE_VOXELS
-  },
-  'licensing_office': {
-    id: 'licensing_office',
-    npcId: 'licensing',
-    name: 'Bureau of Extraction',
-    pos: { x: WORLD_CENTER + 24, y: centralHub.y - 10 },
-    type: 'OFFICE',
-    isDiscovered: false,
-    explorationItems: ['vane_ledger', 'trash_can_vane'],
-    voxels: LICENSING_OFFICE_VOXELS
-  },
-  'union_hall': {
-    id: 'union_hall',
-    npcId: 'union',
-    name: 'The Gilded Pick',
-    pos: { x: WORLD_CENTER + 18, y: centralHub.y + 18 },
-    type: 'PUB',
-    isDiscovered: false,
-    explorationItems: ['sal_cigar_box'],
-    voxels: UNION_HALL_VOXELS
-  },
-  'inspector_hq': {
-    id: 'inspector_hq',
-    npcId: 'inspector',
-    name: 'Compliance Tower',
-    pos: { x: WORLD_CENTER + 18, y: centralHub.y - 26 },
-    type: 'OFFICE',
-    isDiscovered: false,
-    explorationItems: ['krell_blueprints'],
-    voxels: INSPECTOR_HQ_VOXELS
-  },
-  'fixer_den': {
-    id: 'fixer_den',
-    npcId: 'fixer',
-    name: 'Slink\'s Salvage',
-    pos: { x: WORLD_CENTER + 34, y: centralHub.y + 30 },
-    type: 'HOME',
-    isDiscovered: false,
-    voxels: FIXER_DEN_VOXELS
-  },
-  'hotline_booth': {
-    id: 'hotline_booth',
-    npcId: 'journalist',
-    name: 'Hotline Booth',
-    pos: { x: WORLD_CENTER - 16, y: centralHub.y + 2 },
-    type: 'HOTLINE',
-    isDiscovered: true,
-    voxels: HOTLINE_BOOTH_VOXELS
-  },
-  'chief_hut': {
-    id: 'chief_hut',
-    npcId: 'chief',
-    name: 'Chief\'s Hut',
-    pos: { x: WORLD_CENTER - 32, y: centralHub.y - 24 },
-    type: 'HOME',
-    isDiscovered: true,
-    voxels: CHIEF_HUT_VOXELS
-  },
-  'mine_entrance': {
-    id: 'mine_entrance',
-    npcId: 'none',
-    name: 'Sector 4 Entrance',
-    pos: { x: centralHub.x, y: WORLD_CENTER + 52 },
-    type: 'MINE_ENTRANCE',
-    isDiscovered: true
-  },
-  'central_park': {
-    id: 'central_park',
-    npcId: 'none',
-    name: 'Dusty Palms Park',
-    pos: { x: WORLD_CENTER - 4, y: centralHub.y - 2 },
-    type: 'PARK',
-    isDiscovered: true,
-    description: 'The only place with actual (dying) trees.',
-    voxels: PARK_VOXELS
-  },
-  ...cityScape
+  player_home: createPlacedBuilding(
+    { x: 3, y: 9 },
+    {
+      id: 'player_home',
+      npcId: 'none',
+      name: 'Your House',
+      type: 'HOME',
+      isDiscovered: true,
+      voxels: PLAYER_HOUSE_VOXELS,
+    },
+    occupiedCityCells
+  ),
+  licensing_office: createPlacedBuilding(
+    { x: 8, y: 5 },
+    {
+      id: 'licensing_office',
+      npcId: 'licensing',
+      name: 'Bureau of Extraction',
+      type: 'OFFICE',
+      isDiscovered: false,
+      explorationItems: ['vane_ledger', 'trash_can_vane'],
+      voxels: LICENSING_OFFICE_VOXELS,
+    },
+    occupiedCityCells
+  ),
+  union_hall: createPlacedBuilding(
+    { x: 8, y: 8 },
+    {
+      id: 'union_hall',
+      npcId: 'union',
+      name: 'The Gilded Pick',
+      type: 'PUB',
+      isDiscovered: false,
+      explorationItems: ['sal_cigar_box'],
+      voxels: UNION_HALL_VOXELS,
+    },
+    occupiedCityCells
+  ),
+  inspector_hq: createPlacedBuilding(
+    { x: 9, y: 1 },
+    {
+      id: 'inspector_hq',
+      npcId: 'inspector',
+      name: 'Compliance Tower',
+      type: 'OFFICE',
+      isDiscovered: false,
+      explorationItems: ['krell_blueprints'],
+      voxels: INSPECTOR_HQ_VOXELS,
+    },
+    occupiedCityCells
+  ),
+  fixer_den: createPlacedBuilding(
+    { x: 10, y: 9 },
+    {
+      id: 'fixer_den',
+      npcId: 'fixer',
+      name: 'Slink\'s Salvage',
+      type: 'HOME',
+      isDiscovered: false,
+      voxels: FIXER_DEN_VOXELS,
+    },
+    occupiedCityCells
+  ),
+  hotline_booth: createPlacedBuilding(
+    { x: 1, y: 8 },
+    {
+      id: 'hotline_booth',
+      npcId: 'journalist',
+      name: 'Hotline Booth',
+      type: 'HOTLINE',
+      isDiscovered: true,
+      voxels: HOTLINE_BOOTH_VOXELS,
+    },
+    occupiedCityCells
+  ),
+  chief_hut: createPlacedBuilding(
+    { x: 1, y: 2 },
+    {
+      id: 'chief_hut',
+      npcId: 'chief',
+      name: 'Chief\'s Hut',
+      type: 'HOME',
+      isDiscovered: true,
+      voxels: CHIEF_HUT_VOXELS,
+    },
+    occupiedCityCells
+  ),
+  mine_entrance: createPlacedBuilding(
+    { x: 5, y: 11 },
+    {
+      id: 'mine_entrance',
+      npcId: 'none',
+      name: 'Sector 4 Entrance',
+      type: 'MINE_ENTRANCE',
+      isDiscovered: true,
+    },
+    occupiedCityCells
+  ),
+  central_park: createPlacedBuilding(
+    { x: 2, y: 4 },
+    {
+      id: 'central_park',
+      npcId: 'none',
+      name: 'Dusty Palms Park',
+      type: 'PARK',
+      isDiscovered: true,
+      description: 'The only place with actual (dying) trees.',
+      voxels: PARK_VOXELS,
+    },
+    occupiedCityCells
+  ),
+  ...cityRoads,
+  ...cityWalks,
 };
 
 export const BUILDINGS = baseBuildings;

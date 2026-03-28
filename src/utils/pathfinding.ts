@@ -3,6 +3,7 @@ import {
   clampWorldPosition,
   getBlockingFootprint,
 } from './worldNavigation';
+import { WORLD_SIZE } from './voxelConstants';
 
 export interface PathNode {
   x: number;
@@ -248,7 +249,7 @@ export const findPath = (
   start: WorldPosition,
   end: WorldPosition,
   buildings: Record<string, Building>,
-  mapSize: number = 160
+  mapSize: number = WORLD_SIZE
 ): WorldPosition[] => {
   const startTile = clampWorldPosition(start, mapSize);
   const endTile = clampWorldPosition(end, mapSize);

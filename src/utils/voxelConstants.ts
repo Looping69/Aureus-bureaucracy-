@@ -4,6 +4,9 @@ export const CONFIG = {
   VOXEL_SIZE: 1,
 };
 
+export const WORLD_SIZE = 240;
+export const WORLD_HALF_SIZE = WORLD_SIZE / 2;
+
 export const COLORS = {
   WHITE: 0xffffff,
   BLACK: 0x000000,

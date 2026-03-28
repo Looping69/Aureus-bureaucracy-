@@ -55,12 +55,7 @@ const buildHydratedBuildings = (savedBuildings?: GameState['buildings']): GameSt
   ) as GameState['buildings'];
 
 const cloneSerializable = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
-const WORLD_MAP_BUILDING_IDS = new Set(['player_home']);
-
-const getWorldMapBuildings = (buildings: GameState['buildings']) =>
-  Object.fromEntries(
-    Object.entries(buildings).filter(([id]) => WORLD_MAP_BUILDING_IDS.has(id))
-  ) as GameState['buildings'];
+const getWorldMapBuildings = (buildings: GameState['buildings']) => buildings;
 
 const buildInitialGameState = (): GameState => {
   const homePos = getBuildingAccessPosition(BUILDINGS.player_home);

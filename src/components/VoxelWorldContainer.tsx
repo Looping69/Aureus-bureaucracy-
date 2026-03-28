@@ -3,6 +3,7 @@ import { VoxelEngine } from '../VoxelEngine';
 import { Building, NPC, AppState, VoxelData, WorldHoverInfo } from '../types';
 import { useCameraControls } from '../hooks/useCameraControls';
 import { getWorldSurfaceHeight } from '../utils/worldNavigation';
+import { WORLD_HALF_SIZE } from '../utils/voxelConstants';
 
 interface VoxelWorldProps {
   voxels: VoxelData[];
@@ -74,12 +75,12 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
 
       engineRef.current.updateTime(time);
       engineRef.current.setPlayerPosition(
-        playerPos.x - 80, 
-        playerPos.y - 80, 
+        playerPos.x - WORLD_HALF_SIZE, 
+        playerPos.y - WORLD_HALF_SIZE, 
         playerSurfaceY,
         isMoving, 
-        targetPos ? targetPos.x - 80 : undefined, 
-        targetPos ? targetPos.y - 80 : undefined,
+        targetPos ? targetPos.x - WORLD_HALF_SIZE : undefined, 
+        targetPos ? targetPos.y - WORLD_HALF_SIZE : undefined,
         path
       );
 
@@ -133,12 +134,12 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
   useEffect(() => {
     if (engineRef.current) {
       engineRef.current.setPlayerPosition(
-        playerPos.x - 80, 
-        playerPos.y - 80, 
+        playerPos.x - WORLD_HALF_SIZE, 
+        playerPos.y - WORLD_HALF_SIZE, 
         playerSurfaceY,
         isMoving, 
-        targetPos ? targetPos.x - 80 : undefined, 
-        targetPos ? targetPos.y - 80 : undefined,
+        targetPos ? targetPos.x - WORLD_HALF_SIZE : undefined, 
+        targetPos ? targetPos.y - WORLD_HALF_SIZE : undefined,
         path
       );
     }

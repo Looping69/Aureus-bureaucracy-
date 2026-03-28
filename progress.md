@@ -327,3 +327,44 @@ Original prompt: Okay so there are still so many gaps in the gameplay we need to
   - World taps were simplified: ground taps move immediately, house taps open the Move Here / Enter prompt.
   - Validation: npm run lint (pass), npm run build (pass), direct Playwright screenshots output/world-ground-move-only-home.png and output/world-home-prompt-only-home.png confirm both behaviors.
 
+- 2026-03-28 world grid expansion:
+  - Introduced shared WORLD_SIZE/WORLD_HALF_SIZE in src/utils/voxelConstants.ts and increased the world from 160 to 240 blocks.
+  - Rewired src/data.ts, src/EntityManager.ts, src/VoxelEngine.ts, src/components/VoxelWorldContainer.tsx, src/components/WorldScene.tsx, src/utils/pathfinding.ts, and src/utils/worldNavigation.ts to use the shared size/offsets instead of hardcoded 160/80 values.
+  - Validation: npm run lint (pass), npm run build (pass).
+
+- Building asset redesign pass (2026-03-28):
+  - Rebuilt all authored voxel structures in src/buildings.ts with richer silhouettes, trim, signage, rooflines, porches, annexes, and cleaner muted materials.
+  - Rebuilt PLAYER_HOUSE_VOXELS in src/voxelData.ts to match the newer architectural language (layered roof, porch, windows, vertical accents, antenna).
+  - Simplified road/sidewalk assets into cleaner, intentional paving patterns instead of placeholder flat slabs.
+- Validation:
+  - npm run lint (pass)
+  - npm run build (pass)
+  - Visual spot check against local server on http://127.0.0.1:4275
+  - Screenshot: output/building-redesign-world.png shows the updated player house in-world.
+- Follow-up ideas:
+  - Reintroduce the other world landmarks once the interaction layer is stable so the redesigned asset set is actually visible in normal play.
+  - Add small prop clusters (vents, signs, crate stacks, awnings) as reusable voxel decorators instead of baking every detail into each building.
+- World landmark restoration pass (2026-03-28, continued):
+  - Removed the temporary world-map filter that only rendered player_home.
+  - WorldScene now renders Object.values(state.buildings), so all authored buildings/roads/sidewalks/park tiles are visible again on the world map.
+  - App pathfinding now uses the full building set again instead of the single-house fallback.
+- Validation:
+  - npm run lint (pass)
+  - npm run build (pass)
+  - Visual screenshot: output/world-all-buildings-restored.png confirms the world map is populated again.
+- Known follow-up:
+  - Restoring the full map also surfaces the older road/ground rendering artifacting again; that still needs a dedicated cleanup pass.
+- City layout rebuild pass (2026-03-28, no-overlap placement):
+  - Replaced ad-hoc world placement in src/data.ts with a coarse city-grid planner.
+  - Added CITY_CELL_SIZE-based placement helpers so roads, sidewalks, parks, and landmarks sit on deliberate cells rather than overlapping every 1 world unit.
+  - Added occupancy validation during data construction; duplicate cell placement now throws immediately instead of silently stacking geometry.
+  - Repositioned all main landmarks (home, Bureau, tower, union hall, fixer, hotline, chief, park, mine entrance) onto distinct cells.
+  - Rebuilt road and sidewalk runs as non-overlapping branches/segments rather than intersecting slabs.
+- Validation:
+  - npm run lint (pass)
+  - npm run build (pass)
+  - Runtime validation through live dev server on http://127.0.0.1:4275 with occupancy check active.
+  - Screenshot: output/world-layout-redone-live.png confirms the world boots with the new layout.
+- Remaining follow-up:
+  - Camera framing still starts too tight on the house, so the improved district layout is not obvious immediately from the default spawn view.
+  - The debug world grid overlay is still visible and should be hidden again once interaction debugging is finished.
