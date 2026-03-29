@@ -11,8 +11,7 @@ import {
   CHIEF_HUT_VOXELS, 
   HOTLINE_BOOTH_VOXELS,
   PARK_VOXELS,
-  ROAD_VOXELS,
-  SIDEWALK_VOXELS
+  ROAD_VOXELS
 } from './buildings';
 
 export const generateGrid = (width: number, height: number, yieldRate: number = 0.2): Tile[] => {
@@ -1305,7 +1304,7 @@ const createPlacedBuilding = (
 
 const occupiedCityCells = new Set<string>();
 
-const cityRoads: Record<string, Building> = {
+const cityStreets: Record<string, Building> = {
   ...createPlacedTiles(
     'main_avenue',
     'ROAD',
@@ -1346,72 +1345,6 @@ const cityRoads: Record<string, Building> = {
     'ROAD',
     [{ x: 10, y: 8 }],
     ROAD_VOXELS,
-    occupiedCityCells
-  ),
-};
-
-const cityWalks: Record<string, Building> = {
-  ...createPlacedTiles(
-    'main_walk_west_upper',
-    'SIDEWALK',
-    createCityLine({ x: 4, y: 2 }, { x: 4, y: 3 }),
-    SIDEWALK_VOXELS,
-    occupiedCityCells
-  ),
-  ...createPlacedTiles(
-    'main_walk_west_lower',
-    'SIDEWALK',
-    createCityLine({ x: 4, y: 8 }, { x: 4, y: 10 }),
-    SIDEWALK_VOXELS,
-    occupiedCityCells
-  ),
-  ...createPlacedTiles(
-    'main_walk_east_upper',
-    'SIDEWALK',
-    createCityLine({ x: 6, y: 2 }, { x: 6, y: 3 }),
-    SIDEWALK_VOXELS,
-    occupiedCityCells
-  ),
-  ...createPlacedTiles(
-    'main_walk_east_lower',
-    'SIDEWALK',
-    createCityLine({ x: 6, y: 7 }, { x: 6, y: 10 }),
-    SIDEWALK_VOXELS,
-    occupiedCityCells
-  ),
-  ...createPlacedTiles(
-    'market_walk_north',
-    'SIDEWALK',
-    createCityLine({ x: 2, y: 5 }, { x: 4, y: 5 }),
-    SIDEWALK_VOXELS,
-    occupiedCityCells
-  ),
-  ...createPlacedTiles(
-    'market_walk_south',
-    'SIDEWALK',
-    createCityLine({ x: 2, y: 7 }, { x: 4, y: 7 }),
-    SIDEWALK_VOXELS,
-    occupiedCityCells
-  ),
-  ...createPlacedTiles(
-    'bureau_walk_south',
-    'SIDEWALK',
-    createCityLine({ x: 6, y: 5 }, { x: 7, y: 5 }),
-    SIDEWALK_VOXELS,
-    occupiedCityCells
-  ),
-  ...createPlacedTiles(
-    'tower_walk_east',
-    'SIDEWALK',
-    createCityLine({ x: 10, y: 2 }, { x: 10, y: 3 }),
-    SIDEWALK_VOXELS,
-    occupiedCityCells
-  ),
-  ...createPlacedTiles(
-    'union_walk_east',
-    'SIDEWALK',
-    createCityLine({ x: 10, y: 6 }, { x: 10, y: 7 }),
-    SIDEWALK_VOXELS,
     occupiedCityCells
   ),
 };
@@ -1528,8 +1461,7 @@ const baseBuildings: Record<string, Building> = {
     },
     occupiedCityCells
   ),
-  ...cityRoads,
-  ...cityWalks,
+  ...cityStreets,
 };
 
 export const BUILDINGS = baseBuildings;

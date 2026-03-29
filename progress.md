@@ -368,3 +368,16 @@ Original prompt: Okay so there are still so many gaps in the gameplay we need to
 - Remaining follow-up:
   - Camera framing still starts too tight on the house, so the improved district layout is not obvious immediately from the default spawn view.
   - The debug world grid overlay is still visible and should be hidden again once interaction debugging is finished.
+- Street system cleanup pass (2026-03-29):
+  - Replaced separate road and sidewalk voxel assets in src/buildings.ts with one unified STREET_VOXELS tile.
+  - ROAD_VOXELS and SIDEWALK_VOXELS now alias the same integrated street surface so the world no longer renders stacked curb/road slabs.
+  - Removed the extra sidewalk placement network from src/data.ts; the city now lays only one street element per path cell.
+  - Lowered infrastructure surface height in src/utils/worldNavigation.ts so street tiles sit almost flush with the ground instead of reading like full-height blocks.
+- Validation:
+  - npm run lint (pass)
+  - npm run build (pass)
+  - Live dev server restarted on http://127.0.0.1:4275
+  - Screenshot: output/unified-street-layout.png
+- Remaining follow-up:
+  - The spawn camera is still too zoomed into the house, so the improved street system is hard to appreciate from the default view.
+  - If we want even cleaner roads, the next move is to add proper corner/T-junction variants instead of repeating the same straight street tile everywhere.

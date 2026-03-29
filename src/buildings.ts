@@ -260,23 +260,13 @@ genPark.addBox(-2, 2, 1, -1, 3, 1, TIMBER);
 genPark.addBox(-1, -1, 1, 1, 1, 1, BRASS);
 export const PARK_VOXELS = genPark.getVoxels();
 
-// 13. Sidewalk - cleaner curb and slab joints.
-const genSidewalk = new BuildingGenerator();
-genSidewalk.addBox(-5, -5, 0, 4, 4, 0, PAVEMENT);
-genSidewalk.addBox(-5, -5, 0, 4, -5, 0, CURB);
-genSidewalk.addBox(-5, 4, 0, 4, 4, 0, CURB);
-genSidewalk.addBox(-5, -5, 0, -5, 4, 0, CURB);
-genSidewalk.addBox(4, -5, 0, 4, 4, 0, CURB);
-genSidewalk.addBox(-1, -5, 0, -1, 4, 0, OFF_WHITE);
-genSidewalk.addBox(2, -5, 0, 2, 4, 0, OFF_WHITE);
-export const SIDEWALK_VOXELS = genSidewalk.getVoxels();
-
-// 14. Road - deliberate lane markings instead of noisy checker garbage.
-const genRoad = new BuildingGenerator();
-genRoad.addBox(-5, -5, 0, 4, 4, 0, ASPHALT);
-for (let y = -5; y <= 4; y += 3) {
-  genRoad.addBox(-1, y, 1, 0, Math.min(y + 1, 4), 1, OFF_WHITE);
-}
-genRoad.addBox(-5, -5, 1, -5, 4, 1, '#464b52');
-genRoad.addBox(4, -5, 1, 4, 4, 1, '#464b52');
-export const ROAD_VOXELS = genRoad.getVoxels();
+// 13/14. Unified street tile - one paving element with carriageway + shoulders.
+const genStreet = new BuildingGenerator();
+genStreet.addBox(-5, -5, 0, 4, 4, 0, PAVEMENT);
+genStreet.addBox(-3, -5, 0, 2, 4, 0, ASPHALT);
+genStreet.addBox(-1, -5, 0, 0, 4, 0, OFF_WHITE);
+genStreet.addBox(-5, -5, 0, -4, 4, 0, CURB);
+genStreet.addBox(3, -5, 0, 4, 4, 0, CURB);
+export const STREET_VOXELS = genStreet.getVoxels();
+export const ROAD_VOXELS = STREET_VOXELS;
+export const SIDEWALK_VOXELS = STREET_VOXELS;
