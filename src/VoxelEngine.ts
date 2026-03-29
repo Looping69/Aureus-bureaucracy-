@@ -192,7 +192,7 @@ export class VoxelEngine {
       0x94a3b8,
       0x64748b
     );
-    this.worldGrid.position.y = CONFIG.FLOOR_Y + 0.02;
+    this.worldGrid.position.set(-0.5, CONFIG.FLOOR_Y + 0.02, -0.5);
     const gridMaterial = this.worldGrid.material as THREE.Material | THREE.Material[];
     const materials = Array.isArray(gridMaterial) ? gridMaterial : [gridMaterial];
     materials.forEach((material) => {
