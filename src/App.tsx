@@ -266,7 +266,13 @@ export default function App() {
   }, []);
 
   const handleContinueGame = React.useCallback(() => {
-    const saved = loadSavedGameState();
+    let saved: GameState | null = null;
+    try {
+      saved = loadSavedGameState();
+    } catch {
+      setNotification({ title: 'Load Failed', msg: 'Save data is corrupted. Starting fresh.' });
+      return;
+    }
     if (!saved) return;
     setState(hydrateSavedState(saved));
     setSavePreview(saved);
@@ -369,36 +375,32 @@ export default function App() {
     }
 
     const energyCost = mine.travelTime * 5;
-    if (state.energy < energyCost) {
+    if (state.energy <= energyCost) {
       setNotification({ title: "Too Exhausted", msg: `Traveling to ${mine.name} requires ${energyCost} energy.` });
       return;
     }
 
     beginTrackedAction(`travel:${mineId}`);
-    setState(prev => ({
-      ...(prev.energy - energyCost <= 0
-        ? (() => {
-            const collapsed = applyExhaustionCollapse({
-              ...prev,
-              energy: prev.energy - energyCost,
-              time: (prev.time + mine.travelTime) % 24
-            });
-            setNotification(collapsed.notification);
-            return collapsed.nextState;
-          })()
-        : {
-            ...prev,
-            currentScene: 'MINE',
-            activeMineId: mineId,
-            energy: prev.energy - energyCost,
-            time: (prev.time + mine.travelTime) % 24
-          })
-    }));
-    setShowMinePicker(false);
-
-    if (state.energy - energyCost > 0) {
+    setState(prev => {
+      if (prev.energy - energyCost <= 0) {
+        const collapsed = applyExhaustionCollapse({
+          ...prev,
+          energy: prev.energy - energyCost,
+          time: (prev.time + mine.travelTime) % 24
+        });
+        setNotification(collapsed.notification);
+        return collapsed.nextState;
+      }
       setNotification({ title: "Travel Complete", msg: `You arrived at ${mine.name} after ${mine.travelTime} hours.` });
-    }
+      return {
+        ...prev,
+        currentScene: 'MINE' as const,
+        activeMineId: mineId,
+        energy: prev.energy - energyCost,
+        time: (prev.time + mine.travelTime) % 24
+      };
+    });
+    setShowMinePicker(false);
   };
 
   const openMineScene = () => {

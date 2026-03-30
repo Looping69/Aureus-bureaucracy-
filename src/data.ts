@@ -88,6 +88,8 @@ export const INITIAL_NPCS: Record<string, NPC> = {
     rivals: ['inspector'],
     allies: ['fixer'],
     workHours: { start: 10, end: 22 },
+    homeBuildingId: 'union_hall',
+    workBuildingId: 'union_hall',
     moodShiftType: 'HAPPY'
   },
   'inspector': {
@@ -111,6 +113,8 @@ export const INITIAL_NPCS: Record<string, NPC> = {
     rivals: ['union', 'fixer'],
     allies: ['licensing'],
     workHours: { start: 8, end: 16 },
+    homeBuildingId: 'inspector_hq',
+    workBuildingId: 'inspector_hq',
     moodShiftType: 'GRUMPY'
   },
   'fixer': {
@@ -134,6 +138,8 @@ export const INITIAL_NPCS: Record<string, NPC> = {
     rivals: ['licensing', 'inspector'],
     allies: ['union'],
     workHours: { start: 18, end: 4 },
+    homeBuildingId: 'fixer_den',
+    workBuildingId: 'fixer_den',
     moodShiftType: 'HAPPY'
   },
   'journalist': {
@@ -157,6 +163,8 @@ export const INITIAL_NPCS: Record<string, NPC> = {
     rivals: [],
     allies: [],
     workHours: { start: 0, end: 24 },
+    homeBuildingId: 'hotline_booth',
+    workBuildingId: 'hotline_booth',
     moodShiftType: 'NEUTRAL'
   },
   'chief': {
@@ -180,6 +188,8 @@ export const INITIAL_NPCS: Record<string, NPC> = {
     rivals: ['licensing'],
     allies: [],
     workHours: { start: 6, end: 20 },
+    homeBuildingId: 'chief_hut',
+    workBuildingId: 'chief_hut',
     moodShiftType: 'NEUTRAL'
   }
 };
@@ -313,7 +323,7 @@ export const INITIAL_MINES: Mine[] = [
     location: 'DEEP_WASTE',
     travelTime: 6,
     hasLocals: true,
-    chiefId: 'chief-hollow',
+    chiefId: 'chief',
     yield: 3,
     danger: 40,
     discovered: false,
