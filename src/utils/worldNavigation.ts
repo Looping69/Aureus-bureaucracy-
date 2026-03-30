@@ -9,9 +9,9 @@ export interface BuildingFootprint {
 }
 
 const INFRASTRUCTURE_BASE_HEIGHTS: Partial<Record<Building['type'], number>> = {
-  ROAD: CONFIG.FLOOR_Y + 0.01,
-  SIDEWALK: CONFIG.FLOOR_Y + 0.01,
-  PARK: CONFIG.FLOOR_Y + 0.08,
+  ROAD: CONFIG.FLOOR_Y + 0.05,
+  SIDEWALK: CONFIG.FLOOR_Y + 0.06,
+  PARK: CONFIG.FLOOR_Y + 0.12,
 };
 
 const WALKABLE_BUILDING_TYPES = new Set<Building['type']>([
