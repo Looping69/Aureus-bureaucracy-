@@ -1,9 +1,11 @@
-import { WorldPosition, Building } from '../types';
-import {
-  clampWorldPosition,
-  getBlockingFootprint,
-} from './worldNavigation';
+import { Building, WorldPosition } from '../types';
 import { WORLD_SIZE } from './voxelConstants';
+import {
+  buildWorldSurfaceMap,
+  getNearestWalkableTile,
+  getWorldSurfaceTile,
+  type WorldSurfaceMap,
+} from './worldSurface';
 
 export interface PathNode {
   x: number;
@@ -16,7 +18,7 @@ export interface PathNode {
 
 const STRAIGHT_COST = 1;
 const DIAGONAL_COST = Math.SQRT2;
-const SEARCH_RADIUS = 12;
+const STEP_HEIGHT_LIMIT = 1;
 
 const DIRECTIONS = [
   { x: 1, y: 0, cost: STRAIGHT_COST },
@@ -31,67 +33,54 @@ const DIRECTIONS = [
 
 const keyFor = (x: number, y: number) => `${x},${y}`;
 
+const clampWorldCoordinate = (value: number, mapSize: number) => {
+  const rounded = Math.round(value);
+  return Math.max(0, Math.min(mapSize - 1, rounded));
+};
+
+const clampWorldPosition = (
+  pos: WorldPosition,
+  mapSize: number
+): WorldPosition => ({
+  x: clampWorldCoordinate(pos.x, mapSize),
+  y: clampWorldCoordinate(pos.y, mapSize),
+});
+
 const octileDistance = (a: WorldPosition, b: WorldPosition) => {
   const dx = Math.abs(a.x - b.x);
   const dy = Math.abs(a.y - b.y);
   return dx + dy + (DIAGONAL_COST - 2) * Math.min(dx, dy);
 };
 
-const buildBlockedTiles = (buildings: Record<string, Building>) => {
+const buildBlockedTiles = (surfaceMap: WorldSurfaceMap) => {
   const blocked = new Set<string>();
 
-  Object.values(buildings).forEach((building) => {
-    const footprint = getBlockingFootprint(building);
-    if (!footprint) return;
-
-    for (let x = footprint.minX; x <= footprint.maxX; x++) {
-      for (let y = footprint.minY; y <= footprint.maxY; y++) {
-        blocked.add(keyFor(x, y));
-      }
+  surfaceMap.tiles.forEach((tile) => {
+    if (!tile.walkable) {
+      blocked.add(keyFor(tile.x, tile.y));
     }
   });
 
   return blocked;
 };
 
-const getFootprintApproachTargets = (
-  building: Building,
-  blocked: Set<string>,
-  mapSize: number
-) => {
-  const footprint = getBlockingFootprint(building);
-  if (!footprint) return [];
-
-  const candidates: WorldPosition[] = [];
-  const seen = new Set<string>();
-  const pushCandidate = (candidate: WorldPosition) => {
-    const clamped = clampWorldPosition(candidate, mapSize);
-    const candidateKey = keyFor(clamped.x, clamped.y);
-    if (seen.has(candidateKey) || blocked.has(candidateKey)) {
-      return;
-    }
-    seen.add(candidateKey);
-    candidates.push(clamped);
-  };
-
-  for (let x = footprint.minX - 1; x <= footprint.maxX + 1; x++) {
-    pushCandidate({ x, y: footprint.minY - 1 });
-    pushCandidate({ x, y: footprint.maxY + 1 });
-  }
-
-  for (let y = footprint.minY; y <= footprint.maxY; y++) {
-    pushCandidate({ x: footprint.minX - 1, y });
-    pushCandidate({ x: footprint.maxX + 1, y });
-  }
-
-  return candidates;
-};
-
 const isInBounds = (x: number, y: number, mapSize: number) =>
   x >= 0 && x < mapSize && y >= 0 && y < mapSize;
 
-const canOccupyTile = (x: number, y: number, blocked: Set<string>, mapSize: number) =>
-  isInBounds(x, y, mapSize) && !blocked.has(keyFor(x, y));
+const canOccupyTile = (
+  x: number,
+  y: number,
+  blocked: Set<string>,
+  mapSize: number,
+  surfaceMap: WorldSurfaceMap
+) => {
+  if (!isInBounds(x, y, mapSize) || blocked.has(keyFor(x, y))) {
+    return false;
+  }
+
+  const tile = getWorldSurfaceTile(surfaceMap, x, y);
+  return Boolean(tile?.walkable);
+};
 
 const reconstructPath = (node: PathNode) => {
   const path: WorldPosition[] = [];
@@ -109,11 +98,19 @@ const findPathOnGrid = (
   start: WorldPosition,
   end: WorldPosition,
   blocked: Set<string>,
-  mapSize: number
+  mapSize: number,
+  surfaceMap: WorldSurfaceMap
 ): WorldPosition[] => {
   const openList: PathNode[] = [];
   const openMap = new Map<string, PathNode>();
   const closed = new Set<string>();
+
+  const startTile = getWorldSurfaceTile(surfaceMap, start.x, start.y);
+  const endTile = getWorldSurfaceTile(surfaceMap, end.x, end.y);
+
+  if (!startTile || !endTile) {
+    return [];
+  }
 
   const startNode: PathNode = {
     x: start.x,
@@ -145,26 +142,44 @@ const findPathOnGrid = (
       return reconstructPath(current);
     }
 
+    const currentSurface = getWorldSurfaceTile(surfaceMap, current.x, current.y);
+    if (!currentSurface) {
+      continue;
+    }
+
     for (const direction of DIRECTIONS) {
       const nextX = current.x + direction.x;
       const nextY = current.y + direction.y;
       const nextKey = keyFor(nextX, nextY);
 
-      if (!canOccupyTile(nextX, nextY, blocked, mapSize) || closed.has(nextKey)) {
+      if (closed.has(nextKey)) {
         continue;
       }
 
-      // Do not let diagonals clip through building corners.
+      if (!canOccupyTile(nextX, nextY, blocked, mapSize, surfaceMap)) {
+        continue;
+      }
+
+      const nextSurface = getWorldSurfaceTile(surfaceMap, nextX, nextY);
+      if (!nextSurface) {
+        continue;
+      }
+
+      const heightDelta = Math.abs(nextSurface.height - currentSurface.height);
+      if (heightDelta > STEP_HEIGHT_LIMIT) {
+        continue;
+      }
+
       if (direction.x !== 0 && direction.y !== 0) {
         if (
-          !canOccupyTile(current.x + direction.x, current.y, blocked, mapSize) ||
-          !canOccupyTile(current.x, current.y + direction.y, blocked, mapSize)
+          !canOccupyTile(current.x + direction.x, current.y, blocked, mapSize, surfaceMap) ||
+          !canOccupyTile(current.x, current.y + direction.y, blocked, mapSize, surfaceMap)
         ) {
           continue;
         }
       }
 
-      const g = current.g + direction.cost;
+      const g = current.g + direction.cost + nextSurface.cost + heightDelta * 0.4;
       const existing = openMap.get(nextKey);
 
       if (!existing) {
@@ -190,83 +205,30 @@ const findPathOnGrid = (
   return [];
 };
 
-const getCandidateTargets = (
-  target: WorldPosition,
-  blocked: Set<string>,
-  mapSize: number,
-  buildings: Record<string, Building>
-) => {
-  const candidates: WorldPosition[] = [];
-  const seen = new Set<string>();
-
-  const pushCandidate = (candidate: WorldPosition) => {
-    const clamped = clampWorldPosition(candidate, mapSize);
-    const candidateKey = keyFor(clamped.x, clamped.y);
-    if (seen.has(candidateKey) || blocked.has(candidateKey)) {
-      return;
-    }
-    seen.add(candidateKey);
-    candidates.push(clamped);
-  };
-
-  pushCandidate(target);
-
-  Object.values(buildings).forEach((building) => {
-    const footprint = getBlockingFootprint(building);
-    if (!footprint) return;
-
-    const withinFootprint =
-      target.x >= footprint.minX &&
-      target.x <= footprint.maxX &&
-      target.y >= footprint.minY &&
-      target.y <= footprint.maxY;
-
-    if (!withinFootprint) return;
-
-    getFootprintApproachTargets(building, blocked, mapSize).forEach(pushCandidate);
-  });
-
-  for (let radius = 1; radius <= SEARCH_RADIUS; radius++) {
-    const ring: WorldPosition[] = [];
-    for (let dx = -radius; dx <= radius; dx++) {
-      ring.push({ x: target.x + dx, y: target.y - radius });
-      ring.push({ x: target.x + dx, y: target.y + radius });
-    }
-    for (let dy = -radius + 1; dy <= radius - 1; dy++) {
-      ring.push({ x: target.x - radius, y: target.y + dy });
-      ring.push({ x: target.x + radius, y: target.y + dy });
-    }
-
-    ring
-      .sort((a, b) => octileDistance(a, target) - octileDistance(b, target))
-      .forEach(pushCandidate);
-  }
-
-  return candidates;
-};
-
 export const findPath = (
   start: WorldPosition,
   end: WorldPosition,
   buildings: Record<string, Building>,
   mapSize: number = WORLD_SIZE
 ): WorldPosition[] => {
-  const startTile = clampWorldPosition(start, mapSize);
-  const endTile = clampWorldPosition(end, mapSize);
+  const surfaceMap = buildWorldSurfaceMap(buildings, mapSize);
+  const blocked = buildBlockedTiles(surfaceMap);
 
-  if (startTile.x === endTile.x && startTile.y === endTile.y) {
+  const startTile = getNearestWalkableTile(clampWorldPosition(start, mapSize), surfaceMap);
+  const endTile = getNearestWalkableTile(clampWorldPosition(end, mapSize), surfaceMap);
+
+  if (!startTile || !endTile) {
     return [];
   }
 
-  const blocked = buildBlockedTiles(buildings);
-  blocked.delete(keyFor(startTile.x, startTile.y));
+  const startPos = { x: startTile.x, y: startTile.y };
+  const endPos = { x: endTile.x, y: endTile.y };
 
-  for (const candidate of getCandidateTargets(endTile, blocked, mapSize, buildings)) {
-    const path = findPathOnGrid(startTile, candidate, blocked, mapSize);
-    if (path.length > 0) {
-      return path;
-    }
+  if (startPos.x === endPos.x && startPos.y === endPos.y) {
+    return [];
   }
 
-  return [];
+  blocked.delete(keyFor(startPos.x, startPos.y));
+
+  return findPathOnGrid(startPos, endPos, blocked, mapSize, surfaceMap);
 };

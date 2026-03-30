@@ -3,7 +3,12 @@ import { VoxelCharacter } from './VoxelCharacter';
 import { VoxelBuilding } from './VoxelBuilding';
 import { Building, NPC } from './types';
 import { CONFIG, WORLD_HALF_SIZE } from './utils/voxelConstants';
-import { getBuildingFootprint, getStructureBaseHeight } from './utils/worldNavigation';
+import {
+  getBuildingAccessPosition,
+  getBuildingFootprint,
+  getBuildingHeight,
+  getStructureBaseHeight,
+} from './utils/worldNavigation';
 
 export class EntityManager {
   private scene: THREE.Scene;
@@ -54,8 +59,14 @@ export class EntityManager {
       building.group.userData.buildingId = buildingData.id;
       building.group.userData.buildingType = buildingData.type;
       building.group.userData.worldFootprint = getBuildingFootprint(buildingData);
+      building.group.userData.worldAccessPoint = getBuildingAccessPosition(buildingData);
       this.buildings.set(buildingData.id, building);
       this.entityGroup.add(building.group);
+
+      const collider = this.createInteractionCollider(buildingData);
+      if (collider) {
+        building.group.add(collider);
+      }
 
       // Add light if it's a street light
       if (buildingData.name === 'Street Light') {
@@ -64,6 +75,53 @@ export class EntityManager {
         building.group.userData.lightPos = new THREE.Vector3(worldX + 1, CONFIG.FLOOR_Y + 6, worldZ);
       }
     }
+  }
+
+  private createInteractionCollider(buildingData: Building) {
+    if (['ROAD', 'SIDEWALK', 'PARK'].includes(buildingData.type)) {
+      return null;
+    }
+
+    const footprint = getBuildingFootprint(buildingData) ?? (
+      buildingData.type === 'MINE_ENTRANCE' || buildingData.type === 'HOTLINE'
+        ? {
+            minX: buildingData.pos.x - 1,
+            maxX: buildingData.pos.x + 1,
+            minY: buildingData.pos.y - 1,
+            maxY: buildingData.pos.y + 1,
+          }
+        : null
+    );
+
+    if (!footprint) {
+      return null;
+    }
+
+    const width = Math.max(1.5, footprint.maxX - footprint.minX + 1.25);
+    const depth = Math.max(1.5, footprint.maxY - footprint.minY + 1.25);
+    const height = Math.max(2.5, getBuildingHeight(buildingData) + 0.75);
+
+    const collider = new THREE.Mesh(
+      new THREE.BoxGeometry(width, height, depth),
+      new THREE.MeshBasicMaterial({
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+      })
+    );
+
+    collider.position.set(
+      (footprint.minX + footprint.maxX) / 2 - WORLD_HALF_SIZE,
+      getStructureBaseHeight(buildingData.type) + height / 2,
+      (footprint.minY + footprint.maxY) / 2 - WORLD_HALF_SIZE
+    );
+    collider.userData.buildingId = buildingData.id;
+    collider.userData.buildingType = buildingData.type;
+    collider.userData.worldFootprint = footprint;
+    collider.userData.worldAccessPoint = getBuildingAccessPosition(buildingData);
+    collider.renderOrder = -1;
+
+    return collider;
   }
 
   public addNPC(npcData: NPC, position: { x: number, y: number }) {
