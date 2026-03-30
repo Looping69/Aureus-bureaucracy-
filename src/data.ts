@@ -1302,6 +1302,67 @@ const createPlacedBuilding = (
   };
 };
 
+const getLayoutBounds = (buildings: Record<string, Building>) => {
+  const bounds = {
+    minX: Number.POSITIVE_INFINITY,
+    maxX: Number.NEGATIVE_INFINITY,
+    minY: Number.POSITIVE_INFINITY,
+    maxY: Number.NEGATIVE_INFINITY,
+  };
+
+  Object.values(buildings).forEach((building) => {
+    if (building.voxels && building.voxels.length > 0) {
+      building.voxels.forEach((voxel) => {
+        bounds.minX = Math.min(bounds.minX, building.pos.x + voxel.x);
+        bounds.maxX = Math.max(bounds.maxX, building.pos.x + voxel.x);
+        bounds.minY = Math.min(bounds.minY, building.pos.y + voxel.y);
+        bounds.maxY = Math.max(bounds.maxY, building.pos.y + voxel.y);
+      });
+      return;
+    }
+
+    bounds.minX = Math.min(bounds.minX, building.pos.x);
+    bounds.maxX = Math.max(bounds.maxX, building.pos.x);
+    bounds.minY = Math.min(bounds.minY, building.pos.y);
+    bounds.maxY = Math.max(bounds.maxY, building.pos.y);
+  });
+
+  return bounds;
+};
+
+const normalizeWorldLayout = (buildings: Record<string, Building>) => {
+  const WORLD_PADDING = 16;
+  const bounds = getLayoutBounds(buildings);
+  const currentCenterX = (bounds.minX + bounds.maxX) / 2;
+  const currentCenterY = (bounds.minY + bounds.maxY) / 2;
+
+  let offsetX = Math.round(WORLD_CENTER - currentCenterX);
+  let offsetY = Math.round(WORLD_CENTER - currentCenterY);
+
+  const shiftedMinX = bounds.minX + offsetX;
+  const shiftedMaxX = bounds.maxX + offsetX;
+  const shiftedMinY = bounds.minY + offsetY;
+  const shiftedMaxY = bounds.maxY + offsetY;
+
+  if (shiftedMinX < WORLD_PADDING) offsetX += WORLD_PADDING - shiftedMinX;
+  if (shiftedMaxX > WORLD_SIZE - 1 - WORLD_PADDING) offsetX -= shiftedMaxX - (WORLD_SIZE - 1 - WORLD_PADDING);
+  if (shiftedMinY < WORLD_PADDING) offsetY += WORLD_PADDING - shiftedMinY;
+  if (shiftedMaxY > WORLD_SIZE - 1 - WORLD_PADDING) offsetY -= shiftedMaxY - (WORLD_SIZE - 1 - WORLD_PADDING);
+
+  return Object.fromEntries(
+    Object.entries(buildings).map(([id, building]) => [
+      id,
+      {
+        ...building,
+        pos: {
+          x: building.pos.x + offsetX,
+          y: building.pos.y + offsetY,
+        },
+      },
+    ])
+  ) as Record<string, Building>;
+};
+
 const occupiedCityCells = new Set<string>();
 
 const cityStreets: Record<string, Building> = {
@@ -1464,4 +1525,4 @@ const baseBuildings: Record<string, Building> = {
   ...cityStreets,
 };
 
-export const BUILDINGS = baseBuildings;
+export const BUILDINGS = normalizeWorldLayout(baseBuildings);

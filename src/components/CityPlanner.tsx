@@ -19,6 +19,8 @@ import { Canvas, useThree } from '@react-three/fiber';
 import { OrthographicCamera, MapControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { BuildingMesh } from './BuildingMesh';
+import { WORLD_SIZE } from '../utils/voxelConstants';
+import type { BuildingFootprint } from '../utils/worldNavigation';
 
 interface CityPlannerProps {
   state: GameState;
@@ -41,8 +43,8 @@ const BUILDING_TEMPLATES: Partial<Building>[] = [
   { type: 'ROAD', name: 'Road', voxels: ROAD_VOXELS },
 ];
 
-const GRID_SIZE = 16; // 1:10 scale of 160x160
 const WORLD_SCALE = 10;
+const GRID_SIZE = WORLD_SIZE / WORLD_SCALE;
 
 const GridPlane = ({ onHover, onClick, onLeave, onRightClick, isPainting, setIsPainting, isErasing, setIsErasing, hasTemplate }: any) => {
   return (
@@ -103,32 +105,86 @@ export const CityPlanner: React.FC<CityPlannerProps> = ({ state, onUpdateBuildin
   const [isPainting, setIsPainting] = useState(false);
   const [isErasing, setIsErasing] = useState(false);
 
+  const getPlacementFootprint = (building: Building): BuildingFootprint | null => {
+    if (!building.voxels || building.voxels.length === 0) {
+      return {
+        minX: building.pos.x,
+        maxX: building.pos.x,
+        minY: building.pos.y,
+        maxY: building.pos.y,
+      };
+    }
+
+    return building.voxels.reduce(
+      (bounds, voxel) => ({
+        minX: Math.min(bounds.minX, building.pos.x + voxel.x),
+        maxX: Math.max(bounds.maxX, building.pos.x + voxel.x),
+        minY: Math.min(bounds.minY, building.pos.y + voxel.y),
+        maxY: Math.max(bounds.maxY, building.pos.y + voxel.y),
+      }),
+      {
+        minX: Number.POSITIVE_INFINITY,
+        maxX: Number.NEGATIVE_INFINITY,
+        minY: Number.POSITIVE_INFINITY,
+        maxY: Number.NEGATIVE_INFINITY,
+      }
+    );
+  };
+
+  const getPlannedBuilding = (template: Partial<Building>, pos: { x: number; y: number }) => ({
+    id: 'preview',
+    npcId: 'none',
+    name: template.name || 'Preview',
+    pos: {
+      x: pos.x * WORLD_SCALE + 5,
+      y: pos.y * WORLD_SCALE + 5,
+    },
+    type: (template.type as Building['type']) || 'HOME',
+    isDiscovered: true,
+    voxels: template.voxels,
+  } as Building);
+
+  type Footprint = BuildingFootprint;
+
+  const footprintsOverlap = (a: Footprint, b: Footprint) =>
+    !(a.maxX < b.minX || a.minX > b.maxX || a.maxY < b.minY || a.minY > b.maxY);
+
   const isValidPlacement = (x: number, y: number) => {
     if (x < 0 || x >= GRID_SIZE || y < 0 || y >= GRID_SIZE) return false;
+    if (!selectedTemplate) return false;
 
-    // Check if occupied by another building in the same grid cell
-    const isOccupied = Object.values(tempBuildings).some(b => {
-      const bx = Math.floor(b.pos.x / WORLD_SCALE);
-      const by = Math.floor(b.pos.y / WORLD_SCALE);
-      return bx === x && by === y;
+    const preview = getPlannedBuilding(selectedTemplate, { x, y });
+    const previewFootprint = getPlacementFootprint(preview);
+    if (!previewFootprint) return false;
+
+    if (
+      previewFootprint.minX < 0 ||
+      previewFootprint.minY < 0 ||
+      previewFootprint.maxX >= WORLD_SIZE ||
+      previewFootprint.maxY >= WORLD_SIZE
+    ) {
+      return false;
+    }
+
+    return !Object.values(tempBuildings).some((existing) => {
+      const existingFootprint = getPlacementFootprint(existing);
+      return existingFootprint ? footprintsOverlap(previewFootprint, existingFootprint) : false;
     });
-
-    return !isOccupied;
   };
 
   const placeBuilding = (pos: {x: number, y: number}) => {
     if (!selectedTemplate || !isValidPlacement(pos.x, pos.y)) return;
 
     const newId = `custom_${Date.now()}_${Math.random()}`;
+    const worldPos = {
+      x: pos.x * WORLD_SCALE + 5,
+      y: pos.y * WORLD_SCALE + 5
+    };
     const newBuilding: Building = {
       id: newId,
       npcId: 'none',
       name: selectedTemplate.name || 'New Building',
-      // Map back to world coordinates (centered in the 10x10 cell)
-      pos: { 
-        x: pos.x * WORLD_SCALE + 5, 
-        y: pos.y * WORLD_SCALE + 5 
-      },
+      pos: worldPos,
       type: selectedTemplate.type as any || 'HOME',
       isDiscovered: true,
       voxels: selectedTemplate.voxels
@@ -145,9 +201,11 @@ export const CityPlanner: React.FC<CityPlannerProps> = ({ state, onUpdateBuildin
       const next = { ...prev };
       const idToRemove = Object.keys(next).find(id => {
         const b = next[id];
-        const bx = Math.floor(b.pos.x / WORLD_SCALE);
-        const by = Math.floor(b.pos.y / WORLD_SCALE);
-        return bx === pos.x && by === pos.y;
+      const footprint = getPlacementFootprint(b);
+      if (!footprint) return false;
+      const worldX = pos.x * WORLD_SCALE + 5;
+      const worldY = pos.y * WORLD_SCALE + 5;
+      return worldX >= footprint.minX && worldX <= footprint.maxX && worldY >= footprint.minY && worldY <= footprint.maxY;
       });
       if (idToRemove) {
         delete next[idToRemove];
@@ -292,4 +350,3 @@ export const CityPlanner: React.FC<CityPlannerProps> = ({ state, onUpdateBuildin
     </div>
   );
 };
-

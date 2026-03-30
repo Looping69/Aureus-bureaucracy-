@@ -43,6 +43,46 @@ export const WorldScene = ({
     () => state.buildings.player_home ? getBuildingFootprint(state.buildings.player_home) : null,
     [state.buildings]
   );
+  const mapItems = React.useMemo(
+    () => Object.values(state.buildings).map((building) => ({
+      id: building.id,
+      type: building.type,
+      pos: building.pos,
+      footprint: getBuildingFootprint(building),
+    })),
+    [state.buildings]
+  );
+  const cityBounds = React.useMemo(() => {
+    const entries = mapItems.flatMap((item) => {
+      if (item.footprint) {
+        return [item.footprint.minX, item.footprint.maxX, item.footprint.minY, item.footprint.maxY];
+      }
+      return [item.pos.x, item.pos.y];
+    });
+
+    if (entries.length === 0) return null;
+
+    let minX = Number.POSITIVE_INFINITY;
+    let maxX = Number.NEGATIVE_INFINITY;
+    let minY = Number.POSITIVE_INFINITY;
+    let maxY = Number.NEGATIVE_INFINITY;
+
+    mapItems.forEach((item) => {
+      if (item.footprint) {
+        minX = Math.min(minX, item.footprint.minX);
+        maxX = Math.max(maxX, item.footprint.maxX);
+        minY = Math.min(minY, item.footprint.minY);
+        maxY = Math.max(maxY, item.footprint.maxY);
+      } else {
+        minX = Math.min(minX, item.pos.x);
+        maxX = Math.max(maxX, item.pos.x);
+        minY = Math.min(minY, item.pos.y);
+        maxY = Math.max(maxY, item.pos.y);
+      }
+    });
+
+    return { minX, maxX, minY, maxY };
+  }, [mapItems]);
   const miniMapScale = 144 / WORLD_SIZE;
   const toMiniMapStyle = React.useCallback(
     (x: number, y: number, width: number = 1, height: number = 1) => ({
@@ -238,6 +278,42 @@ export const WorldScene = ({
                   )}
                 />
               )}
+              {mapItems.map((item) => {
+                if (item.id === 'player_home') return null;
+                if (item.footprint) {
+                  return (
+                    <div
+                      key={item.id}
+                      className={`absolute rounded-sm border ${
+                        item.type === 'ROAD'
+                          ? 'border-slate-600/80 bg-slate-700/35'
+                          : item.type === 'PARK'
+                            ? 'border-emerald-500/70 bg-emerald-500/25'
+                            : 'border-sky-500/70 bg-sky-500/20'
+                      }`}
+                      style={toMiniMapStyle(
+                        item.footprint.minX,
+                        item.footprint.minY,
+                        item.footprint.maxX - item.footprint.minX + 1,
+                        item.footprint.maxY - item.footprint.minY + 1
+                      )}
+                    />
+                  );
+                }
+
+                return (
+                  <div
+                    key={item.id}
+                    className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full border border-sky-500 bg-sky-400"
+                    style={{
+                      left: `${item.pos.x * miniMapScale}px`,
+                      top: `${item.pos.y * miniMapScale}px`,
+                      width: '4px',
+                      height: '4px',
+                    }}
+                  />
+                );
+              })}
               <div
                 className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full border border-white bg-sky-500 shadow"
                 style={{
@@ -264,6 +340,7 @@ export const WorldScene = ({
               <p>Player {playerGridPos.x},{playerGridPos.y}</p>
               <p>Hover {hoverInfo ? `${hoverInfo.x},${hoverInfo.y},${hoverInfo.z}` : '--'}</p>
               <p>House {homeFootprint ? `${homeFootprint.minX}-${homeFootprint.maxX} / ${homeFootprint.minY}-${homeFootprint.maxY}` : '--'}</p>
+              <p>City {cityBounds ? `${cityBounds.minX}-${cityBounds.maxX} / ${cityBounds.minY}-${cityBounds.maxY}` : '--'}</p>
             </div>
           </div>
         </div>

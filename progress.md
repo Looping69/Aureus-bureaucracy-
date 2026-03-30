@@ -381,3 +381,22 @@ Original prompt: Okay so there are still so many gaps in the gameplay we need to
 - Remaining follow-up:
   - The spawn camera is still too zoomed into the house, so the improved street system is hard to appreciate from the default view.
   - If we want even cleaner roads, the next move is to add proper corner/T-junction variants instead of repeating the same straight street tile everywhere.
+- World bounds normalization pass (2026-03-29, continued):
+  - Added layout bound calculation in src/data.ts using actual voxel footprints, not just nominal cell positions.
+  - Added normalizeWorldLayout() so the entire city layout is shifted back inside the 240x240 world with padding if any footprint drifts outward.
+  - Updated the WorldScene debug mini-map to render all building/road footprints and show aggregate city bounds, not just the player's house.
+- Validation:
+  - npm run lint (pass)
+  - npm run build (pass)
+  - Live screenshot on Vite dev server (port 3001 due 3000 conflict): output/world-map-bounds-check.png
+  - Observed debug city bounds: x 53-188 / y 48-192 inside the 240x240 world.
+- World-grid alignment pass (2026-03-30):
+  - CityPlanner was still hardcoded to a 160x160 editor grid. Updated it to derive the grid size from WORLD_SIZE so the editor matches the actual 240x240 world.
+  - Planner placement/removal now uses footprint-based collision checks instead of center-cell checks, which prevents street/building templates from spilling outside the world or overlapping silently.
+  - The city/world layout remains normalized against actual voxel footprints, so the city stays inside bounds after placement changes.
+- Validation:
+  - npm run lint (pass)
+  - npm run build (pass)
+  - Live dev server on http://127.0.0.1:3001
+- Follow-up:
+  - The world debug overlay is still visible in the main world view and should be hidden again once placement validation is done.
