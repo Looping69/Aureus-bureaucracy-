@@ -22,7 +22,7 @@ export const applyTakePhoto = (
   }
 
   const building = prev.activeBuildingId ? prev.buildings[prev.activeBuildingId] : null;
-  const targetNpcId = (building && building.npcId !== 'none') ? building.npcId : 'licensing';
+  const targetNpcId = (building?.npcId && building.npcId !== 'none') ? building.npcId : 'licensing';
 
   let dirtType: DirtType = 'PERMIT_VIOLATION';
   if (item.type === 'DIRT') dirtType = 'BACKROOM_DEAL';

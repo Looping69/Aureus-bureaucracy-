@@ -58,6 +58,9 @@ export class VoxelEngine {
   
   private animationId: number = 0;
   private lastTime: number = 0;
+  private boundPointerMove!: (e: PointerEvent) => void;
+  private boundPointerDown!: (e: PointerEvent) => void;
+  private boundPointerLeave!: () => void;
   
   // Edit State
   private isEditMode: boolean = false;
@@ -239,13 +242,16 @@ export class VoxelEngine {
     // Entities (Player, Buildings, etc)
     this.entities = new EntityManager(this.scene);
 
-    // Events
-    this.container.addEventListener('pointermove', this.onPointerMove.bind(this));
-    this.container.addEventListener('pointerdown', this.onPointerDown.bind(this));
-    this.container.addEventListener('pointerleave', () => {
+    // Events - store bound references for cleanup
+    this.boundPointerMove = this.onPointerMove.bind(this);
+    this.boundPointerDown = this.onPointerDown.bind(this);
+    this.boundPointerLeave = () => {
       this.updateHoverSelector(null);
       this.onHoverPosition?.(null);
-    });
+    };
+    this.container.addEventListener('pointermove', this.boundPointerMove);
+    this.container.addEventListener('pointerdown', this.boundPointerDown);
+    this.container.addEventListener('pointerleave', this.boundPointerLeave);
 
     this.animate = this.animate.bind(this);
     this.updateTime(this.time);
@@ -1598,6 +1604,9 @@ export class VoxelEngine {
 
   public cleanup() {
     cancelAnimationFrame(this.animationId);
+    this.container.removeEventListener('pointermove', this.boundPointerMove);
+    this.container.removeEventListener('pointerdown', this.boundPointerDown);
+    this.container.removeEventListener('pointerleave', this.boundPointerLeave);
     if (this.container && this.renderer.domElement.parentElement === this.container) {
       this.container.removeChild(this.renderer.domElement);
     }
