@@ -4,7 +4,7 @@ import { VoxelEngine } from '../VoxelEngine';
 export const useCameraControls = (engineRef: React.MutableRefObject<VoxelEngine | null>) => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const moveSpeed = 2;
+      const moveSpeed = 3;
       if (engineRef.current) {
         if (e.key === 'w' || e.key === 'ArrowUp') engineRef.current.moveCamera(0, -moveSpeed);
         if (e.key === 's' || e.key === 'ArrowDown') engineRef.current.moveCamera(0, moveSpeed);

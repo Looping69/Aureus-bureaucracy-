@@ -25,6 +25,8 @@ export class VoxelObject {
     geometry.setAttribute('normal', new THREE.Float32BufferAttribute(meshData.normals, 3));
     geometry.setAttribute('color', new THREE.Float32BufferAttribute(meshData.colors, 3));
     geometry.setIndex(meshData.indices);
+    geometry.computeBoundingSphere();
+    geometry.computeBoundingBox();
     
     const material = new THREE.MeshStandardMaterial({ 
         vertexColors: true,
@@ -35,6 +37,7 @@ export class VoxelObject {
     const mesh = new THREE.Mesh(geometry, material);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
+    mesh.frustumCulled = true;
     this.group.add(mesh);
   }
 

@@ -13,8 +13,8 @@ import { GreedyMesher } from './utils/GreedyMesher';
 import { BuildingFootprint } from './utils/worldNavigation';
 
 export class VoxelEngine {
-  private static readonly MIN_CAMERA_POLAR = Math.PI / 5;
-  private static readonly MAX_CAMERA_POLAR = 0.95;
+  private static readonly MIN_CAMERA_POLAR = Math.PI / 8;
+  private static readonly MAX_CAMERA_POLAR = Math.PI / 2.2;
   private container: HTMLElement;
   private scene: THREE.Scene;
   private camera: THREE.PerspectiveCamera;
@@ -32,6 +32,8 @@ export class VoxelEngine {
   private targetIndicator: THREE.Mesh;
   private pathLine: THREE.Line;
   private skyDome: THREE.Mesh;
+  private floor: THREE.Mesh;
+  private worldGrid: THREE.GridHelper;
   public entities: EntityManager;
   private dummy = new THREE.Object3D();
   
@@ -89,7 +91,7 @@ export class VoxelEngine {
 
     // Init Three.js
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.Fog(CONFIG.BG_COLOR, 60, 140);
+    this.scene.fog = new THREE.Fog(CONFIG.BG_COLOR, 200, 500);
     
     this.physicsWorld = new CANNON.World({
       gravity: new CANNON.Vec3(0, -9.82, 0),
@@ -101,11 +103,12 @@ export class VoxelEngine {
     const width = this.container.clientWidth || window.innerWidth;
     const height = this.container.clientHeight || window.innerHeight;
 
-    this.camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
-    this.camera.position.set(18, 24, 18);
+    this.camera = new THREE.PerspectiveCamera(50, width / height, 0.5, 2000);
+    this.camera.position.set(20, 30, 20);
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     this.renderer.setClearColor(0x000000, 0); // Transparent background
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.setSize(width, height);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
@@ -113,34 +116,38 @@ export class VoxelEngine {
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
-    this.controls.dampingFactor = 0.05;
+    this.controls.dampingFactor = 0.08;
     this.controls.screenSpacePanning = true;
     this.controls.autoRotate = false;
     this.controls.target.set(0, 0, 0);
     this.controls.minPolarAngle = VoxelEngine.MIN_CAMERA_POLAR;
     this.controls.maxPolarAngle = VoxelEngine.MAX_CAMERA_POLAR;
-    this.controls.minDistance = 16;
-    this.controls.maxDistance = 120;
+    this.controls.minDistance = 10;
+    this.controls.maxDistance = 200;
+    this.controls.zoomSpeed = 1.2;
+    this.controls.rotateSpeed = 0.6;
     this.controls.update();
     this.enforceCameraBounds();
 
     // Lights
-    this.ambientLight = new THREE.AmbientLight(0xffffff, 0.1);
+    this.ambientLight = new THREE.AmbientLight(0xffffff, 0.15);
     this.scene.add(this.ambientLight);
 
-    this.hemiLight = new THREE.HemisphereLight(0x87CEEB, 0x3b82f6, 0.2);
+    this.hemiLight = new THREE.HemisphereLight(0x87CEEB, 0x3b82f6, 0.25);
     this.scene.add(this.hemiLight);
     
     this.dirLight = new THREE.DirectionalLight(0xffffff, 0);
     this.dirLight.position.set(50, 80, 30);
     this.dirLight.castShadow = true;
-    this.dirLight.shadow.mapSize.width = 2048;
-    this.dirLight.shadow.mapSize.height = 2048;
-    this.dirLight.shadow.camera.left = -60;
-    this.dirLight.shadow.camera.right = 60;
-    this.dirLight.shadow.camera.top = 60;
-    this.dirLight.shadow.camera.bottom = -60;
-    this.dirLight.shadow.bias = -0.0005;
+    this.dirLight.shadow.mapSize.width = 4096;
+    this.dirLight.shadow.mapSize.height = 4096;
+    this.dirLight.shadow.camera.left = -100;
+    this.dirLight.shadow.camera.right = 100;
+    this.dirLight.shadow.camera.top = 100;
+    this.dirLight.shadow.camera.bottom = -100;
+    this.dirLight.shadow.camera.near = 0.5;
+    this.dirLight.shadow.camera.far = 400;
+    this.dirLight.shadow.bias = -0.0003;
     this.scene.add(this.dirLight);
 
     this.playerLight = new THREE.PointLight(0xffffff, 0.8, 10);
@@ -174,14 +181,14 @@ export class VoxelEngine {
     this.scene.add(this.moon);
 
     // Sky Dome
-    const skyGeom = new THREE.SphereGeometry(500, 32, 32);
+    const skyGeom = new THREE.SphereGeometry(900, 64, 64);
     const skyMat = new THREE.MeshBasicMaterial({ color: 0x87CEEB, side: THREE.BackSide });
     this.skyDome = new THREE.Mesh(skyGeom, skyMat);
     this.scene.add(this.skyDome);
 
     // Floor
     const planeMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 1 });
-    this.floor = new THREE.Mesh(new THREE.PlaneGeometry(WORLD_SIZE + 12, WORLD_SIZE + 12), planeMat);
+    this.floor = new THREE.Mesh(new THREE.PlaneGeometry(WORLD_SIZE + 40, WORLD_SIZE + 40), planeMat);
     this.floor.rotation.x = -Math.PI / 2;
     this.floor.position.y = CONFIG.FLOOR_Y - 5.51; // Below the sand layer
     this.floor.receiveShadow = true;
@@ -269,17 +276,27 @@ export class VoxelEngine {
   }
 
   public moveCamera(dx: number, dz: number) {
-    this.controls.target.x += dx;
-    this.controls.target.z += dz;
-    this.camera.position.x += dx;
-    this.camera.position.z += dz;
+    // Move camera relative to its current orientation for intuitive WASD controls
+    const forward = new THREE.Vector3();
+    this.camera.getWorldDirection(forward);
+    forward.y = 0;
+    forward.normalize();
+    const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
+
+    const moveX = right.x * dx + forward.x * dz;
+    const moveZ = right.z * dx + forward.z * dz;
+
+    this.controls.target.x += moveX;
+    this.controls.target.z += moveZ;
+    this.camera.position.x += moveX;
+    this.camera.position.z += moveZ;
     this.clampCameraTargetToWorldBounds();
     this.enforceCameraBounds();
     this.controls.update();
   }
 
   public zoomCamera(delta: number) {
-    const zoomSpeed = 2;
+    const zoomSpeed = 3;
     const direction = new THREE.Vector3();
     this.camera.getWorldDirection(direction);
     
@@ -329,7 +346,12 @@ export class VoxelEngine {
 
     const isDay = time >= 6 && time < 18;
     const fogColor = isDay ? 0xe2e8f0 : 0x020617;
-    this.scene.fog?.color.setHex(fogColor);
+    if (this.scene.fog) {
+      this.scene.fog.color.setHex(fogColor);
+      // Push fog far enough so world never vanishes during navigation
+      (this.scene.fog as THREE.Fog).near = isDay ? 250 : 150;
+      (this.scene.fog as THREE.Fog).far = isDay ? 600 : 400;
+    }
 
     // Update street lights
     const isNight = time >= 19 || time < 6;
@@ -405,9 +427,9 @@ export class VoxelEngine {
   public recenterOnPlayer() {
     this.controls.target.copy(this.currentPlayerPos);
     this.camera.position.set(
-      this.currentPlayerPos.x + 18,
-      this.currentPlayerPos.y + 24,
-      this.currentPlayerPos.z + 18
+      this.currentPlayerPos.x + 20,
+      this.currentPlayerPos.y + 30,
+      this.currentPlayerPos.z + 20
     );
     this.enforceCameraBounds();
     this.controls.update();
@@ -431,7 +453,7 @@ export class VoxelEngine {
     offset.setFromSpherical(spherical);
     this.camera.position.copy(this.controls.target).add(offset);
 
-    const minimumHeight = this.controls.target.y + 8;
+    const minimumHeight = this.controls.target.y + 4;
     if (this.camera.position.y < minimumHeight) {
       this.camera.position.y = minimumHeight;
     }
@@ -451,12 +473,6 @@ export class VoxelEngine {
     this.terrainGroup.children.forEach((child) => {
       if (child instanceof THREE.Mesh) {
         objectsToCheck.push(child);
-      } else if (child instanceof THREE.LOD) {
-        child.levels.forEach((level) => {
-          if (level.object instanceof THREE.Mesh) {
-            objectsToCheck.push(level.object);
-          }
-        });
       }
     });
     return objectsToCheck;
@@ -753,11 +769,7 @@ export class VoxelEngine {
         
         // Check if intersect.object is one of our terrain meshes
         const isTerrainMesh = this.terrainGroup.children.some(child => {
-            if (child === intersect.object) return true;
-            if (child instanceof THREE.LOD) {
-                return child.levels.some(level => level.object === intersect.object);
-            }
-            return false;
+            return child === intersect.object;
         });
 
         if (isTerrainMesh) {
@@ -861,11 +873,7 @@ export class VoxelEngine {
 
         // Check if intersect.object is one of our terrain meshes
         const isTerrainMesh = this.terrainGroup.children.some(child => {
-            if (child === intersect.object) return true;
-            if (child instanceof THREE.LOD) {
-                return child.levels.some(level => level.object === intersect.object);
-            }
-            return false;
+            return child === intersect.object;
         });
 
         if (isTerrainMesh) {
@@ -960,14 +968,6 @@ export class VoxelEngine {
             child.geometry.dispose();
             if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
             else child.material.dispose();
-        } else if (child instanceof THREE.LOD) {
-            child.levels.forEach(level => {
-                if (level.object instanceof THREE.Mesh) {
-                    level.object.geometry.dispose();
-                    if (Array.isArray(level.object.material)) level.object.material.forEach(m => m.dispose());
-                    else level.object.material.dispose();
-                }
-            });
         }
     }
     this.optimizedMesh = null;
@@ -996,15 +996,14 @@ export class VoxelEngine {
         });
 
         chunks.forEach((voxels) => {
-            const lod = new THREE.LOD();
-            
-            // High detail
             const meshData = GreedyMesher.mesh(voxels);
             const geometry = new THREE.BufferGeometry();
             geometry.setAttribute('position', new THREE.Float32BufferAttribute(meshData.positions, 3));
             geometry.setAttribute('normal', new THREE.Float32BufferAttribute(meshData.normals, 3));
             geometry.setAttribute('color', new THREE.Float32BufferAttribute(meshData.colors, 3));
             geometry.setIndex(meshData.indices);
+            geometry.computeBoundingSphere();
+            geometry.computeBoundingBox();
             
             const material = new THREE.MeshStandardMaterial({ 
                 vertexColors: true,
@@ -1018,10 +1017,7 @@ export class VoxelEngine {
             mesh.receiveShadow = true;
             mesh.frustumCulled = true;
             
-            lod.addLevel(mesh, 0);
-            lod.addLevel(new THREE.Object3D(), 100); // Hide at distance
-            
-            this.terrainGroup.add(lod);
+            this.terrainGroup.add(mesh);
         });
     } else {
         // Fallback to InstancedMesh for physics

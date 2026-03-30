@@ -27,11 +27,12 @@ export const BuildingMesh = ({ voxels, position, opacity = 1 }: { voxels: Buildi
       if (meshRef.current.instanceColor) {
         meshRef.current.instanceColor.needsUpdate = true;
       }
+      meshRef.current.computeBoundingSphere();
     }
   }, [voxels]);
 
   return (
-    <instancedMesh ref={meshRef} args={[undefined, undefined, voxels.length]} position={position} frustumCulled={false} raycast={() => null}>
+    <instancedMesh ref={meshRef} args={[undefined, undefined, voxels.length]} position={position} frustumCulled={true} raycast={() => null}>
       <boxGeometry args={[1, 1, 1]} />
       <meshStandardMaterial roughness={0.8} metalness={0.2} transparent={opacity < 1} opacity={opacity} />
     </instancedMesh>
