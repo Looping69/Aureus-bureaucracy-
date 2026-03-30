@@ -125,7 +125,11 @@ export const WorldScene = ({
     if (target.kind === 'BUILDING' && target.id) {
       const building = state.buildings[target.id];
       if (!building) return;
-      if (building.id === 'player_home') {
+
+      // Show the entry prompt for every interactable building type so
+      // the player can choose to move to it or enter it directly.
+      const interactableTypes = ['OFFICE', 'HOME', 'MINE_ENTRANCE', 'PUB', 'HOTLINE'];
+      if (interactableTypes.includes(building.type)) {
         setBuildingPromptId(target.id);
         return;
       }

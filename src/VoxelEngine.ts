@@ -190,12 +190,12 @@ export class VoxelEngine {
     this.skyDome = new THREE.Mesh(skyGeom, skyMat);
     this.scene.add(this.skyDome);
 
-    // Floor
-    const planeMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 1 });
-    this.floor = new THREE.Mesh(new THREE.PlaneGeometry(WORLD_SIZE + 40, WORLD_SIZE + 40), planeMat);
+    // Floor – use an unlit material that matches the fog colour so the plane
+    // blends seamlessly with the background at every camera angle.
+    const planeMat = new THREE.MeshBasicMaterial({ color: 0xe2e8f0 });
+    this.floor = new THREE.Mesh(new THREE.PlaneGeometry(WORLD_SIZE * 4, WORLD_SIZE * 4), planeMat);
     this.floor.rotation.x = -Math.PI / 2;
-    this.floor.position.y = CONFIG.FLOOR_Y - 5.51; // Below the sand layer
-    this.floor.receiveShadow = true;
+    this.floor.position.y = CONFIG.FLOOR_Y - 5.01; // Below the sand layer
     this.scene.add(this.floor);
 
     this.worldGrid = new THREE.GridHelper(
@@ -356,6 +356,9 @@ export class VoxelEngine {
       (this.scene.fog as THREE.Fog).near = isDay ? VoxelEngine.FOG_NEAR_DAY : VoxelEngine.FOG_NEAR_NIGHT;
       (this.scene.fog as THREE.Fog).far = isDay ? VoxelEngine.FOG_FAR_DAY : VoxelEngine.FOG_FAR_NIGHT;
     }
+
+    // Keep the floor colour in sync with the fog so it stays invisible
+    (this.floor.material as THREE.MeshBasicMaterial).color.setHex(fogColor);
 
     // Update street lights
     const isNight = time >= 19 || time < 6;
