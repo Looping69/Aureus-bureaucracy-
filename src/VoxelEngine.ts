@@ -23,7 +23,6 @@ export class VoxelEngine {
   private physicsWorld: CANNON.World;
   private instanceMesh: THREE.InstancedMesh | null = null;
   private terrainGroup: THREE.Group;
-  private floor: THREE.Mesh;
   private sun: THREE.Mesh;
   private moon: THREE.Mesh;
   private ambientLight: THREE.AmbientLight;
@@ -32,7 +31,6 @@ export class VoxelEngine {
   private playerLight: THREE.PointLight;
   private targetIndicator: THREE.Mesh;
   private pathLine: THREE.Line;
-  private worldGrid: THREE.GridHelper;
   private skyDome: THREE.Mesh;
   public entities: EntityManager;
   private dummy = new THREE.Object3D();
@@ -178,40 +176,6 @@ export class VoxelEngine {
     this.skyDome = new THREE.Mesh(skyGeom, skyMat);
     this.scene.add(this.skyDome);
 
-    // Floor
-    const planeMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 1 });
-    this.floor = new THREE.Mesh(new THREE.PlaneGeometry(WORLD_SIZE + 12, WORLD_SIZE + 12), planeMat);
-    this.floor.rotation.x = -Math.PI / 2;
-    this.floor.position.y = CONFIG.FLOOR_Y - 5.51; // Below the sand layer
-    this.floor.receiveShadow = true;
-    this.scene.add(this.floor);
-
-    this.worldGrid = new THREE.GridHelper(
-      WORLD_SIZE,
-      WORLD_SIZE,
-      0x94a3b8,
-      0x64748b
-    );
-    this.worldGrid.position.y = CONFIG.FLOOR_Y + 0.02;
-    const gridMaterial = this.worldGrid.material as THREE.Material | THREE.Material[];
-    const materials = Array.isArray(gridMaterial) ? gridMaterial : [gridMaterial];
-    materials.forEach((material) => {
-      if (material instanceof THREE.LineBasicMaterial) {
-        material.transparent = true;
-        material.opacity = 0.22;
-        material.depthWrite = false;
-      }
-    });
-    this.scene.add(this.worldGrid);
-
-    const floorBody = new CANNON.Body({
-      type: CANNON.Body.STATIC,
-      shape: new CANNON.Plane(),
-    });
-    floorBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
-    floorBody.position.set(0, CONFIG.FLOOR_Y - 5.51, 0);
-    this.physicsWorld.addBody(floorBody);
-
     // Ghost Voxels
     const ghostGeom = new THREE.BoxGeometry(CONFIG.VOXEL_SIZE, CONFIG.VOXEL_SIZE, CONFIG.VOXEL_SIZE);
     const ghostMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.3 });
@@ -269,6 +233,7 @@ export class VoxelEngine {
     this.controls.target.z += dz;
     this.camera.position.x += dx;
     this.camera.position.z += dz;
+    this.clampCameraTargetToWorldBounds();
     this.enforceCameraBounds();
     this.controls.update();
   }
@@ -432,8 +397,16 @@ export class VoxelEngine {
     }
   }
 
+  private clampCameraTargetToWorldBounds() {
+    const worldLimit = WORLD_HALF_SIZE - 6;
+    this.controls.target.x = THREE.MathUtils.clamp(this.controls.target.x, -worldLimit, worldLimit);
+    this.controls.target.z = THREE.MathUtils.clamp(this.controls.target.z, -worldLimit, worldLimit);
+    this.camera.position.x = THREE.MathUtils.clamp(this.camera.position.x, -worldLimit, worldLimit);
+    this.camera.position.z = THREE.MathUtils.clamp(this.camera.position.z, -worldLimit, worldLimit);
+  }
+
   private collectTerrainObjects() {
-    const objectsToCheck: THREE.Object3D[] = [this.floor];
+    const objectsToCheck: THREE.Object3D[] = [];
     if (this.instanceMesh) objectsToCheck.push(this.instanceMesh);
     this.terrainGroup.children.forEach((child) => {
       if (child instanceof THREE.Mesh) {
@@ -451,11 +424,8 @@ export class VoxelEngine {
 
   private getSnappedWorldPoint(intersect: THREE.Intersection) {
     const pos = new THREE.Vector3();
-    if (intersect.object === this.floor) {
-      pos.copy(intersect.point).add(new THREE.Vector3(0, 0.5, 0));
-    } else {
-      pos.copy(intersect.point).add(intersect.face!.normal.clone().multiplyScalar(0.5));
-    }
+    const normal = intersect.face?.normal?.clone() ?? new THREE.Vector3(0, 1, 0);
+    pos.copy(intersect.point).add(normal.multiplyScalar(0.5));
 
     return {
       x: Math.round(pos.x + WORLD_HALF_SIZE),
@@ -501,6 +471,11 @@ export class VoxelEngine {
     while (obj && !(obj instanceof THREE.Scene)) {
       for (const [id, entity] of entries) {
         if (entity.group === obj) {
+          const buildingType = entity.group.userData.buildingType as string | undefined;
+          if (buildingType && ['ROAD', 'SIDEWALK', 'PARK'].includes(buildingType)) {
+            return null;
+          }
+
           const snapped = this.getSnappedWorldPoint(intersect);
           return {
             x: snapped.x,
@@ -521,10 +496,8 @@ export class VoxelEngine {
   private resolveWorldTarget() {
     this.raycaster.setFromCamera(this.pointer, this.camera);
 
-    const groundTarget = this.getGroundPlaneTarget();
     const npcGroups = Array.from(this.entities.npcs.values()).map((n) => n.group);
     const buildingGroups = Array.from(this.entities.buildings.values()).map((b) => b.group);
-    const terrainObjects = this.collectTerrainObjects();
     const npcIntersects = this.raycaster.intersectObjects(npcGroups, true);
     if (npcIntersects.length > 0) {
       const npcTarget = this.resolveEntityTarget(npcIntersects[0], 'NPC');
@@ -537,21 +510,12 @@ export class VoxelEngine {
     if (buildingIntersects.length > 0) {
       const buildingIntersect = buildingIntersects[0];
       const buildingTarget = this.resolveEntityTarget(buildingIntersect, 'BUILDING');
-      const buildingFootprint = this.findBuildingFootprint(buildingIntersect.object);
-      const hitTopSurface = Math.abs(buildingIntersect.face?.normal.y ?? 0) > 0.5;
-
       if (buildingTarget) {
-        if (groundTarget && buildingFootprint) {
-          const distance = this.distanceToFootprint(groundTarget.x, groundTarget.y, buildingFootprint);
-          if (distance > 1.5 && !hitTopSurface) {
-            return groundTarget;
-          }
-        }
-
         return buildingTarget;
       }
     }
 
+    const terrainObjects = this.collectTerrainObjects();
     const terrainIntersects = this.raycaster.intersectObjects(terrainObjects, true);
     if (terrainIntersects.length > 0) {
       const snapped = this.getSnappedWorldPoint(terrainIntersects[0]);
@@ -564,7 +528,7 @@ export class VoxelEngine {
       };
     }
 
-    return groundTarget;
+    return null;
   }
 
   private updateHoverSelector(target: WorldHoverInfo | null) {
@@ -575,24 +539,6 @@ export class VoxelEngine {
 
     this.hoverSelector.position.set(target.x - WORLD_HALF_SIZE, target.z + 0.03, target.y - WORLD_HALF_SIZE);
     this.hoverSelector.visible = true;
-  }
-
-  private getGroundPlaneTarget(): WorldHoverInfo | null {
-    const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -(CONFIG.FLOOR_Y + 0.5));
-    const point = new THREE.Vector3();
-    const hit = this.raycaster.ray.intersectPlane(plane, point);
-
-    if (!hit) {
-      return null;
-    }
-
-    return {
-      x: Math.round(point.x + WORLD_HALF_SIZE),
-      y: Math.round(point.z + WORLD_HALF_SIZE),
-      z: Math.round(point.y),
-      kind: 'GROUND',
-      label: 'Ground',
-    };
   }
 
   private findBuildingFootprint(object: THREE.Object3D): BuildingFootprint | null {
@@ -658,9 +604,7 @@ export class VoxelEngine {
     // Shift + Click Explosion (Removes voxels)
     if (event.shiftKey) {
       this.raycaster.setFromCamera(this.pointer, this.camera);
-      const objectsToCheck: THREE.Object3D[] = [this.floor];
-      if (this.instanceMesh) objectsToCheck.push(this.instanceMesh);
-      if (this.optimizedMesh) objectsToCheck.push(this.optimizedMesh);
+      const objectsToCheck = this.collectTerrainObjects();
 
       const intersects = this.raycaster.intersectObjects(objectsToCheck);
       
@@ -705,16 +649,7 @@ export class VoxelEngine {
     // If physics is active, applying force
     if (this.state === AppState.DISMANTLING) {
         this.raycaster.setFromCamera(this.pointer, this.camera);
-        const objectsToCheck: THREE.Object3D[] = [this.floor];
-        if (this.instanceMesh) objectsToCheck.push(this.instanceMesh);
-        this.terrainGroup.children.forEach(child => {
-            if (child instanceof THREE.Mesh) objectsToCheck.push(child);
-            else if (child instanceof THREE.LOD) {
-                child.levels.forEach(level => {
-                    if (level.object instanceof THREE.Mesh) objectsToCheck.push(level.object);
-                });
-            }
-        });
+        const objectsToCheck = this.collectTerrainObjects();
 
         const intersects = this.raycaster.intersectObjects(objectsToCheck);
         if (intersects.length > 0) {
@@ -756,16 +691,7 @@ export class VoxelEngine {
     
     // Perform Raycast
     this.raycaster.setFromCamera(this.pointer, this.camera);
-    const objectsToCheck: THREE.Object3D[] = [this.floor];
-    if (this.instanceMesh) objectsToCheck.push(this.instanceMesh);
-    this.terrainGroup.children.forEach(child => {
-        if (child instanceof THREE.Mesh) objectsToCheck.push(child);
-        else if (child instanceof THREE.LOD) {
-            child.levels.forEach(level => {
-                if (level.object instanceof THREE.Mesh) objectsToCheck.push(level.object);
-            });
-        }
-    });
+    const objectsToCheck = this.collectTerrainObjects();
 
     const intersects = this.raycaster.intersectObjects(objectsToCheck);
 
@@ -774,11 +700,8 @@ export class VoxelEngine {
       const pos = new THREE.Vector3();
 
       if (this.activeTool === EditTool.BRUSH) {
-        if (intersect.object === this.floor) {
-          pos.copy(intersect.point).add(new THREE.Vector3(0, 0.5, 0));
-        } else {
-          pos.copy(intersect.point).add(intersect.face!.normal.clone().multiplyScalar(0.5));
-        }
+        const normal = intersect.face?.normal?.clone() ?? new THREE.Vector3(0, 1, 0);
+        pos.copy(intersect.point).add(normal.multiplyScalar(0.5));
         
         const gridPos = { x: Math.round(pos.x), y: Math.round(pos.y), z: Math.round(pos.z) };
         this.addVoxelAt(gridPos.x, gridPos.y, gridPos.z, true);
@@ -798,7 +721,8 @@ export class VoxelEngine {
         });
 
         if (isTerrainMesh) {
-             pos.copy(intersect.point).sub(intersect.face!.normal.clone().multiplyScalar(0.5));
+             const normal = intersect.face?.normal?.clone() ?? new THREE.Vector3(0, 1, 0);
+             pos.copy(intersect.point).sub(normal.multiplyScalar(0.5));
              targetX = Math.round(pos.x);
              targetY = Math.round(pos.y);
              targetZ = Math.round(pos.z);
@@ -808,7 +732,7 @@ export class VoxelEngine {
              if (index !== -1) {
                  this.removeVoxelAt(index, true);
              }
-        } else if (intersect.object !== this.floor && intersect.instanceId !== undefined) {
+        } else if (intersect.instanceId !== undefined) {
           this.removeVoxelAt(intersect.instanceId, true);
         }
       }
@@ -858,16 +782,7 @@ export class VoxelEngine {
 
   private updateGhost() {
     this.raycaster.setFromCamera(this.pointer, this.camera);
-    const objectsToCheck: THREE.Object3D[] = [this.floor];
-    if (this.instanceMesh) objectsToCheck.push(this.instanceMesh);
-    this.terrainGroup.children.forEach(child => {
-        if (child instanceof THREE.Mesh) objectsToCheck.push(child);
-        else if (child instanceof THREE.LOD) {
-            child.levels.forEach(level => {
-                if (level.object instanceof THREE.Mesh) objectsToCheck.push(level.object);
-            });
-        }
-    });
+    const objectsToCheck = this.collectTerrainObjects();
 
     const intersects = this.raycaster.intersectObjects(objectsToCheck);
 
@@ -876,11 +791,8 @@ export class VoxelEngine {
       const pos = new THREE.Vector3();
       
       if (this.activeTool === EditTool.BRUSH) {
-        if (intersect.object === this.floor) {
-          pos.copy(intersect.point).add(new THREE.Vector3(0, 0.5, 0));
-        } else {
-          pos.copy(intersect.point).add(intersect.face!.normal.clone().multiplyScalar(0.5));
-        }
+        const normal = intersect.face?.normal?.clone() ?? new THREE.Vector3(0, 1, 0);
+        pos.copy(intersect.point).add(normal.multiplyScalar(0.5));
         
         const gridX = Math.round(pos.x);
         const gridY = Math.round(pos.y);
@@ -917,12 +829,13 @@ export class VoxelEngine {
         });
 
         if (isTerrainMesh) {
-             pos.copy(intersect.point).sub(intersect.face!.normal.clone().multiplyScalar(0.5));
+             const normal = intersect.face?.normal?.clone() ?? new THREE.Vector3(0, 1, 0);
+             pos.copy(intersect.point).sub(normal.multiplyScalar(0.5));
              targetX = Math.round(pos.x);
              targetY = Math.round(pos.y);
              targetZ = Math.round(pos.z);
              found = true;
-        } else if (intersect.object !== this.floor && intersect.instanceId !== undefined) {
+        } else if (intersect.instanceId !== undefined) {
           const vox = this.voxels[intersect.instanceId];
           targetX = vox.x;
           targetY = vox.y;

@@ -2,8 +2,8 @@ import React, { useEffect, useRef } from 'react';
 import { VoxelEngine } from '../VoxelEngine';
 import { Building, NPC, AppState, VoxelData, WorldHoverInfo } from '../types';
 import { useCameraControls } from '../hooks/useCameraControls';
-import { getWorldSurfaceHeight } from '../utils/worldNavigation';
 import { WORLD_HALF_SIZE } from '../utils/voxelConstants';
+import { buildWorldSurfaceMap, getWorldSurfaceHeight } from '../utils/worldSurface';
 
 interface VoxelWorldProps {
   voxels: VoxelData[];
@@ -38,9 +38,10 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<VoxelEngine | null>(null);
+  const surfaceMap = React.useMemo(() => buildWorldSurfaceMap(buildings), [buildings]);
   const playerSurfaceY = React.useMemo(
-    () => getWorldSurfaceHeight(playerPos, buildings),
-    [buildings, playerPos]
+    () => getWorldSurfaceHeight(playerPos, surfaceMap),
+    [playerPos, surfaceMap]
   );
 
   useCameraControls(engineRef);

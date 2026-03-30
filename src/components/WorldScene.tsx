@@ -1,11 +1,12 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { DoorOpen, MapPin, MoveDiagonal2, X } from 'lucide-react';
-import { GameState, WorldHoverInfo, WorldPosition, VoxelData } from '../types';
-import { COLORS, CONFIG, WORLD_SIZE } from '../utils/voxelConstants';
+import { GameState, WorldHoverInfo, WorldPosition } from '../types';
 import { VoxelWorldContainer } from './VoxelWorldContainer';
 import { getBuildingAccessPosition } from '../utils/buildingAccess';
 import { getBuildingFootprint } from '../utils/worldNavigation';
+import { buildWorldTerrainVoxels } from '../utils/worldSurface';
+import { WORLD_SIZE } from '../utils/voxelConstants';
 
 export const WorldScene = ({ 
   state, 
@@ -94,55 +95,10 @@ export const WorldScene = ({
     [miniMapScale]
   );
 
-  const allVoxels = React.useMemo(() => {
-    const voxels: VoxelData[] = [];
-    const size = WORLD_SIZE;
-    for (let x = 0; x < size; x++) {
-      for (let z = 0; z < size; z++) {
-        const worldX = x - size / 2;
-        const worldZ = z - size / 2;
-        
-        // Grass Layer
-        voxels.push({
-          x: worldX,
-          y: CONFIG.FLOOR_Y,
-          z: worldZ,
-          color: COLORS.GRASS
-        });
-
-        // Layers Underneath
-        // y = -1, -2: Dirt
-        for (let y = CONFIG.FLOOR_Y - 1; y >= CONFIG.FLOOR_Y - 2; y--) {
-          voxels.push({
-            x: worldX,
-            y: y,
-            z: worldZ,
-            color: COLORS.DARK // Using DARK as dirt
-          });
-        }
-
-        // y = -3, -4: Stone
-        for (let y = CONFIG.FLOOR_Y - 3; y >= CONFIG.FLOOR_Y - 4; y--) {
-          voxels.push({
-            x: worldX,
-            y: y,
-            z: worldZ,
-            color: COLORS.GREY // Using GREY as stone
-          });
-        }
-
-        // y = -5: Sand
-        voxels.push({
-          x: worldX,
-          y: CONFIG.FLOOR_Y - 5,
-          z: worldZ,
-          color: COLORS.SAND
-        });
-      }
-    }
-    
-    return voxels;
-  }, []);
+  const allVoxels = React.useMemo(
+    () => buildWorldTerrainVoxels(state.buildings, WORLD_SIZE).voxels,
+    [state.buildings]
+  );
 
   const worldBuildings = React.useMemo(
     () => Object.values(state.buildings),
@@ -168,14 +124,15 @@ export const WorldScene = ({
 
     if (target.kind === 'BUILDING' && target.id) {
       const building = state.buildings[target.id];
-      if (building?.id === 'player_home') {
+      if (!building) return;
+      if (building.id === 'player_home') {
         setBuildingPromptId(target.id);
         return;
       }
 
-      confirmGroundMove(target);
+      onMove(getBuildingAccessPosition(building));
     }
-  }, [confirmGroundMove, onInteract, state.buildings]);
+  }, [confirmGroundMove, onInteract, onMove, state.buildings]);
   const flushHoverPosition = React.useCallback(() => {
     hoverRafRef.current = null;
     const pending = pendingHoverPosRef.current;
