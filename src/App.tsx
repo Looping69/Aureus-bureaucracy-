@@ -374,14 +374,13 @@ export default function App() {
       return;
     }
 
-    const energyCost = mine.travelTime * 5;
-    if (state.energy <= energyCost) {
-      setNotification({ title: "Too Exhausted", msg: `Traveling to ${mine.name} requires ${energyCost} energy.` });
-      return;
-    }
-
     beginTrackedAction(`travel:${mineId}`);
     setState(prev => {
+      const energyCost = mine.travelTime * 5;
+      if (prev.energy <= energyCost) {
+        setNotification({ title: "Too Exhausted", msg: `Traveling to ${mine.name} requires more than ${energyCost} energy.` });
+        return prev;
+      }
       if (prev.energy - energyCost <= 0) {
         const collapsed = applyExhaustionCollapse({
           ...prev,

@@ -184,7 +184,7 @@ export const applyMineTileInteraction = (
     } else {
       notifications.push({
         title: 'Strike!',
-        msg: `Found ${oreGain} Ore.`
+        msg: `Extracted ${oreGain} Ore. Export for cash at the market.`
       });
     }
   } else if (tile.stability < 55) {
