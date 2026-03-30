@@ -15,7 +15,8 @@ export const WorldScene = ({
   onEnterHome,
   onEnterMine,
   onRecenter,
-  onTravel
+  onTravel,
+  showDebug = false
 }: { 
   state: GameState, 
   onMove: (pos: WorldPosition) => void,
@@ -23,7 +24,8 @@ export const WorldScene = ({
   onEnterHome: () => void,
   onEnterMine: () => void,
   onRecenter: () => void,
-  onTravel: (mineId: string) => void
+  onTravel: (mineId: string) => void,
+  showDebug?: boolean
 }) => {
   const [showTravelMenu, setShowTravelMenu] = React.useState(false);
   const [hoverInfo, setHoverInfo] = React.useState<WorldHoverInfo | null>(null);
@@ -187,7 +189,8 @@ export const WorldScene = ({
         onSelect={handleWorldSelect}
       />
 
-      {/* Coordinate Display */}
+      {/* Coordinate Display (debug only) */}
+      {showDebug && (
       <div className="absolute top-4 left-4 pointer-events-none flex flex-col gap-3">
         <div className={`backdrop-blur-md px-3 py-1.5 border border-black/10 rounded-lg shadow-sm transition-all ${isNight ? 'bg-slate-900/40 text-slate-400' : 'bg-white/40 text-slate-600'}`}>
           <p className="text-[10px] font-mono uppercase tracking-widest flex items-center gap-2">
@@ -306,6 +309,7 @@ export const WorldScene = ({
           </div>
         </div>
       </div>
+      )}
 
       {/* UI Overlay */}
       <div className="absolute bottom-4 right-4">

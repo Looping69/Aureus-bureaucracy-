@@ -210,7 +210,7 @@ export class VoxelEngine {
     materials.forEach((material) => {
       if (material instanceof THREE.LineBasicMaterial) {
         material.transparent = true;
-        material.opacity = 0.22;
+        material.opacity = 0;
         material.depthWrite = false;
       }
     });
