@@ -15,6 +15,10 @@ import { BuildingFootprint } from './utils/worldNavigation';
 export class VoxelEngine {
   private static readonly MIN_CAMERA_POLAR = Math.PI / 8;
   private static readonly MAX_CAMERA_POLAR = Math.PI / 2.2;
+  private static readonly FOG_NEAR_DAY = 250;
+  private static readonly FOG_FAR_DAY = 600;
+  private static readonly FOG_NEAR_NIGHT = 150;
+  private static readonly FOG_FAR_NIGHT = 400;
   private container: HTMLElement;
   private scene: THREE.Scene;
   private camera: THREE.PerspectiveCamera;
@@ -181,7 +185,7 @@ export class VoxelEngine {
     this.scene.add(this.moon);
 
     // Sky Dome
-    const skyGeom = new THREE.SphereGeometry(900, 64, 64);
+    const skyGeom = new THREE.SphereGeometry(900, 32, 32);
     const skyMat = new THREE.MeshBasicMaterial({ color: 0x87CEEB, side: THREE.BackSide });
     this.skyDome = new THREE.Mesh(skyGeom, skyMat);
     this.scene.add(this.skyDome);
@@ -349,8 +353,8 @@ export class VoxelEngine {
     if (this.scene.fog) {
       this.scene.fog.color.setHex(fogColor);
       // Push fog far enough so world never vanishes during navigation
-      (this.scene.fog as THREE.Fog).near = isDay ? 250 : 150;
-      (this.scene.fog as THREE.Fog).far = isDay ? 600 : 400;
+      (this.scene.fog as THREE.Fog).near = isDay ? VoxelEngine.FOG_NEAR_DAY : VoxelEngine.FOG_NEAR_NIGHT;
+      (this.scene.fog as THREE.Fog).far = isDay ? VoxelEngine.FOG_FAR_DAY : VoxelEngine.FOG_FAR_NIGHT;
     }
 
     // Update street lights
