@@ -262,11 +262,11 @@ export const PARK_VOXELS = genPark.getVoxels();
 
 // 13/14. Unified street tile - one paving element with carriageway + shoulders.
 const genStreet = new BuildingGenerator();
-genStreet.addBox(-5, -5, 0, 4, 4, 0, PAVEMENT);
-genStreet.addBox(-3, -5, 0, 2, 4, 0, ASPHALT);
-genStreet.addBox(-1, -5, 0, 0, 4, 0, OFF_WHITE);
-genStreet.addBox(-5, -5, 0, -4, 4, 0, CURB);
-genStreet.addBox(3, -5, 0, 4, 4, 0, CURB);
+genStreet.addBox(-4, -4, 0, 4, 4, 0, PAVEMENT);
+genStreet.addBox(-2, -4, 0, 2, 4, 0, ASPHALT);
+genStreet.addBox(0, -4, 0, 0, 4, 0, OFF_WHITE);
+genStreet.addBox(-4, -4, 0, -3, 4, 0, CURB);
+genStreet.addBox(3, -4, 0, 4, 4, 0, CURB);
 export const STREET_VOXELS = genStreet.getVoxels();
 export const ROAD_VOXELS = STREET_VOXELS;
 export const SIDEWALK_VOXELS = STREET_VOXELS;

@@ -129,7 +129,7 @@ export const applyMineTileInteraction = (
 
   const instabilityPenalty = tile.stability < 55 ? 15 : 0;
   const safetyReduction = hasSafetyKit ? 12 : 0;
-  const hazardChance = Math.max(2, activeMine.danger + instabilityPenalty - safetyReduction - (hasCommunityBacking ? 8 : 0));
+  const hazardChance = Math.min(95, Math.max(2, activeMine.danger + instabilityPenalty - safetyReduction - (hasCommunityBacking ? 8 : 0)));
   const riskRoll = Math.random() * 100;
   const isHazard = riskRoll < hazardChance;
   const isGasLeak = isHazard && Math.random() > 0.5;
@@ -176,8 +176,6 @@ export const applyMineTileInteraction = (
   } else if (isCaveIn) {
     notifications.push({ title: 'Cave-In!', msg: 'Unstable ground collapsed. You lost some ore and energy.' });
   } else if (tile.type === 'ORE') {
-    const hasWashPlant = prev.permits['wash-plant-permit']?.status === 'APPROVED';
-    const multiplier = hasWashPlant ? 2 : 1;
     if (richVeinBonus > 0) {
       notifications.push({
         title: 'Rich Vein!',
@@ -186,7 +184,7 @@ export const applyMineTileInteraction = (
     } else {
       notifications.push({
         title: 'Strike!',
-        msg: `Found ${activeMine.yield * multiplier} Ore worth $${activeMine.yield * 50 * multiplier}.`
+        msg: `Extracted ${oreGain} Ore. Export for cash at the market.`
       });
     }
   } else if (tile.stability < 55) {

@@ -81,6 +81,7 @@ export const buildSpecialDialogueOptions = ({
     {
       text: `Small Talk: Compliment their work (+Trust / minor risk)`,
       action: (s: GameState) => {
+        const freshNpc = s.npcs[npc.id];
         const success = Math.random() > 0.3;
         const baseGain = success ? 5 : -2;
         const gain = applyMood(Math.round(baseGain * profile.trustVolatility));
@@ -88,7 +89,7 @@ export const buildSpecialDialogueOptions = ({
         return {
           npcs: {
             ...s.npcs,
-            [npc.id]: { ...npc, trustLevel: clampPercent(npc.trustLevel + gain) }
+            [npc.id]: { ...freshNpc, trustLevel: clampPercent(freshNpc.trustLevel + gain) }
           }
         };
       }
@@ -101,6 +102,7 @@ export const buildSpecialDialogueOptions = ({
       text: addCooldownLabel(`Target Vulnerability: ${npc.vulnerability.description} (+Trust, +Leverage${npc.id === 'licensing' || npc.id === 'inspector' ? effectLabel('bureauPull', 10) : npc.id === 'chief' || npc.id === 'union' ? effectLabel('communityBacking', 12) : npc.id === 'fixer' ? effectLabel('marketInsight', 12) : ''})`, state, key),
       condition: (s: GameState) => npc.trustLevel >= 20 && !isCoolingDown(s, key),
       action: (s: GameState) => {
+        const freshNpc = s.npcs[npc.id];
         const gain = applyMood(Math.round(25 * profile.trustVolatility));
         const worldEffects =
           npc.id === 'licensing' || npc.id === 'inspector'
@@ -117,7 +119,7 @@ export const buildSpecialDialogueOptions = ({
           worldEffects,
           npcs: {
             ...s.npcs,
-            [npc.id]: { ...npc, trustLevel: clampPercent(npc.trustLevel + gain) }
+            [npc.id]: { ...freshNpc, trustLevel: clampPercent(freshNpc.trustLevel + gain) }
           }
         };
       }
@@ -136,6 +138,7 @@ export const buildSpecialDialogueOptions = ({
         s.money >= bribeCost &&
         !isCoolingDown(s, key),
       action: (s: GameState) => {
+        const freshNpc = s.npcs[npc.id];
         const gain = applyMood(Math.round(14 * profile.trustVolatility));
         triggerFeedback(npc.id, gain, 'TRUST');
         return {
@@ -147,7 +150,7 @@ export const buildSpecialDialogueOptions = ({
           },
           npcs: {
             ...s.npcs,
-            [npc.id]: { ...npc, trustLevel: clampPercent(npc.trustLevel + gain) }
+            [npc.id]: { ...freshNpc, trustLevel: clampPercent(freshNpc.trustLevel + gain) }
           }
         };
       }
@@ -168,7 +171,8 @@ export const buildSpecialDialogueOptions = ({
         Object.values(s.permits).some(p => p.status === 'PENDING') &&
         !isCoolingDown(s, key),
       action: (s: GameState) => {
-        const successRate = Math.min(95, Math.max(10, (npc.trustLevel / 2) + (npc.leverage * 1.5) + profile.negotiateBonus));
+        const freshNpc = s.npcs[npc.id];
+        const successRate = Math.min(95, Math.max(10, (freshNpc.trustLevel / 2) + (freshNpc.leverage * 1.5) + profile.negotiateBonus));
         const roll = Math.random() * 100;
 
         if (roll < successRate) {
@@ -194,7 +198,7 @@ export const buildSpecialDialogueOptions = ({
           },
           npcs: {
             ...s.npcs,
-            [npc.id]: { ...npc, trustLevel: Math.max(0, npc.trustLevel - trustPenalty) }
+            [npc.id]: { ...freshNpc, trustLevel: Math.max(0, freshNpc.trustLevel - trustPenalty) }
           }
         };
       }
@@ -234,6 +238,7 @@ export const buildSpecialDialogueOptions = ({
       text: 'Buy Movement Upgrade: Sturdy Boots (-$200, +Speed)',
       condition: (s: GameState) => s.money >= 200 && !s.upgrades.includes('boots'),
       action: (s: GameState) => {
+        const freshNpc = s.npcs[npc.id];
         triggerFeedback(npc.id, 5, 'TRUST');
         return {
           money: s.money - 200,
@@ -241,7 +246,7 @@ export const buildSpecialDialogueOptions = ({
           upgrades: [...s.upgrades, 'boots'],
           npcs: {
             ...s.npcs,
-            [npc.id]: { ...npc, trustLevel: clampPercent(npc.trustLevel + 5) }
+            [npc.id]: { ...freshNpc, trustLevel: clampPercent(freshNpc.trustLevel + 5) }
           }
         };
       }
@@ -250,6 +255,7 @@ export const buildSpecialDialogueOptions = ({
       text: 'Buy Movement Upgrade: Used Scooter (-$1000, ++Speed)',
       condition: (s: GameState) => s.money >= 1000 && s.upgrades.includes('boots') && !s.upgrades.includes('scooter'),
       action: (s: GameState) => {
+        const freshNpc = s.npcs[npc.id];
         triggerFeedback(npc.id, 10, 'TRUST');
         return {
           money: s.money - 1000,
@@ -257,7 +263,7 @@ export const buildSpecialDialogueOptions = ({
           upgrades: [...s.upgrades, 'scooter'],
           npcs: {
             ...s.npcs,
-            [npc.id]: { ...npc, trustLevel: clampPercent(npc.trustLevel + 10) }
+            [npc.id]: { ...freshNpc, trustLevel: clampPercent(freshNpc.trustLevel + 10) }
           }
         };
       }
@@ -266,6 +272,7 @@ export const buildSpecialDialogueOptions = ({
       text: 'Buy Movement Upgrade: Rusty Truck (-$5000, +++Speed)',
       condition: (s: GameState) => s.money >= 5000 && s.upgrades.includes('scooter') && !s.upgrades.includes('truck'),
       action: (s: GameState) => {
+        const freshNpc = s.npcs[npc.id];
         triggerFeedback(npc.id, 20, 'TRUST');
         return {
           money: s.money - 5000,
@@ -273,7 +280,7 @@ export const buildSpecialDialogueOptions = ({
           upgrades: [...s.upgrades, 'truck'],
           npcs: {
             ...s.npcs,
-            [npc.id]: { ...npc, trustLevel: clampPercent(npc.trustLevel + 20) }
+            [npc.id]: { ...freshNpc, trustLevel: clampPercent(freshNpc.trustLevel + 20) }
           }
         };
       }
@@ -287,6 +294,8 @@ export const buildSpecialDialogueOptions = ({
         action: (s: GameState) => {
           const dirtTypes: DirtType[] = ['PERMIT_VIOLATION', 'BACKROOM_DEAL', 'PERSONAL_SECRET'];
           const targetIds = Object.keys(s.npcs).filter(id => id !== 'fixer' && id !== 'journalist');
+
+          if (targetIds.length === 0) return { evidence: 0 };
 
           const newDirt: DirtItem[] = Array.from({ length: s.evidence }).map((_, i) => {
             const type = dirtTypes[Math.floor(Math.random() * dirtTypes.length)];
@@ -411,10 +420,11 @@ export const buildSpecialDialogueOptions = ({
       action: (s: GameState) => {
         const item = s.dirtItems[0];
         const remainingDirt = s.dirtItems.slice(1);
+        const freshNpc = s.npcs[npc.id];
 
         if (item.targetNpcId === npc.id) {
-          triggerFeedback(npc.id, -npc.trustLevel, 'TRUST');
-          triggerFeedback(npc.id, -npc.leverage, 'LEVERAGE');
+          triggerFeedback(npc.id, -freshNpc.trustLevel, 'TRUST');
+          triggerFeedback(npc.id, -freshNpc.leverage, 'LEVERAGE');
           return {
             dirtItems: remainingDirt,
             dialogueCooldowns: withCooldown(s, key, 12),
@@ -432,7 +442,7 @@ export const buildSpecialDialogueOptions = ({
             },
             npcs: {
               ...s.npcs,
-              [npc.id]: { ...npc, trustLevel: 0, leverage: 0 }
+              [npc.id]: { ...freshNpc, trustLevel: 0, leverage: 0 }
             }
           };
         }
@@ -456,7 +466,7 @@ export const buildSpecialDialogueOptions = ({
           },
           npcs: {
             ...s.npcs,
-            [npc.id]: { ...npc, trustLevel: Math.min(100, npc.trustLevel + 15) },
+            [npc.id]: { ...freshNpc, trustLevel: Math.min(100, freshNpc.trustLevel + 15) },
             [item.targetNpcId]: { ...target, trustLevel: Math.max(0, target.trustLevel - 30) }
           }
         };
@@ -470,10 +480,11 @@ export const buildSpecialDialogueOptions = ({
       text: addCooldownLabel('Use Leverage to Fast-Track Permit (-20 Leverage, instant approval)', state, key),
       condition: (s: GameState) => !isCoolingDown(s, key),
       action: (s: GameState) => {
+        const freshNpc = s.npcs[npc.id];
         triggerFeedback(npc.id, -20, 'LEVERAGE');
         return {
           dialogueCooldowns: withCooldown(s, key, 12),
-          npcs: { ...s.npcs, [npc.id]: { ...npc, leverage: Math.max(0, npc.leverage - 20) } },
+          npcs: { ...s.npcs, [npc.id]: { ...freshNpc, leverage: Math.max(0, freshNpc.leverage - 20) } },
           permits: Object.fromEntries(
             Object.entries(s.permits).map(([id, p]) =>
               p.status === 'PENDING' ? [id, { ...p, status: 'APPROVED' as const }] : [id, p]

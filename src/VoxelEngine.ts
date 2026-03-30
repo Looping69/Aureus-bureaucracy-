@@ -56,6 +56,9 @@ export class VoxelEngine {
   
   private animationId: number = 0;
   private lastTime: number = 0;
+  private boundPointerMove!: (e: PointerEvent) => void;
+  private boundPointerDown!: (e: PointerEvent) => void;
+  private boundPointerLeave!: () => void;
   
   // Edit State
   private isEditMode: boolean = false;
@@ -176,6 +179,40 @@ export class VoxelEngine {
     this.skyDome = new THREE.Mesh(skyGeom, skyMat);
     this.scene.add(this.skyDome);
 
+    // Floor
+    const planeMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 1 });
+    this.floor = new THREE.Mesh(new THREE.PlaneGeometry(WORLD_SIZE + 12, WORLD_SIZE + 12), planeMat);
+    this.floor.rotation.x = -Math.PI / 2;
+    this.floor.position.y = CONFIG.FLOOR_Y - 5.51; // Below the sand layer
+    this.floor.receiveShadow = true;
+    this.scene.add(this.floor);
+
+    this.worldGrid = new THREE.GridHelper(
+      WORLD_SIZE,
+      WORLD_SIZE,
+      0x94a3b8,
+      0x64748b
+    );
+    this.worldGrid.position.set(-0.5, CONFIG.FLOOR_Y + 0.02, -0.5);
+    const gridMaterial = this.worldGrid.material as THREE.Material | THREE.Material[];
+    const materials = Array.isArray(gridMaterial) ? gridMaterial : [gridMaterial];
+    materials.forEach((material) => {
+      if (material instanceof THREE.LineBasicMaterial) {
+        material.transparent = true;
+        material.opacity = 0.22;
+        material.depthWrite = false;
+      }
+    });
+    this.scene.add(this.worldGrid);
+
+    const floorBody = new CANNON.Body({
+      type: CANNON.Body.STATIC,
+      shape: new CANNON.Plane(),
+    });
+    floorBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
+    floorBody.position.set(0, CONFIG.FLOOR_Y - 5.51, 0);
+    this.physicsWorld.addBody(floorBody);
+
     // Ghost Voxels
     const ghostGeom = new THREE.BoxGeometry(CONFIG.VOXEL_SIZE, CONFIG.VOXEL_SIZE, CONFIG.VOXEL_SIZE);
     const ghostMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.3 });
@@ -203,13 +240,16 @@ export class VoxelEngine {
     // Entities (Player, Buildings, etc)
     this.entities = new EntityManager(this.scene);
 
-    // Events
-    this.container.addEventListener('pointermove', this.onPointerMove.bind(this));
-    this.container.addEventListener('pointerdown', this.onPointerDown.bind(this));
-    this.container.addEventListener('pointerleave', () => {
+    // Events - store bound references for cleanup
+    this.boundPointerMove = this.onPointerMove.bind(this);
+    this.boundPointerDown = this.onPointerDown.bind(this);
+    this.boundPointerLeave = () => {
       this.updateHoverSelector(null);
       this.onHoverPosition?.(null);
-    });
+    };
+    this.container.addEventListener('pointermove', this.boundPointerMove);
+    this.container.addEventListener('pointerdown', this.boundPointerDown);
+    this.container.addEventListener('pointerleave', this.boundPointerLeave);
 
     this.animate = this.animate.bind(this);
     this.updateTime(this.time);
@@ -1511,6 +1551,9 @@ export class VoxelEngine {
 
   public cleanup() {
     cancelAnimationFrame(this.animationId);
+    this.container.removeEventListener('pointermove', this.boundPointerMove);
+    this.container.removeEventListener('pointerdown', this.boundPointerDown);
+    this.container.removeEventListener('pointerleave', this.boundPointerLeave);
     if (this.container && this.renderer.domElement.parentElement === this.container) {
       this.container.removeChild(this.renderer.domElement);
     }

@@ -29,6 +29,7 @@ export const OfficeScene = ({
   // If we are in a specific building, show that building's view
   if (state.activeBuildingId) {
     const building = state.buildings[state.activeBuildingId];
+    if (!building) return null;
     
     // If exploration is active, show exploration view
     if (state.explorationActive) {
