@@ -25,7 +25,7 @@ interface GameSceneRouterProps {
   onPointerMove: (e: React.PointerEvent) => void;
   onPointerUp: (e: React.PointerEvent) => void;
   onWheel: (e: React.WheelEvent) => void;
-  onMove: (pos: WorldPosition) => void;
+  onMove: (pos: WorldPosition, options?: { ignoreDrag?: boolean }) => void;
   onMine: (tileId: string) => void;
   onMineAction: (action: string) => void;
   onOpenMine: () => void;
