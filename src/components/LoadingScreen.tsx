@@ -15,6 +15,7 @@ const LOADING_PHASES: { threshold: number; text: string }[] = [
 ];
 
 const PROGRESS_DURATION_MS = 3000;
+const REVERSED_PHASES = [...LOADING_PHASES].reverse();
 
 export const LoadingScreen: React.FC<LoadingScreenProps> = ({ visible }) => {
   const [progress, setProgress] = useState(0);
@@ -30,7 +31,7 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({ visible }) => {
       const pct = Math.min(Math.round((elapsed / PROGRESS_DURATION_MS) * 100), 100);
       setProgress(pct);
 
-      const current = [...LOADING_PHASES].reverse().find(p => pct >= p.threshold);
+      const current = REVERSED_PHASES.find(p => pct >= p.threshold);
       if (current) setPhase(current.text);
 
       if (pct >= 100) clearInterval(interval);

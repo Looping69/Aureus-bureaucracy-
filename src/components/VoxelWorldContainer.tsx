@@ -6,6 +6,9 @@ import { WORLD_HALF_SIZE } from '../utils/voxelConstants';
 import { buildWorldSurfaceMap, getWorldSurfaceHeight } from '../utils/worldSurface';
 import { LoadingScreen } from './LoadingScreen';
 
+/** Must be slightly longer than PROGRESS_DURATION_MS in LoadingScreen so the bar reaches 100% before fade-out. */
+const MIN_LOADING_DISPLAY_MS = 3400;
+
 interface VoxelWorldProps {
   voxels: VoxelData[];
   buildings: Building[];
@@ -55,7 +58,7 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
     const timer = setTimeout(() => {
       minTimeElapsedRef.current = true;
       if (engineReadyRef.current) setLoading(false);
-    }, 3400);
+    }, MIN_LOADING_DISPLAY_MS);
     return () => clearTimeout(timer);
   }, []);
 
