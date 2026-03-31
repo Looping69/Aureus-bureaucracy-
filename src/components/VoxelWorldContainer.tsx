@@ -40,6 +40,8 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<VoxelEngine | null>(null);
   const [loading, setLoading] = useState(true);
+  const engineReadyRef = useRef(false);
+  const minTimeElapsedRef = useRef(false);
   const surfaceMap = React.useMemo(() => buildWorldSurfaceMap(buildings), [buildings]);
   const playerSurfaceY = React.useMemo(
     () => getWorldSurfaceHeight(playerPos, surfaceMap),
@@ -47,6 +49,15 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
   );
 
   useCameraControls(engineRef);
+
+  // Minimum display time for loading screen so progress animation completes
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      minTimeElapsedRef.current = true;
+      if (engineReadyRef.current) setLoading(false);
+    }, 3400);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     if (engineRef.current && recenterTrigger !== undefined) {
@@ -93,9 +104,11 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
       );
 
       // Hide loading screen after engine has rendered at least one frame
+      // AND minimum display time has elapsed
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          setLoading(false);
+          engineReadyRef.current = true;
+          if (minTimeElapsedRef.current) setLoading(false);
         });
       });
 
