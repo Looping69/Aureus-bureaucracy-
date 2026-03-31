@@ -222,6 +222,36 @@ genHouseB.addBox(0, -4, 3, 0, -4, 4, TIMBER);
 addFrontSteps(genHouseB, 2, -4, 1, PALE_STONE, DUST);
 export const GENERIC_HOUSE_B_VOXELS = genHouseB.getVoxels();
 
+// 9b. Generic House C - brick cottage with planter boxes.
+const genHouseC = new BuildingGenerator();
+genHouseC.addBox(-3, -3, 0, 3, 3, 0, CHARCOAL);
+genHouseC.addBox(-3, -3, 1, 3, 3, 1, PALE_STONE);
+genHouseC.addHollowBox(-3, -3, 2, 3, 3, 4, RUST);
+genHouseC.addBox(-1, -3, 2, 0, -3, 4, TIMBER);
+genHouseC.addBox(2, -3, 3, 2, -3, 3, GLASS);
+genHouseC.addBox(-2, -3, 3, -2, -3, 3, GLASS);
+genHouseC.addBox(3, -2, 3, 3, 1, 3, GLASS);
+genHouseC.addBox(-3, -3, 5, 3, 3, 5, SLATE);
+genHouseC.addBox(-2, -2, 6, 2, 2, 6, SLATE);
+genHouseC.addBox(-3, -4, 2, -2, -4, 2, MOSS);
+genHouseC.addBox(1, -4, 2, 2, -4, 2, MOSS);
+addFrontSteps(genHouseC, 1, -4, 1, PALE_STONE, CHARCOAL);
+export const GENERIC_HOUSE_C_VOXELS = genHouseC.getVoxels();
+
+// 9c. Generic House D - industrial worker cabin with metal roof.
+const genHouseD = new BuildingGenerator();
+genHouseD.addBox(-3, -3, 0, 3, 3, 0, CHARCOAL);
+genHouseD.addBox(-3, -3, 1, 3, 3, 1, CONCRETE);
+genHouseD.addHollowBox(-3, -3, 2, 3, 3, 4, SLATE);
+genHouseD.addBox(0, -3, 2, 1, -3, 4, TIMBER);
+genHouseD.addBox(-2, -3, 3, -1, -3, 3, GLASS);
+genHouseD.addBox(3, 0, 3, 3, 2, 3, GLASS);
+genHouseD.addBox(-3, -3, 5, 3, 3, 5, CHARCOAL);
+genHouseD.addBox(-2, -2, 6, 2, 2, 6, CHARCOAL);
+genHouseD.addBox(-1, -1, 7, -1, -1, 7, SIGNAL_RED);
+addFrontSteps(genHouseD, 1, -4, 1, CONCRETE, CHARCOAL);
+export const GENERIC_HOUSE_D_VOXELS = genHouseD.getVoxels();
+
 // 10. Generic Office - cleaner podium office with stepped crown.
 const genOffice = new BuildingGenerator();
 genOffice.addBox(-3, -3, 0, 3, 3, 0, CHARCOAL);

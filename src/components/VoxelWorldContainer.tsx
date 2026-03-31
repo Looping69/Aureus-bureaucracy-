@@ -76,6 +76,11 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
         }
       });
 
+      // Initialise NPC commuting routes
+      const buildingsMap: Record<string, Building> = {};
+      buildings.forEach(b => { buildingsMap[b.id] = b; });
+      engineRef.current.entities.initNpcMovement(npcs, buildingsMap);
+
       engineRef.current.updateTime(time);
       engineRef.current.setPlayerPosition(
         playerPos.x - WORLD_HALF_SIZE, 
@@ -133,6 +138,11 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
         entities.addNPC(npcs[b.npcId], b.pos);
       }
     });
+
+    // Re-initialise NPC commuting routes
+    const buildingsMap: Record<string, Building> = {};
+    buildings.forEach(b => { buildingsMap[b.id] = b; });
+    entities.initNpcMovement(npcs, buildingsMap);
   }, [buildings]);
 
   useEffect(() => {

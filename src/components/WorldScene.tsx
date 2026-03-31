@@ -120,7 +120,14 @@ export const WorldScene = ({
     }
 
     if (target.kind === 'NPC' && target.id) {
-      onInteract(target.id, 'none');
+      // Only interact if player is close enough, otherwise move toward them
+      const dx = Math.abs(state.playerPos.x - target.x);
+      const dy = Math.abs(state.playerPos.y - target.y);
+      if (dx <= 3 && dy <= 3) {
+        onInteract(target.id, 'none');
+      } else {
+        onMove({ x: target.x, y: target.y });
+      }
       return;
     }
 
@@ -163,6 +170,14 @@ export const WorldScene = ({
 
   const promptedBuilding = buildingPromptId ? state.buildings[buildingPromptId] : null;
 
+  const isPlayerNearBuilding = React.useMemo(() => {
+    if (!promptedBuilding) return false;
+    const accessPos = getBuildingAccessPosition(promptedBuilding);
+    const dx = Math.abs(state.playerPos.x - accessPos.x);
+    const dy = Math.abs(state.playerPos.y - accessPos.y);
+    return dx <= 2 && dy <= 2;
+  }, [promptedBuilding, state.playerPos.x, state.playerPos.y]);
+
   React.useEffect(() => {
     return () => {
       if (hoverRafRef.current !== null) {
@@ -176,7 +191,7 @@ export const WorldScene = ({
       <VoxelWorldContainer 
         voxels={allVoxels}
         buildings={worldBuildings}
-        npcs={{}}
+        npcs={state.npcs}
         time={state.time}
         playerPos={state.playerPos}
         isMoving={state.path.length > 0}
@@ -346,7 +361,9 @@ export const WorldScene = ({
                 <p className="text-[10px] font-black uppercase tracking-[0.24em] text-black/40">Building</p>
                 <h3 className="mt-1 text-lg font-black leading-none">{promptedBuilding.name}</h3>
                 <p className="mt-2 text-sm font-medium text-black/65">
-                  Enter it, or stay outside and move to the access point.
+                  {isPlayerNearBuilding
+                    ? 'Enter it, or stay outside and move to the access point.'
+                    : 'Move closer to this building before you can enter it.'}
                 </p>
               </div>
               <button
@@ -370,13 +387,19 @@ export const WorldScene = ({
               </button>
               <button
                 onClick={() => {
+                  if (!isPlayerNearBuilding) return;
                   onInteract('none', promptedBuilding.id);
                   setBuildingPromptId(null);
                 }}
-                className="flex items-center justify-center gap-2 rounded-2xl bg-black px-4 py-3 text-xs font-black uppercase tracking-[0.22em] text-white transition-all hover:bg-zinc-800 active:scale-95"
+                disabled={!isPlayerNearBuilding}
+                className={`flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-xs font-black uppercase tracking-[0.22em] transition-all active:scale-95 ${
+                  isPlayerNearBuilding
+                    ? 'bg-black text-white hover:bg-zinc-800'
+                    : 'bg-black/20 text-black/40 cursor-not-allowed'
+                }`}
               >
                 <DoorOpen size={16} />
-                Enter
+                {isPlayerNearBuilding ? 'Enter' : 'Too Far'}
               </button>
             </div>
           </motion.div>

@@ -22,6 +22,8 @@ import {
   TREE_B_VOXELS,
   BUSH_VOXELS,
   GARDEN_VOXELS,
+  GENERIC_HOUSE_C_VOXELS,
+  GENERIC_HOUSE_D_VOXELS,
 } from './buildings';
 
 export const generateGrid = (width: number, height: number, yieldRate: number = 0.2): Tile[] => {
@@ -73,7 +75,7 @@ export const INITIAL_NPCS: Record<string, NPC> = {
     rivals: ['chief', 'fixer'],
     allies: ['inspector'],
     workHours: { start: 9, end: 17 },
-    homeBuildingId: 'licensing_office',
+    homeBuildingId: 'house_south_a',
     workBuildingId: 'licensing_office',
     moodShiftType: 'GRUMPY'
   },
@@ -123,7 +125,7 @@ export const INITIAL_NPCS: Record<string, NPC> = {
     rivals: ['union', 'fixer'],
     allies: ['licensing'],
     workHours: { start: 8, end: 16 },
-    homeBuildingId: 'inspector_hq',
+    homeBuildingId: 'house_south_b',
     workBuildingId: 'inspector_hq',
     moodShiftType: 'GRUMPY'
   },
@@ -201,6 +203,106 @@ export const INITIAL_NPCS: Record<string, NPC> = {
     homeBuildingId: 'chief_hut',
     workBuildingId: 'chief_hut',
     moodShiftType: 'NEUTRAL'
+  },
+  'resident_a': {
+    id: 'resident_a',
+    name: 'Marta Dunn',
+    role: 'Factory Worker',
+    persona: 'Quiet, hardworking, keeps her head down.',
+    motive: 'Providing for her family.',
+    vulnerability: {
+      id: 'marta_debt',
+      description: 'Behind on company housing payments.',
+      discovered: false,
+      leverageDialogue: 'I know about the payment notices.',
+      successDialogue: 'Please, don\'t tell anyone. I\'ll help however I can.',
+      reward: 'INFO'
+    },
+    trustLevel: 30,
+    leverage: 0,
+    potentialLeverage: 'Witnessed an accident at the factory.',
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Marta&backgroundColor=ffd5dc',
+    rivals: [],
+    allies: [],
+    workHours: { start: 7, end: 15 },
+    homeBuildingId: 'house_nw_d',
+    workBuildingId: 'factory_west',
+    moodShiftType: 'NEUTRAL'
+  },
+  'resident_b': {
+    id: 'resident_b',
+    name: 'Dag Holt',
+    role: 'Clerk',
+    persona: 'Nervous, meticulous, always checking over his shoulder.',
+    motive: 'Staying out of trouble.',
+    vulnerability: {
+      id: 'dag_files',
+      description: 'Accidentally shredded an important audit report.',
+      discovered: false,
+      leverageDialogue: 'I found the missing audit pages in the recycler.',
+      successDialogue: 'Oh no, oh no. Please, I\'ll do anything.',
+      reward: 'INFO'
+    },
+    trustLevel: 25,
+    leverage: 0,
+    potentialLeverage: 'Knows where backup files are stored.',
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Dag&backgroundColor=c0aede',
+    rivals: [],
+    allies: [],
+    workHours: { start: 9, end: 17 },
+    homeBuildingId: 'house_ne_c',
+    workBuildingId: 'office_east',
+    moodShiftType: 'GRUMPY'
+  },
+  'resident_c': {
+    id: 'resident_c',
+    name: 'Pria Sato',
+    role: 'Miner',
+    persona: 'Tough, laconic, covered in dust.',
+    motive: 'Earning enough to leave this place.',
+    vulnerability: {
+      id: 'pria_moonlight',
+      description: 'Sells ore on the side to a rival company.',
+      discovered: false,
+      leverageDialogue: 'I saw the off-books shipment manifest with your name on it.',
+      successDialogue: 'Fine. What do you want?',
+      reward: 'DISCOUNT'
+    },
+    trustLevel: 20,
+    leverage: 0,
+    potentialLeverage: 'Knows about unstable tunnels.',
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Pria&backgroundColor=b6e3f4',
+    rivals: [],
+    allies: [],
+    workHours: { start: 6, end: 14 },
+    homeBuildingId: 'house_sw_e',
+    workBuildingId: 'mine_entrance',
+    moodShiftType: 'NEUTRAL'
+  },
+  'resident_d': {
+    id: 'resident_d',
+    name: 'Tomek Bray',
+    role: 'Shift Supervisor',
+    persona: 'Boisterous, likes a drink after work.',
+    motive: 'Keep the operation running smoothly.',
+    vulnerability: {
+      id: 'tomek_injury',
+      description: 'Hiding a chronic back injury to keep his position.',
+      discovered: false,
+      leverageDialogue: 'The medical records tell a different story, Tomek.',
+      successDialogue: 'Alright, alright. Sit down, let\'s talk.',
+      reward: 'SPEED'
+    },
+    trustLevel: 35,
+    leverage: 0,
+    potentialLeverage: 'Witnessed the safety cover-up in Sector 3.',
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Tomek&backgroundColor=ffdfbf',
+    rivals: [],
+    allies: ['union'],
+    workHours: { start: 8, end: 18 },
+    homeBuildingId: 'house_east_f',
+    workBuildingId: 'union_hall',
+    moodShiftType: 'HAPPY'
   }
 };
 
@@ -1671,6 +1773,56 @@ const baseBuildings: Record<string, Building> = {
       type: 'HOME',
       isDiscovered: true,
       voxels: GENERIC_HOUSE_B_VOXELS,
+    },
+    occupiedCityCells
+  ),
+
+  // ── NPC residential houses ─────────────────────────────────────────
+  house_nw_d: createPlacedBuilding(
+    { x: 4, y: 9 },
+    {
+      id: 'house_nw_d',
+      npcId: 'resident_a',
+      name: 'Dunn Residence',
+      type: 'HOME',
+      isDiscovered: true,
+      voxels: GENERIC_HOUSE_C_VOXELS,
+    },
+    occupiedCityCells
+  ),
+  house_ne_c: createPlacedBuilding(
+    { x: 6, y: 9 },
+    {
+      id: 'house_ne_c',
+      npcId: 'resident_b',
+      name: 'Holt Residence',
+      type: 'HOME',
+      isDiscovered: true,
+      voxels: GENERIC_HOUSE_D_VOXELS,
+    },
+    occupiedCityCells
+  ),
+  house_sw_e: createPlacedBuilding(
+    { x: 4, y: 3 },
+    {
+      id: 'house_sw_e',
+      npcId: 'resident_c',
+      name: 'Sato Residence',
+      type: 'HOME',
+      isDiscovered: true,
+      voxels: GENERIC_HOUSE_C_VOXELS,
+    },
+    occupiedCityCells
+  ),
+  house_east_f: createPlacedBuilding(
+    { x: 9, y: 7 },
+    {
+      id: 'house_east_f',
+      npcId: 'resident_d',
+      name: 'Bray Residence',
+      type: 'HOME',
+      isDiscovered: true,
+      voxels: GENERIC_HOUSE_D_VOXELS,
     },
     occupiedCityCells
   ),
