@@ -148,7 +148,7 @@ const applyWalkableSurface = (
   kind: Extract<SurfaceKind, 'ROAD' | 'SIDEWALK' | 'PARK' | 'PLAZA'>,
   targetHeight: number
 ) => {
-  tile.height = Math.max(tile.height, targetHeight);
+  tile.height = targetHeight;
   tile.kind = kind;
   tile.walkable = true;
   tile.cost = WALKABLE_COSTS[kind];
