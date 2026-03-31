@@ -14,7 +14,7 @@ const LOADING_PHASES: { threshold: number; text: string }[] = [
   { threshold: 100, text: 'Access Granted' },
 ];
 
-const PROGRESS_DURATION_MS = 3000;
+export const PROGRESS_DURATION_MS = 3000;
 const REVERSED_PHASES = [...LOADING_PHASES].reverse();
 
 export const LoadingScreen: React.FC<LoadingScreenProps> = ({ visible }) => {

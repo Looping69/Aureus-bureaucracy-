@@ -4,10 +4,10 @@ import { Building, NPC, AppState, VoxelData, WorldHoverInfo } from '../types';
 import { useCameraControls } from '../hooks/useCameraControls';
 import { WORLD_HALF_SIZE } from '../utils/voxelConstants';
 import { buildWorldSurfaceMap, getWorldSurfaceHeight } from '../utils/worldSurface';
-import { LoadingScreen } from './LoadingScreen';
+import { LoadingScreen, PROGRESS_DURATION_MS } from './LoadingScreen';
 
-/** Must be slightly longer than PROGRESS_DURATION_MS in LoadingScreen so the bar reaches 100% before fade-out. */
-const MIN_LOADING_DISPLAY_MS = 3400;
+/** Slightly longer than PROGRESS_DURATION_MS so the bar reaches 100% before fade-out. */
+const MIN_LOADING_DISPLAY_MS = PROGRESS_DURATION_MS + 400;
 
 interface VoxelWorldProps {
   voxels: VoxelData[];
