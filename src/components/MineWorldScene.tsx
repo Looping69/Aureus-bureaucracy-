@@ -221,8 +221,8 @@ export const MineWorldScene = ({
 
   const handleHarvest = (nodeId: string) => {
     if (!canHarvest(nodeId)) return;
-    const yield_ = MINE_NODE_YIELDS[nodeId] ?? 1;
-    onCollectResource(yield_);
+    const yieldAmount = MINE_NODE_YIELDS[nodeId] ?? 1;
+    onCollectResource(yieldAmount);
     setNodeStates(prev => ({ ...prev, [nodeId]: { lastHarvested: Date.now() } }));
   };
 
@@ -409,7 +409,7 @@ export const MineWorldScene = ({
               </div>
               {/* Moving arm */}
               <motion.div
-                className="absolute top-2 h-4 w-6 rounded-sm bg-metal-grey border-2 border-white/20"
+                className="absolute top-2 h-4 w-6 rounded-sm border-2 border-white/20"
                 style={{ backgroundColor: '#9ca3af' }}
                 animate={{ x: ['0%', '85%', '0%'] }}
                 transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
