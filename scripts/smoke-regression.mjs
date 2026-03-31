@@ -3,7 +3,9 @@ import { createServer } from 'vite';
 
 const APP_URL = 'http://127.0.0.1:4173';
 const SAVE_KEY = 'aureus-save-v1';
+const MOBILE_VIEWPORT_WIDTH = 430;
 const ANALOG_STICK_DRAG_DISTANCE = 26;
+const STICK_CENTER_TOLERANCE_PX = 40;
 
 const assert = (condition, message) => {
   if (!condition) throw new Error(message);
@@ -95,6 +97,12 @@ const run = async () => {
       };
     });
     assert(!!stickBox, 'Expected the analog stick to be measurable for drag input.');
+    const viewportCenterX = MOBILE_VIEWPORT_WIDTH / 2;
+    const stickCenterOffset = Math.abs((stickBox.x + (stickBox.width / 2)) - viewportCenterX);
+    assert(
+      stickCenterOffset <= STICK_CENTER_TOLERANCE_PX,
+      `Expected the analog stick to stay near the horizontal center of the screen, got offset ${stickCenterOffset}.`
+    );
     const stickCenterX = stickBox.x + (stickBox.width / 2);
     const stickCenterY = stickBox.y + (stickBox.height / 2);
 

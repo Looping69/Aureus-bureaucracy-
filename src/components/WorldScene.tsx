@@ -2,6 +2,7 @@ import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { DoorOpen, MapPin, MoveDiagonal2, X } from 'lucide-react';
 import { GameState, WorldHoverInfo, WorldPosition } from '../types';
+import { WORLD_CAMERA_AZIMUTH } from '../VoxelEngine';
 import { VoxelWorldContainer } from './VoxelWorldContainer';
 import { AnalogStick, AnalogStickVector } from './AnalogStick';
 import { getBuildingAccessPosition } from '../utils/buildingAccess';
@@ -28,6 +29,20 @@ export const WorldScene = ({
   onTravel: (mineId: string) => void,
   showDebug?: boolean
 }) => {
+  const fixedCameraForwardWorldXY = React.useMemo(
+    () => ({
+      x: -Math.sin(WORLD_CAMERA_AZIMUTH),
+      y: -Math.cos(WORLD_CAMERA_AZIMUTH)
+    }),
+    []
+  );
+  const fixedCameraRightWorldXY = React.useMemo(
+    () => ({
+      x: Math.cos(WORLD_CAMERA_AZIMUTH),
+      y: -Math.sin(WORLD_CAMERA_AZIMUTH)
+    }),
+    []
+  );
   const [showTravelMenu, setShowTravelMenu] = React.useState(false);
   const [hoverInfo, setHoverInfo] = React.useState<WorldHoverInfo | null>(null);
   const [pendingSelection, setPendingSelection] = React.useState<WorldHoverInfo | null>(null);
@@ -191,8 +206,12 @@ export const WorldScene = ({
   const issueAnalogMove = React.useCallback(() => {
     if (state.path.length > 0 || analogInput.magnitude < 0.35) return;
 
-    const stepX = analogInput.x > 0.35 ? 1 : analogInput.x < -0.35 ? -1 : 0;
-    const stepY = analogInput.y > 0.35 ? 1 : analogInput.y < -0.35 ? -1 : 0;
+    const screenVertical = -analogInput.y;
+    const worldX = (fixedCameraRightWorldXY.x * analogInput.x) + (fixedCameraForwardWorldXY.x * screenVertical);
+    const worldY = (fixedCameraRightWorldXY.y * analogInput.x) + (fixedCameraForwardWorldXY.y * screenVertical);
+
+    const stepX = worldX > 0.35 ? 1 : worldX < -0.35 ? -1 : 0;
+    const stepY = worldY > 0.35 ? 1 : worldY < -0.35 ? -1 : 0;
     if (stepX === 0 && stepY === 0) return;
 
     const nextPos = {
@@ -202,7 +221,7 @@ export const WorldScene = ({
 
     if (nextPos.x === Math.round(state.playerPos.x) && nextPos.y === Math.round(state.playerPos.y)) return;
     onMove(nextPos, { ignoreDrag: true });
-  }, [analogInput.magnitude, analogInput.x, analogInput.y, onMove, state.path.length, state.playerPos.x, state.playerPos.y]);
+  }, [analogInput.magnitude, analogInput.x, analogInput.y, fixedCameraForwardWorldXY.x, fixedCameraForwardWorldXY.y, fixedCameraRightWorldXY.x, fixedCameraRightWorldXY.y, onMove, state.path.length, state.playerPos.x, state.playerPos.y]);
 
   React.useEffect(() => {
     if (!analogInput.active || analogInput.magnitude < 0.35 || state.path.length > 0) return;
@@ -381,7 +400,7 @@ export const WorldScene = ({
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
-            className="absolute inset-x-4 bottom-32 z-[110] rounded-3xl border-2 border-black bg-white/95 p-5 shadow-2xl backdrop-blur-sm"
+            className="absolute inset-x-4 bottom-40 z-[110] rounded-3xl border-2 border-black bg-white/95 p-5 shadow-2xl backdrop-blur-sm"
           >
             <div className="flex items-start justify-between gap-4">
               <div>

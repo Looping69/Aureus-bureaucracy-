@@ -15,6 +15,7 @@ interface AnalogStickProps {
 const STICK_RADIUS = 44;
 const STICK_DIAMETER = STICK_RADIUS * 2;
 const THUMB_DIAMETER = 34;
+const ANALOG_STICK_Z_INDEX = 95;
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
@@ -88,7 +89,10 @@ export const AnalogStick: React.FC<AnalogStickProps> = ({ onChange, isNight = fa
   };
 
   return (
-    <div className="absolute bottom-4 left-4 z-[95] select-none touch-none">
+    <div
+      className="absolute bottom-6 left-1/2 -translate-x-1/2 select-none touch-none"
+      style={{ zIndex: ANALOG_STICK_Z_INDEX }}
+    >
       <div
         ref={stickRef}
         aria-label="Movement stick"
