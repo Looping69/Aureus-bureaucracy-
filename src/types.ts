@@ -105,7 +105,7 @@ export interface Building {
   npcId: string;
   name: string;
   pos: WorldPosition;
-  type: 'OFFICE' | 'HOME' | 'MINE_ENTRANCE' | 'PUB' | 'HOTLINE' | 'PARK' | 'LANDMARK' | 'RESIDENTIAL' | 'INDUSTRIAL' | 'ROAD' | 'SIDEWALK';
+  type: 'OFFICE' | 'HOME' | 'MINE_ENTRANCE' | 'PUB' | 'HOTLINE' | 'PARK' | 'LANDMARK' | 'RESIDENTIAL' | 'INDUSTRIAL' | 'ROAD' | 'SIDEWALK' | 'EXTRACTION_NODE' | 'LOADING_ZONE' | 'UNLOADING_ZONE' | 'DELIVERY_ZONE';
   isDiscovered: boolean;
   description?: string;
   explorationItems?: string[];
@@ -176,7 +176,7 @@ export interface GameState {
   objectives: Objective[];
   mines: Mine[];
   activeMineId: string | null;
-  currentScene: 'MINE' | 'OFFICE' | 'WORLD' | 'MENU' | 'CITY_PLANNER';
+  currentScene: 'MINE' | 'MINE_WORLD' | 'OFFICE' | 'WORLD' | 'MENU' | 'CITY_PLANNER';
   activeNPCId: string | null;
   activePermitId: string | null;
   activeBuildingId: string | null;

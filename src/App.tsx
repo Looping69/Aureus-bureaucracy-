@@ -552,7 +552,18 @@ export default function App() {
     const building = state.buildings[bId];
     if (!building) return;
 
-    const interactableTypes = ['OFFICE', 'HOME', 'MINE_ENTRANCE', 'PUB', 'HOTLINE'];
+    // Mine entrance → open the 3-D mine world scene
+    if (building.type === 'MINE_ENTRANCE') {
+      beginTrackedAction(`enter_mine_world:${bId}`);
+      setState(s => ({
+        ...s,
+        activeBuildingId: bId,
+        currentScene: 'MINE_WORLD' as const
+      }));
+      return;
+    }
+
+    const interactableTypes = ['OFFICE', 'HOME', 'PUB', 'HOTLINE'];
     if (!interactableTypes.includes(building.type)) return;
 
     const hasExploration = !!building.explorationItems && building.explorationItems.length > 0;
@@ -592,6 +603,10 @@ export default function App() {
         onUpdateBuildings={(newBuildings) => setState(s => ({ ...s, buildings: newBuildings, currentScene: 'WORLD' }))}
         onClosePlanner={() => setState(s => ({ ...s, currentScene: 'WORLD' }))}
         onReturnMineToWorld={() => setState(s => ({ ...s, currentScene: 'WORLD' }))}
+        onCollectMineResource={(amount) => {
+          beginTrackedAction('mine_world_collect');
+          setState(s => ({ ...s, ore: s.ore + amount }));
+        }}
         onSelectNPC={(id) => setState(s => ({ ...s, activeNPCId: id }))}
         onSelectPermit={(id) => {
           beginTrackedAction(`select_permit:${id}`);
