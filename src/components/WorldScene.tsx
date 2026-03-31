@@ -2,7 +2,9 @@ import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { DoorOpen, MapPin, MoveDiagonal2, X } from 'lucide-react';
 import { GameState, WorldHoverInfo, WorldPosition } from '../types';
+import { WORLD_CAMERA_AZIMUTH } from '../VoxelEngine';
 import { VoxelWorldContainer } from './VoxelWorldContainer';
+import { AnalogStick, AnalogStickVector } from './AnalogStick';
 import { getBuildingAccessPosition } from '../utils/buildingAccess';
 import { getBuildingFootprint } from '../utils/worldNavigation';
 import { buildWorldTerrainVoxels } from '../utils/worldSurface';
@@ -19,7 +21,7 @@ export const WorldScene = ({
   showDebug = false
 }: { 
   state: GameState, 
-  onMove: (pos: WorldPosition) => void,
+  onMove: (pos: WorldPosition, options?: { ignoreDrag?: boolean }) => void,
   onInteract: (npcId: string, buildingId: string) => void,
   onEnterHome: () => void,
   onEnterMine: () => void,
@@ -27,11 +29,26 @@ export const WorldScene = ({
   onTravel: (mineId: string) => void,
   showDebug?: boolean
 }) => {
+  const fixedCameraForwardWorldXY = React.useMemo(
+    () => ({
+      x: -Math.sin(WORLD_CAMERA_AZIMUTH),
+      y: -Math.cos(WORLD_CAMERA_AZIMUTH)
+    }),
+    []
+  );
+  const fixedCameraRightWorldXY = React.useMemo(
+    () => ({
+      x: Math.cos(WORLD_CAMERA_AZIMUTH),
+      y: -Math.sin(WORLD_CAMERA_AZIMUTH)
+    }),
+    []
+  );
   const [showTravelMenu, setShowTravelMenu] = React.useState(false);
   const [hoverInfo, setHoverInfo] = React.useState<WorldHoverInfo | null>(null);
   const [pendingSelection, setPendingSelection] = React.useState<WorldHoverInfo | null>(null);
   const [buildingPromptId, setBuildingPromptId] = React.useState<string | null>(null);
   const [recenterTrigger, setRecenterTrigger] = React.useState(0);
+  const [analogInput, setAnalogInput] = React.useState<AnalogStickVector>({ x: 0, y: 0, magnitude: 0, active: false });
   const pendingHoverPosRef = React.useRef<WorldHoverInfo | null>(null);
   const hoverRafRef = React.useRef<number | null>(null);
   const isNight = state.time >= 20 || state.time < 6;
@@ -186,6 +203,33 @@ export const WorldScene = ({
     };
   }, []);
 
+  const issueAnalogMove = React.useCallback(() => {
+    if (state.path.length > 0 || analogInput.magnitude < 0.35) return;
+
+    const screenVertical = -analogInput.y;
+    const worldX = (fixedCameraRightWorldXY.x * analogInput.x) + (fixedCameraForwardWorldXY.x * screenVertical);
+    const worldY = (fixedCameraRightWorldXY.y * analogInput.x) + (fixedCameraForwardWorldXY.y * screenVertical);
+
+    const stepX = worldX > 0.35 ? 1 : worldX < -0.35 ? -1 : 0;
+    const stepY = worldY > 0.35 ? 1 : worldY < -0.35 ? -1 : 0;
+    if (stepX === 0 && stepY === 0) return;
+
+    const nextPos = {
+      x: Math.max(0, Math.min(WORLD_SIZE - 1, Math.round(state.playerPos.x) + stepX)),
+      y: Math.max(0, Math.min(WORLD_SIZE - 1, Math.round(state.playerPos.y) + stepY))
+    };
+
+    if (nextPos.x === Math.round(state.playerPos.x) && nextPos.y === Math.round(state.playerPos.y)) return;
+    onMove(nextPos, { ignoreDrag: true });
+  }, [analogInput.magnitude, analogInput.x, analogInput.y, fixedCameraForwardWorldXY.x, fixedCameraForwardWorldXY.y, fixedCameraRightWorldXY.x, fixedCameraRightWorldXY.y, onMove, state.path.length, state.playerPos.x, state.playerPos.y]);
+
+  React.useEffect(() => {
+    if (!analogInput.active || analogInput.magnitude < 0.35 || state.path.length > 0) return;
+    issueAnalogMove();
+    const interval = window.setInterval(issueAnalogMove, 180);
+    return () => window.clearInterval(interval);
+  }, [analogInput.active, analogInput.magnitude, issueAnalogMove, state.path.length]);
+
   return (
     <div className={`flex-1 relative overflow-hidden transition-colors duration-1000 ${isNight ? 'bg-slate-950' : 'bg-slate-200'} cursor-crosshair`}>
       <VoxelWorldContainer 
@@ -327,6 +371,8 @@ export const WorldScene = ({
       )}
 
       {/* UI Overlay */}
+      <AnalogStick onChange={setAnalogInput} isNight={isNight} />
+
       <div className="absolute bottom-4 right-4">
         <button 
           onClick={(e) => {
@@ -354,7 +400,7 @@ export const WorldScene = ({
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
-            className="absolute inset-x-4 bottom-20 z-[110] rounded-3xl border-2 border-black bg-white/95 p-5 shadow-2xl backdrop-blur-sm"
+            className="absolute inset-x-4 bottom-40 z-[110] rounded-3xl border-2 border-black bg-white/95 p-5 shadow-2xl backdrop-blur-sm"
           >
             <div className="flex items-start justify-between gap-4">
               <div>

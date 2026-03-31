@@ -14,13 +14,13 @@ import { PermitOverlay } from './components/PermitOverlay';
 import { FormMiniGame } from './components/FormMiniGame';
 import { StartScreen } from './components/StartScreen';
 import { TutorialOverlay } from './components/TutorialOverlay';
-import { BottomNav } from './components/BottomNav';
 import { GameSceneRouter } from './components/GameSceneRouter';
 import { ActionLogEntry, ActionLogPanel } from './components/ActionLogPanel';
 import { DebugPanel } from './components/DebugPanel';
 import { EndingOverlay } from './components/EndingOverlay';
 import { MarketOverlay } from './components/MarketOverlay';
 import { UtilityDrawer } from './components/UtilityDrawer';
+import { SideNavPanel } from './components/SideNavPanel';
 import { getBuildingAccessPosition } from './utils/buildingAccess';
 import { findPath } from './utils/pathfinding';
 import { applyMineSceneAction, applyMineTileInteraction } from './game/actions/mineActions';
@@ -130,6 +130,7 @@ export default function App() {
   const [showActionLog, setShowActionLog] = useState(false);
   const [showDebugPanel, setShowDebugPanel] = useState(false);
   const [showUtilityDrawer, setShowUtilityDrawer] = useState(false);
+  const [showNavigationPanel, setShowNavigationPanel] = useState(false);
   const [stateUpdateCount, setStateUpdateCount] = useState(0);
   const [lastActionName, setLastActionName] = useState('none');
   const [lastActionMs, setLastActionMs] = useState(0);
@@ -309,8 +310,8 @@ export default function App() {
     // Wheel interactions are handled by the 3D engine controls.
   };
 
-  const handleMove = (pos: WorldPosition) => {
-    if (dragDistanceRef.current > 10) return;
+  const handleMove = (pos: WorldPosition, options?: { ignoreDrag?: boolean }) => {
+    if (!options?.ignoreDrag && dragDistanceRef.current > 10) return;
     setState(prev => {
       if (prev.playerPos.x === pos.x && prev.playerPos.y === pos.y) return prev;
       
@@ -524,6 +525,17 @@ export default function App() {
     }));
   };
 
+  const handleOpenWorldScene = () => {
+    beginTrackedAction('open_world');
+    setState(s => ({
+      ...s,
+      currentScene: 'WORLD',
+      playerPos: s.activeBuildingId && s.buildings[s.activeBuildingId]
+        ? getBuildingAccessPosition(s.buildings[s.activeBuildingId])
+        : s.playerPos
+    }));
+  };
+
   const handleWorldInteract = (npcId: string, bId: string) => {
     if (npcId !== 'none') {
       beginTrackedAction(`world_interact_npc:${npcId}`);
@@ -610,16 +622,12 @@ export default function App() {
         onStartJourney={() => setState(s => ({ ...s, tutorialStep: 1 }))}
       />
 
-      <BottomNav
+      <SideNavPanel
         state={state}
+        isOpen={showNavigationPanel}
+        onToggle={() => setShowNavigationPanel(v => !v)}
         onOpenMine={openMineScene}
-        onOpenWorld={() => setState(s => ({
-          ...s,
-          currentScene: 'WORLD',
-          playerPos: s.activeBuildingId && s.buildings[s.activeBuildingId]
-            ? getBuildingAccessPosition(s.buildings[s.activeBuildingId])
-            : s.playerPos
-        }))}
+        onOpenWorld={handleOpenWorldScene}
         onOpenOffice={() => {
           beginTrackedAction('open_office');
           setState(s => ({ ...s, currentScene: 'OFFICE' }));

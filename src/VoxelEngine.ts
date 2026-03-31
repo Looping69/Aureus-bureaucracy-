@@ -13,9 +13,12 @@ import { GreedyMesher } from './utils/GreedyMesher';
 import { BuildingFootprint } from './utils/worldNavigation';
 import backgroundData from '../background.json';
 
+export const WORLD_CAMERA_AZIMUTH = Math.PI / 4;
+const WORLD_CAMERA_OFFSET = new THREE.Vector3(20, 30, 20);
+const WORLD_CAMERA_DISTANCE = WORLD_CAMERA_OFFSET.length();
+const WORLD_CAMERA_POLAR = Math.acos(WORLD_CAMERA_OFFSET.y / WORLD_CAMERA_DISTANCE);
+
 export class VoxelEngine {
-  private static readonly MIN_CAMERA_POLAR = Math.PI / 8;
-  private static readonly MAX_CAMERA_POLAR = Math.PI / 2.2;
   private static readonly FOG_NEAR_DAY = 120;
   private static readonly FOG_FAR_DAY = 280;
   private static readonly FOG_NEAR_NIGHT = 80;
@@ -110,7 +113,7 @@ export class VoxelEngine {
     const height = this.container.clientHeight || window.innerHeight;
 
     this.camera = new THREE.PerspectiveCamera(50, width / height, 0.5, 2000);
-    this.camera.position.set(20, 30, 20);
+    this.camera.position.copy(WORLD_CAMERA_OFFSET);
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     this.renderer.setClearColor(0x000000, 0); // Transparent background
@@ -123,11 +126,14 @@ export class VoxelEngine {
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.08;
-    this.controls.screenSpacePanning = true;
+    this.controls.enablePan = false;
+    this.controls.enableRotate = false;
     this.controls.autoRotate = false;
     this.controls.target.set(0, 0, 0);
-    this.controls.minPolarAngle = VoxelEngine.MIN_CAMERA_POLAR;
-    this.controls.maxPolarAngle = VoxelEngine.MAX_CAMERA_POLAR;
+    this.controls.minPolarAngle = WORLD_CAMERA_POLAR;
+    this.controls.maxPolarAngle = WORLD_CAMERA_POLAR;
+    this.controls.minAzimuthAngle = WORLD_CAMERA_AZIMUTH;
+    this.controls.maxAzimuthAngle = WORLD_CAMERA_AZIMUTH;
     this.controls.minDistance = 10;
     this.controls.maxDistance = 100;
     this.controls.zoomSpeed = 1.2;
@@ -446,11 +452,7 @@ export class VoxelEngine {
 
   public recenterOnPlayer() {
     this.controls.target.copy(this.currentPlayerPos);
-    this.camera.position.set(
-      this.currentPlayerPos.x + 20,
-      this.currentPlayerPos.y + 30,
-      this.currentPlayerPos.z + 20
-    );
+    this.camera.position.copy(this.currentPlayerPos).add(WORLD_CAMERA_OFFSET);
     this.enforceCameraBounds();
     this.controls.update();
   }
@@ -464,11 +466,8 @@ export class VoxelEngine {
       this.controls.minDistance,
       this.controls.maxDistance
     );
-    spherical.phi = THREE.MathUtils.clamp(
-      spherical.phi,
-      this.controls.minPolarAngle,
-      this.controls.maxPolarAngle
-    );
+    spherical.phi = WORLD_CAMERA_POLAR;
+    spherical.theta = WORLD_CAMERA_AZIMUTH;
 
     offset.setFromSpherical(spherical);
     this.camera.position.copy(this.controls.target).add(offset);

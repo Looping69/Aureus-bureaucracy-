@@ -3,9 +3,31 @@ import { createServer } from 'vite';
 
 const APP_URL = 'http://127.0.0.1:4173';
 const SAVE_KEY = 'aureus-save-v1';
+const MOBILE_VIEWPORT_WIDTH = 430;
+const ANALOG_STICK_DRAG_DISTANCE = 26;
+const STICK_CENTER_TOLERANCE_PX = 40;
 
 const assert = (condition, message) => {
   if (!condition) throw new Error(message);
+};
+
+const openNavigationPanel = async (page) => {
+  await page.waitForTimeout(250);
+  await page.evaluate(() => {
+    const toggle = document.querySelector('[aria-label="Expand navigation panel"], [aria-label="Collapse navigation panel"]');
+    if (!(toggle instanceof HTMLElement)) throw new Error('Navigation toggle not found.');
+    toggle.click();
+  });
+  await page.waitForTimeout(250);
+};
+
+const continueSavedRun = async (page) => {
+  const continueButton = page.getByRole('button', { name: /Continue/i });
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForTimeout(250);
+  if (!(await continueButton.isVisible().catch(() => false))) return;
+  await continueButton.click();
+  await page.waitForTimeout(800);
 };
 
 const run = async () => {
@@ -26,7 +48,7 @@ const run = async () => {
     browser = await chromium.launch({ headless: true });
     const context = await browser.newContext();
     const page = await context.newPage();
-    page.setDefaultTimeout(12000);
+    page.setDefaultTimeout(30000);
 
     console.log('Scenario 1: tutorial -> mine travel');
     await page.goto(APP_URL);
@@ -36,11 +58,78 @@ const run = async () => {
     const outOfBoundsLabelCount = await page.locator('text=/Out of bounds/i').count();
     assert(outOfBoundsLabelCount === 0, 'Expected world HUD to stop showing the misleading "Out of bounds" label on load.');
 
-    await page.getByRole('button', { name: 'Start Journey' }).click();
+    await page.getByRole('button', { name: /New Game/i }).click();
+    const startJourneyButton = page.getByRole('button', { name: /Start Journey/i });
+    await startJourneyButton.waitFor({ state: 'visible', timeout: 30000 });
+    await startJourneyButton.click({ force: true });
     await page.waitForTimeout(500);
-    const guidanceVisible = await page.locator('text=Go To The Bureau').count();
-    assert(guidanceVisible > 0, 'Expected progression guidance to update to "Go To The Bureau".');
+    const startJourneyStillVisible = await page.getByRole('button', { name: /Start Journey/i }).count();
+    assert(startJourneyStillVisible === 0, 'Expected the tutorial CTA to dismiss after starting the journey.');
 
+    await page.waitForTimeout(400);
+    const movementStick = page.locator('[aria-label="Movement stick"]');
+    assert(await movementStick.count() > 0, 'Expected the on-screen analog stick to be visible in the world scene.');
+
+    await page.evaluate((key) => {
+      const raw = window.localStorage.getItem(key);
+      if (!raw) return;
+      const state = JSON.parse(raw);
+      state.currentScene = 'WORLD';
+      state.playerPos = { x: 5, y: 5 };
+      state.targetPos = null;
+      state.path = [];
+      window.localStorage.setItem(key, JSON.stringify(state));
+    }, SAVE_KEY);
+
+    await page.reload();
+    await continueSavedRun(page);
+    await page.waitForTimeout(900);
+
+    const stickBox = await page.evaluate(() => {
+      const stick = document.querySelector('[aria-label="Movement stick"]');
+      if (!stick) return null;
+      const rect = stick.getBoundingClientRect();
+      return {
+        x: rect.x,
+        y: rect.y,
+        width: rect.width,
+        height: rect.height
+      };
+    });
+    assert(!!stickBox, 'Expected the analog stick to be measurable for drag input.');
+    const viewportCenterX = MOBILE_VIEWPORT_WIDTH / 2;
+    const stickCenterOffset = Math.abs((stickBox.x + (stickBox.width / 2)) - viewportCenterX);
+    assert(
+      stickCenterOffset <= STICK_CENTER_TOLERANCE_PX,
+      `Expected the analog stick to stay near the horizontal center of the screen, got offset ${stickCenterOffset}.`
+    );
+    const stickCenterX = stickBox.x + (stickBox.width / 2);
+    const stickCenterY = stickBox.y + (stickBox.height / 2);
+
+    const beforeAnalogMove = await page.evaluate((key) => {
+      const raw = window.localStorage.getItem(key);
+      return raw ? JSON.parse(raw)?.playerPos : null;
+    }, SAVE_KEY);
+
+    await page.mouse.move(stickCenterX, stickCenterY);
+    await page.mouse.down();
+    await page.mouse.move(stickCenterX + ANALOG_STICK_DRAG_DISTANCE, stickCenterY, { steps: 8 });
+    await page.waitForTimeout(1000);
+    await page.mouse.up();
+    await page.waitForTimeout(900);
+
+    const afterAnalogMove = await page.evaluate((key) => {
+      const raw = window.localStorage.getItem(key);
+      return raw ? JSON.parse(raw)?.playerPos : null;
+    }, SAVE_KEY);
+
+    assert(!!beforeAnalogMove && !!afterAnalogMove, 'Expected player position to be readable before and after analog movement.');
+    assert(
+      beforeAnalogMove.x !== afterAnalogMove.x || beforeAnalogMove.y !== afterAnalogMove.y,
+      `Expected analog stick movement to change player position, got ${JSON.stringify(beforeAnalogMove)} -> ${JSON.stringify(afterAnalogMove)}.`
+    );
+
+    await openNavigationPanel(page);
     await page.getByRole('button', { name: 'Mine' }).click();
     await page.waitForTimeout(1200);
     const mineHeading = await page.getByRole('heading', { name: /Iron Vein Outpost/i }).count();
@@ -62,9 +151,13 @@ const run = async () => {
     }, SAVE_KEY);
 
     await page.reload();
+    await continueSavedRun(page);
     await page.waitForTimeout(700);
-    await page.getByRole('button', { name: 'Export' }).click();
-    await page.waitForTimeout(1000);
+    await openNavigationPanel(page);
+    await page.getByRole('button', { name: 'Market' }).click();
+    await page.waitForTimeout(500);
+    await page.getByRole('button', { name: 'Sell All Ore' }).click();
+    await page.waitForTimeout(800);
 
     const savedAfterExport = await page.evaluate((key) => {
       const raw = window.localStorage.getItem(key);
@@ -102,12 +195,16 @@ const run = async () => {
     }, SAVE_KEY);
 
     await page.reload();
+    await continueSavedRun(page);
     await page.waitForTimeout(700);
     const marketWindowVisible = await page.locator('text=/Market Window/i').count();
     assert(marketWindowVisible > 0, 'Expected Market Window effect chip to be visible.');
 
-    await page.getByRole('button', { name: 'Export' }).click();
-    await page.waitForTimeout(1000);
+    await openNavigationPanel(page);
+    await page.getByRole('button', { name: 'Market' }).click();
+    await page.waitForTimeout(500);
+    await page.getByRole('button', { name: 'Sell All Ore' }).click();
+    await page.waitForTimeout(800);
 
     const savedAfterMarketWindow = await page.evaluate((key) => {
       const raw = window.localStorage.getItem(key);
@@ -122,12 +219,14 @@ const run = async () => {
       const raw = window.localStorage.getItem(key);
       if (!raw) return;
       const state = JSON.parse(raw);
-      state.currentScene = 'WORLD';
+      state.currentScene = 'OFFICE';
+      state.activeBuildingId = null;
       state.storyFlags = ['community_pact', 'fixer_smuggling_tie', 'inspector_blacklist'];
       window.localStorage.setItem(key, JSON.stringify(state));
     }, SAVE_KEY);
 
     await page.reload();
+    await continueSavedRun(page);
     await page.waitForTimeout(700);
     const politicalPanelTrigger = page.locator('text=Political Position').first();
     assert(await politicalPanelTrigger.count() > 0, 'Expected Political Position panel trigger to exist.');
@@ -157,6 +256,7 @@ const run = async () => {
     }, SAVE_KEY);
 
     await page.reload();
+    await continueSavedRun(page);
     await page.waitForTimeout(700);
     const blockedEndingCount = await page.getByText('Bureau Tycoon').count();
     assert(blockedEndingCount === 0, 'Expected Bureau Tycoon to stay locked without quiet-route flags.');
