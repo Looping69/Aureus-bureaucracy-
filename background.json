@@ -1,0 +1,72 @@
+{
+  "description": "Tall skyscraper and building silhouettes placed around the world boundary to create a dense city skyline horizon",
+  "fogColor": {
+    "day": "0xe2e8f0",
+    "night": "0x020617"
+  },
+  "motifs": [
+    {
+      "name": "glass_skyscraper",
+      "width": 3,
+      "depth": 3,
+      "floors": 28,
+      "style": "glass_tower"
+    },
+    {
+      "name": "office_tower",
+      "width": 4,
+      "depth": 3,
+      "floors": 22,
+      "style": "office"
+    },
+    {
+      "name": "slim_highrise",
+      "width": 2,
+      "depth": 2,
+      "floors": 32,
+      "style": "slim_highrise"
+    },
+    {
+      "name": "wide_complex",
+      "width": 6,
+      "depth": 4,
+      "floors": 16,
+      "style": "wide_complex"
+    },
+    {
+      "name": "industrial_tower",
+      "width": 3,
+      "depth": 3,
+      "floors": 20,
+      "style": "industrial"
+    },
+    {
+      "name": "residential_block",
+      "width": 5,
+      "depth": 3,
+      "floors": 18,
+      "style": "residential"
+    },
+    {
+      "name": "mega_tower",
+      "width": 4,
+      "depth": 4,
+      "floors": 36,
+      "style": "mega"
+    },
+    {
+      "name": "stepped_tower",
+      "width": 5,
+      "depth": 4,
+      "floors": 24,
+      "style": "stepped"
+    }
+  ],
+  "edgeConfig": {
+    "ringStart": 122,
+    "ringEnd": 175,
+    "spacing": 6,
+    "baseY": -4,
+    "heightJitter": 0.6
+  }
+}

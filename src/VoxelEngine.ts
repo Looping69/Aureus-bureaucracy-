@@ -11,14 +11,15 @@ import { CONFIG, COLORS, WORLD_HALF_SIZE, WORLD_SIZE } from './utils/voxelConsta
 import { EntityManager } from './EntityManager';
 import { GreedyMesher } from './utils/GreedyMesher';
 import { BuildingFootprint } from './utils/worldNavigation';
+import backgroundData from '../background.json';
 
 export class VoxelEngine {
   private static readonly MIN_CAMERA_POLAR = Math.PI / 8;
   private static readonly MAX_CAMERA_POLAR = Math.PI / 2.2;
-  private static readonly FOG_NEAR_DAY = 250;
-  private static readonly FOG_FAR_DAY = 600;
-  private static readonly FOG_NEAR_NIGHT = 150;
-  private static readonly FOG_FAR_NIGHT = 400;
+  private static readonly FOG_NEAR_DAY = 120;
+  private static readonly FOG_FAR_DAY = 280;
+  private static readonly FOG_NEAR_NIGHT = 80;
+  private static readonly FOG_FAR_NIGHT = 220;
   private container: HTMLElement;
   private scene: THREE.Scene;
   private camera: THREE.PerspectiveCamera;
@@ -37,6 +38,7 @@ export class VoxelEngine {
   private pathLine: THREE.Line;
   private skyDome: THREE.Mesh;
   private floor: THREE.Mesh;
+  private edgeGroup: THREE.Group;
   private worldGrid: THREE.GridHelper;
   public entities: EntityManager;
   private dummy = new THREE.Object3D();
@@ -95,7 +97,7 @@ export class VoxelEngine {
 
     // Init Three.js
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.Fog(CONFIG.BG_COLOR, 200, 500);
+    this.scene.fog = new THREE.Fog(CONFIG.BG_COLOR, 120, 280);
     
     this.physicsWorld = new CANNON.World({
       gravity: new CANNON.Vec3(0, -9.82, 0),
@@ -127,7 +129,7 @@ export class VoxelEngine {
     this.controls.minPolarAngle = VoxelEngine.MIN_CAMERA_POLAR;
     this.controls.maxPolarAngle = VoxelEngine.MAX_CAMERA_POLAR;
     this.controls.minDistance = 10;
-    this.controls.maxDistance = 200;
+    this.controls.maxDistance = 100;
     this.controls.zoomSpeed = 1.2;
     this.controls.rotateSpeed = 0.6;
     this.controls.update();
@@ -215,6 +217,13 @@ export class VoxelEngine {
       }
     });
     this.scene.add(this.worldGrid);
+
+    // Edge decorations – place motifs from background.json around the world
+    // boundary so that the edges of the playable area look like a distant
+    // cityscape / industrial horizon fading into fog.
+    this.edgeGroup = new THREE.Group();
+    this.buildEdgeDecorations();
+    this.scene.add(this.edgeGroup);
 
     const floorBody = new CANNON.Body({
       type: CANNON.Body.STATIC,
@@ -472,6 +481,192 @@ export class VoxelEngine {
     this.controls.target.z = THREE.MathUtils.clamp(this.controls.target.z, -worldLimit, worldLimit);
     this.camera.position.x = THREE.MathUtils.clamp(this.camera.position.x, -worldLimit, worldLimit);
     this.camera.position.z = THREE.MathUtils.clamp(this.camera.position.z, -worldLimit, worldLimit);
+  }
+
+  /**
+   * Build edge decorations from background.json motifs.
+   * Procedurally generates tall skyscraper / building silhouettes in a ring
+   * around the world boundary so the playable area is surrounded by a dense
+   * city skyline that fades into fog.
+   */
+  private buildEdgeDecorations() {
+    const cfg = backgroundData.edgeConfig;
+    const motifs = backgroundData.motifs as Array<{
+      name: string; width: number; depth: number; floors: number; style: string;
+    }>;
+    if (!motifs || motifs.length === 0) return;
+
+    const edgeVoxels: VoxelData[] = [];
+
+    // Deterministic pseudo-random from two seed values
+    const seededRandom = (a: number, b: number) => {
+      const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453;
+      return s - Math.floor(s);
+    };
+    const seededRandom2 = (a: number, b: number) => {
+      const s = Math.sin(a * 269.3 + b * 183.1) * 31415.9265;
+      return s - Math.floor(s);
+    };
+
+    // Colour palettes for different building styles
+    const WALL_DARK  = 0x374151;  // dark grey concrete
+    const WALL_MID   = 0x4b5563;  // mid grey
+    const WALL_LIGHT = 0x6b7280;  // light grey
+    const GLASS_BLUE = 0x5b7fa5;  // blue-tinted glass
+    const GLASS_CYAN = 0x4a8c99;  // cyan tint
+    const WINDOW_LIT = 0xfcd34d;  // warm yellow lit window
+    const ROOF_DARK  = 0x1f2937;  // dark roof
+    const STEEL      = 0x9ca3af;  // steel / antenna
+    const RED_LIGHT  = 0xef4444;  // aviation warning light
+
+    /**
+     * Generate voxels for a single skyscraper at world position (ox, oz).
+     */
+    const generateBuilding = (
+      ox: number, oz: number,
+      w: number, d: number, floors: number,
+      style: string, rng: number
+    ) => {
+      const baseY = cfg.baseY;
+      // Height jitter: vary the number of floors per-instance
+      const jitter = cfg.heightJitter;
+      const actualFloors = Math.max(8, Math.round(floors * (1 - jitter / 2 + rng * jitter)));
+
+      // Pick wall / accent colours based on style
+      let wallColor = WALL_MID;
+      let accentColor = GLASS_BLUE;
+      let roofColor = ROOF_DARK;
+      if (style === 'glass_tower')    { wallColor = WALL_LIGHT; accentColor = GLASS_CYAN; }
+      if (style === 'office')         { wallColor = WALL_MID;   accentColor = GLASS_BLUE; }
+      if (style === 'slim_highrise')  { wallColor = WALL_LIGHT; accentColor = GLASS_BLUE; }
+      if (style === 'wide_complex')   { wallColor = WALL_DARK;  accentColor = GLASS_BLUE; }
+      if (style === 'industrial')     { wallColor = WALL_DARK;  accentColor = STEEL;      roofColor = WALL_DARK; }
+      if (style === 'residential')    { wallColor = WALL_MID;   accentColor = WINDOW_LIT; }
+      if (style === 'mega')           { wallColor = WALL_MID;   accentColor = GLASS_CYAN; }
+      if (style === 'stepped')        { wallColor = WALL_LIGHT; accentColor = GLASS_BLUE; }
+
+      // For "stepped" buildings, taper width/depth every N floors
+      let curW = w;
+      let curD = d;
+      const stepInterval = style === 'stepped' ? Math.max(4, Math.floor(actualFloors / 3)) : actualFloors + 1;
+
+      for (let floor = 0; floor < actualFloors; floor++) {
+        // Stepped reduction
+        if (style === 'stepped' && floor > 0 && floor % stepInterval === 0) {
+          if (curW > 2) curW--;
+          if (curD > 2) curD--;
+        }
+
+        const y = baseY + floor;
+        const isWindowFloor = floor > 0 && floor % 3 === 1;  // every 3rd floor has window accents
+        const xOff = Math.floor((w - curW) / 2);  // centre narrowed section
+        const zOff = Math.floor((d - curD) / 2);
+
+        for (let lx = 0; lx < curW; lx++) {
+          for (let lz = 0; lz < curD; lz++) {
+            const isEdge = lx === 0 || lx === curW - 1 || lz === 0 || lz === curD - 1;
+            // Only build the shell (outer walls), not interior
+            if (!isEdge && curW > 2 && curD > 2) continue;
+
+            let color = wallColor;
+            // Window band on edges
+            if (isWindowFloor && isEdge) {
+              color = accentColor;
+            }
+            // Ground floor darker
+            if (floor === 0) color = WALL_DARK;
+
+            edgeVoxels.push({
+              x: ox + lx + xOff,
+              y,
+              z: oz + lz + zOff,
+              color,
+            });
+          }
+        }
+      }
+
+      // === Roof details ===
+      const roofY = baseY + actualFloors;
+
+      // Flat roof cap
+      const rxOff = Math.floor((w - curW) / 2);
+      const rzOff = Math.floor((d - curD) / 2);
+      for (let lx = 0; lx < curW; lx++) {
+        for (let lz = 0; lz < curD; lz++) {
+          edgeVoxels.push({ x: ox + lx + rxOff, y: roofY, z: oz + lz + rzOff, color: roofColor });
+        }
+      }
+
+      // Antenna / spire on tall buildings
+      if (actualFloors >= 20) {
+        const ax = ox + Math.floor(w / 2);
+        const az = oz + Math.floor(d / 2);
+        const antennaH = Math.min(6, Math.floor(actualFloors / 6));
+        for (let i = 1; i <= antennaH; i++) {
+          edgeVoxels.push({ x: ax, y: roofY + i, z: az, color: STEEL });
+        }
+        // Red warning light at top
+        edgeVoxels.push({ x: ax, y: roofY + antennaH + 1, z: az, color: RED_LIGHT });
+      }
+    };
+
+    // Walk the perimeter ring and place buildings
+    const step = cfg.spacing;
+    for (let wx = -cfg.ringEnd; wx <= cfg.ringEnd; wx += step) {
+      for (let wz = -cfg.ringEnd; wz <= cfg.ringEnd; wz += step) {
+        const dist = Math.max(Math.abs(wx), Math.abs(wz));
+        if (dist < cfg.ringStart || dist > cfg.ringEnd) continue;
+
+        const r = seededRandom(wx, wz);
+        const r2 = seededRandom2(wx, wz);
+        // ~75% fill rate for a dense skyline
+        if (r < 0.25) continue;
+
+        const motifIdx = Math.floor(r2 * motifs.length) % motifs.length;
+        const motif = motifs[motifIdx];
+
+        generateBuilding(wx, wz, motif.width, motif.depth, motif.floors, motif.style, r);
+      }
+    }
+
+    if (edgeVoxels.length === 0) return;
+
+    // Use the GreedyMesher to build optimised geometry in chunks
+    const CHUNK = 64;
+    const chunks = new Map<string, VoxelData[]>();
+    for (const v of edgeVoxels) {
+      const cx = Math.floor(v.x / CHUNK);
+      const cz = Math.floor(v.z / CHUNK);
+      const key = `${cx},${cz}`;
+      if (!chunks.has(key)) chunks.set(key, []);
+      chunks.get(key)!.push(v);
+    }
+
+    chunks.forEach((voxels) => {
+      const meshData = GreedyMesher.mesh(voxels);
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(meshData.positions, 3));
+      geometry.setAttribute('normal', new THREE.Float32BufferAttribute(meshData.normals, 3));
+      geometry.setAttribute('color', new THREE.Float32BufferAttribute(meshData.colors, 3));
+      geometry.setIndex(meshData.indices);
+      geometry.computeBoundingSphere();
+      geometry.computeBoundingBox();
+
+      const material = new THREE.MeshStandardMaterial({
+        vertexColors: true,
+        roughness: 0.85,
+        metalness: 0.1,
+        transparent: true,
+        opacity: 0.8,
+      });
+
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.castShadow = false;
+      mesh.receiveShadow = false;
+      mesh.frustumCulled = true;
+      this.edgeGroup.add(mesh);
+    });
   }
 
   private collectTerrainObjects() {
