@@ -4,7 +4,7 @@ import { GameState } from '../../types';
 import { applyDailyEconomyTick } from '../../game/economy';
 import { applyExhaustionCollapse } from '../../game/exhaustion';
 
-const DAY_NIGHT_TIME_SCALE = 0.2;
+const DAY_NIGHT_TIME_SCALE = 0.08;
 
 interface UseTimeAndCurfewLoopArgs {
   setState: React.Dispatch<React.SetStateAction<GameState>>;
