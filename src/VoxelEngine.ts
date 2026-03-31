@@ -11,14 +11,15 @@ import { CONFIG, COLORS, WORLD_HALF_SIZE, WORLD_SIZE } from './utils/voxelConsta
 import { EntityManager } from './EntityManager';
 import { GreedyMesher } from './utils/GreedyMesher';
 import { BuildingFootprint } from './utils/worldNavigation';
+import backgroundData from '../background.json';
 
 export class VoxelEngine {
   private static readonly MIN_CAMERA_POLAR = Math.PI / 8;
   private static readonly MAX_CAMERA_POLAR = Math.PI / 2.2;
-  private static readonly FOG_NEAR_DAY = 250;
-  private static readonly FOG_FAR_DAY = 600;
-  private static readonly FOG_NEAR_NIGHT = 150;
-  private static readonly FOG_FAR_NIGHT = 400;
+  private static readonly FOG_NEAR_DAY = 120;
+  private static readonly FOG_FAR_DAY = 280;
+  private static readonly FOG_NEAR_NIGHT = 80;
+  private static readonly FOG_FAR_NIGHT = 220;
   private container: HTMLElement;
   private scene: THREE.Scene;
   private camera: THREE.PerspectiveCamera;
@@ -37,6 +38,7 @@ export class VoxelEngine {
   private pathLine: THREE.Line;
   private skyDome: THREE.Mesh;
   private floor: THREE.Mesh;
+  private edgeGroup: THREE.Group;
   private worldGrid: THREE.GridHelper;
   public entities: EntityManager;
   private dummy = new THREE.Object3D();
@@ -95,7 +97,7 @@ export class VoxelEngine {
 
     // Init Three.js
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.Fog(CONFIG.BG_COLOR, 200, 500);
+    this.scene.fog = new THREE.Fog(CONFIG.BG_COLOR, 120, 280);
     
     this.physicsWorld = new CANNON.World({
       gravity: new CANNON.Vec3(0, -9.82, 0),
@@ -127,7 +129,7 @@ export class VoxelEngine {
     this.controls.minPolarAngle = VoxelEngine.MIN_CAMERA_POLAR;
     this.controls.maxPolarAngle = VoxelEngine.MAX_CAMERA_POLAR;
     this.controls.minDistance = 10;
-    this.controls.maxDistance = 200;
+    this.controls.maxDistance = 100;
     this.controls.zoomSpeed = 1.2;
     this.controls.rotateSpeed = 0.6;
     this.controls.update();
@@ -215,6 +217,13 @@ export class VoxelEngine {
       }
     });
     this.scene.add(this.worldGrid);
+
+    // Edge decorations – place motifs from background.json around the world
+    // boundary so that the edges of the playable area look like a distant
+    // cityscape / industrial horizon fading into fog.
+    this.edgeGroup = new THREE.Group();
+    this.buildEdgeDecorations();
+    this.scene.add(this.edgeGroup);
 
     const floorBody = new CANNON.Body({
       type: CANNON.Body.STATIC,
@@ -472,6 +481,92 @@ export class VoxelEngine {
     this.controls.target.z = THREE.MathUtils.clamp(this.controls.target.z, -worldLimit, worldLimit);
     this.camera.position.x = THREE.MathUtils.clamp(this.camera.position.x, -worldLimit, worldLimit);
     this.camera.position.z = THREE.MathUtils.clamp(this.camera.position.z, -worldLimit, worldLimit);
+  }
+
+  /**
+   * Build edge decorations from background.json motifs.
+   * Places semi-random structures in a ring around the world boundary so that
+   * the playable area is surrounded by a distant-looking horizon that fades
+   * into fog.
+   */
+  private buildEdgeDecorations() {
+    const cfg = backgroundData.edgeConfig;
+    const motifs = backgroundData.motifs;
+    if (!motifs || motifs.length === 0) return;
+
+    // Collect all voxel data for the edge ring, then mesh it in one pass
+    const edgeVoxels: VoxelData[] = [];
+
+    // Simple seeded pseudo-random based on position
+    const seededRandom = (a: number, b: number) => {
+      const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453;
+      return s - Math.floor(s);
+    };
+
+    // Walk the perimeter ring and scatter motifs
+    const step = cfg.spacing;
+    for (let wx = -cfg.ringEnd; wx <= cfg.ringEnd; wx += step) {
+      for (let wz = -cfg.ringEnd; wz <= cfg.ringEnd; wz += step) {
+        const dist = Math.max(Math.abs(wx), Math.abs(wz));
+        if (dist < cfg.ringStart || dist > cfg.ringEnd) continue;
+
+        const r = seededRandom(wx, wz);
+        // Only place a structure ~60% of the time for variety
+        if (r < 0.4) continue;
+
+        const motifIdx = Math.floor(r * motifs.length) % motifs.length;
+        const motif = motifs[motifIdx];
+        const scale = cfg.scaleRange[0] + r * (cfg.scaleRange[1] - cfg.scaleRange[0]);
+
+        for (const v of motif.voxels) {
+          edgeVoxels.push({
+            x: wx + Math.round(v.x * scale),
+            y: cfg.baseY + Math.round(v.y * scale),
+            z: wz + Math.round(v.z * scale),
+            color: parseInt(v.color),
+          });
+        }
+      }
+    }
+
+    if (edgeVoxels.length === 0) return;
+
+    // Use the GreedyMesher to build optimised geometry
+    const CHUNK = 64;
+    const chunks = new Map<string, VoxelData[]>();
+    for (const v of edgeVoxels) {
+      const cx = Math.floor(v.x / CHUNK);
+      const cz = Math.floor(v.z / CHUNK);
+      const key = `${cx},${cz}`;
+      if (!chunks.has(key)) chunks.set(key, []);
+      chunks.get(key)!.push(v);
+    }
+
+    chunks.forEach((voxels) => {
+      const meshData = GreedyMesher.mesh(voxels);
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(meshData.positions, 3));
+      geometry.setAttribute('normal', new THREE.Float32BufferAttribute(meshData.normals, 3));
+      geometry.setAttribute('color', new THREE.Float32BufferAttribute(meshData.colors, 3));
+      geometry.setIndex(meshData.indices);
+      geometry.computeBoundingSphere();
+      geometry.computeBoundingBox();
+
+      const material = new THREE.MeshStandardMaterial({
+        vertexColors: true,
+        roughness: 0.9,
+        metalness: 0.05,
+        // slightly transparent so they feel ghostly / distant
+        transparent: true,
+        opacity: 0.75,
+      });
+
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.castShadow = false;
+      mesh.receiveShadow = false;
+      mesh.frustumCulled = true;
+      this.edgeGroup.add(mesh);
+    });
   }
 
   private collectTerrainObjects() {
