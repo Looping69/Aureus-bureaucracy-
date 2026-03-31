@@ -58,7 +58,7 @@ export class VoxelCharacter {
     this.innerGroup.add(this.body, this.head, this.leftArm, this.rightArm, this.leftLeg, this.rightLeg);
   }
 
-  private createBody(c: { shirt: number; belt: number; pants: number }): THREE.Group {
+  private createBody(c: { shirt: number; belt: number }): THREE.Group {
     const group = new THREE.Group();
     const s = this.subVoxelSize;
 
