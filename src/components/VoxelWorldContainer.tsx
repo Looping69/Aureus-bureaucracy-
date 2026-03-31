@@ -1,9 +1,10 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { VoxelEngine } from '../VoxelEngine';
 import { Building, NPC, AppState, VoxelData, WorldHoverInfo } from '../types';
 import { useCameraControls } from '../hooks/useCameraControls';
 import { WORLD_HALF_SIZE } from '../utils/voxelConstants';
 import { buildWorldSurfaceMap, getWorldSurfaceHeight } from '../utils/worldSurface';
+import { LoadingScreen } from './LoadingScreen';
 
 interface VoxelWorldProps {
   voxels: VoxelData[];
@@ -38,6 +39,7 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<VoxelEngine | null>(null);
+  const [loading, setLoading] = useState(true);
   const surfaceMap = React.useMemo(() => buildWorldSurfaceMap(buildings), [buildings]);
   const playerSurfaceY = React.useMemo(
     () => getWorldSurfaceHeight(playerPos, surfaceMap),
@@ -84,6 +86,13 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
         targetPos ? targetPos.y - WORLD_HALF_SIZE : undefined,
         path
       );
+
+      // Hide loading screen after engine has rendered at least one frame
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setLoading(false);
+        });
+      });
 
       const resizeObserver = new ResizeObserver(() => {
         engineRef.current?.handleResize();
@@ -157,5 +166,9 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
     }
   }, [onStateChange, onCountChange, onHoverPosition, onSelect]);
 
-  return <div ref={containerRef} className="w-full h-full" />;
+  return (
+    <div ref={containerRef} className="w-full h-full relative">
+      <LoadingScreen visible={loading} />
+    </div>
+  );
 };

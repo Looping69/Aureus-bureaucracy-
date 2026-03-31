@@ -14,6 +14,14 @@ import {
   ROAD_NS_VOXELS,
   ROAD_EW_VOXELS,
   ROAD_CROSS_VOXELS,
+  GENERIC_HOUSE_A_VOXELS,
+  GENERIC_HOUSE_B_VOXELS,
+  GENERIC_OFFICE_VOXELS,
+  FACTORY_VOXELS,
+  TREE_A_VOXELS,
+  TREE_B_VOXELS,
+  BUSH_VOXELS,
+  GARDEN_VOXELS,
 } from './buildings';
 
 export const generateGrid = (width: number, height: number, yieldRate: number = 0.2): Tile[] => {
@@ -1387,11 +1395,11 @@ const occupiedCityCells = new Set<string>();
 // both directions so the lane markings match the connecting segments.
 
 const cityStreets: Record<string, Building> = {
-  // Main Avenue south of intersection (NS tiles)
+  // Main Avenue extends from bottom to top of grid (NS tiles)
   ...createPlacedTiles(
     'main_ave_s',
     'ROAD',
-    createCityLine({ x: 5, y: 1 }, { x: 5, y: 4 }),
+    createCityLine({ x: 5, y: 0 }, { x: 5, y: 4 }),
     ROAD_NS_VOXELS,
     occupiedCityCells
   ),
@@ -1419,19 +1427,19 @@ const cityStreets: Record<string, Building> = {
     ROAD_CROSS_VOXELS,
     occupiedCityCells
   ),
-  // Main Avenue north end (NS tile)
+  // Main Avenue north end (NS tile – stops at y=9 because mine entrance is at y=10)
   ...createPlacedTiles(
     'main_ave_n',
     'ROAD',
-    [{ x: 5, y: 9 }],
+    createCityLine({ x: 5, y: 9 }, { x: 5, y: 9 }),
     ROAD_NS_VOXELS,
     occupiedCityCells
   ),
-  // Cross Street west of intersection (EW tiles)
+  // Cross Street extends from left edge to right edge (EW tiles)
   ...createPlacedTiles(
     'cross_st_w',
     'ROAD',
-    createCityLine({ x: 1, y: 5 }, { x: 4, y: 5 }),
+    createCityLine({ x: 0, y: 5 }, { x: 4, y: 5 }),
     ROAD_EW_VOXELS,
     occupiedCityCells
   ),
@@ -1439,15 +1447,15 @@ const cityStreets: Record<string, Building> = {
   ...createPlacedTiles(
     'cross_st_e',
     'ROAD',
-    createCityLine({ x: 6, y: 5 }, { x: 9, y: 5 }),
+    createCityLine({ x: 6, y: 5 }, { x: 10, y: 5 }),
     ROAD_EW_VOXELS,
     occupiedCityCells
   ),
-  // North Lane west of intersection (EW tiles)
+  // North Lane extends from left edge to right edge (EW tiles)
   ...createPlacedTiles(
     'north_ln_w',
     'ROAD',
-    createCityLine({ x: 2, y: 8 }, { x: 4, y: 8 }),
+    createCityLine({ x: 0, y: 8 }, { x: 4, y: 8 }),
     ROAD_EW_VOXELS,
     occupiedCityCells
   ),
@@ -1455,7 +1463,7 @@ const cityStreets: Record<string, Building> = {
   ...createPlacedTiles(
     'north_ln_e',
     'ROAD',
-    createCityLine({ x: 6, y: 8 }, { x: 8, y: 8 }),
+    createCityLine({ x: 6, y: 8 }, { x: 10, y: 8 }),
     ROAD_EW_VOXELS,
     occupiedCityCells
   ),
@@ -1464,20 +1472,21 @@ const cityStreets: Record<string, Building> = {
 // ── Building placement ───────────────────────────────────────────────
 // Buildings are positioned on the 11 × 11 city grid so that every
 // structure sits directly adjacent to at least one road cell.
+// Roads now extend to the grid edges for a more complete feel.
 // (Y increases upward in the diagram; top row = y 10.)
 //
 //    0  1  2  3  4  5  6  7  8  9  10
 // 10 .  .  .  .  .  ME .  .  .  .  .
 //  9 .  .  .  PH .  R  .  .  .  FD .
-//  8 .  .  R  R  R  +  R  R  R  .  .
+//  8 R  R  R  R  R  +  R  R  R  R  R
 //  7 .  .  .  CP .  R  .  UH .  .  .
 //  6 .  .  .  .  .  R  .  .  .  .  .
-//  5 .  R  R  R  R  +  R  R  R  R  .
+//  5 R  R  R  R  R  +  R  R  R  R  R
 //  4 .  .  HB .  .  R  .  LO .  .  .
 //  3 .  CH .  .  .  R  .  .  .  .  .
 //  2 .  .  .  .  .  R  .  .  IH .  .
 //  1 .  .  .  .  .  R  .  .  .  .  .
-//  0 .  .  .  .  .  .  .  .  .  .  .
+//  0 .  .  .  .  .  R  .  .  .  .  .
 
 const baseBuildings: Record<string, Building> = {
   player_home: createPlacedBuilding(
@@ -1591,6 +1600,179 @@ const baseBuildings: Record<string, Building> = {
     },
     occupiedCityCells
   ),
+
+  // ── Extra buildings ────────────────────────────────────────────────
+  house_south_a: createPlacedBuilding(
+    { x: 3, y: 1 },
+    {
+      id: 'house_south_a',
+      npcId: 'none',
+      name: 'Residential Unit A',
+      type: 'HOME',
+      isDiscovered: true,
+      voxels: GENERIC_HOUSE_A_VOXELS,
+    },
+    occupiedCityCells
+  ),
+  house_south_b: createPlacedBuilding(
+    { x: 7, y: 1 },
+    {
+      id: 'house_south_b',
+      npcId: 'none',
+      name: 'Residential Unit B',
+      type: 'HOME',
+      isDiscovered: true,
+      voxels: GENERIC_HOUSE_B_VOXELS,
+    },
+    occupiedCityCells
+  ),
+  office_east: createPlacedBuilding(
+    { x: 9, y: 3 },
+    {
+      id: 'office_east',
+      npcId: 'none',
+      name: 'District Office',
+      type: 'OFFICE',
+      isDiscovered: true,
+      voxels: GENERIC_OFFICE_VOXELS,
+    },
+    occupiedCityCells
+  ),
+  factory_west: createPlacedBuilding(
+    { x: 1, y: 6 },
+    {
+      id: 'factory_west',
+      npcId: 'none',
+      name: 'Processing Plant',
+      type: 'OFFICE',
+      isDiscovered: true,
+      voxels: FACTORY_VOXELS,
+    },
+    occupiedCityCells
+  ),
+  house_north_a: createPlacedBuilding(
+    { x: 7, y: 9 },
+    {
+      id: 'house_north_a',
+      npcId: 'none',
+      name: 'Foreman\'s Quarters',
+      type: 'HOME',
+      isDiscovered: true,
+      voxels: GENERIC_HOUSE_A_VOXELS,
+    },
+    occupiedCityCells
+  ),
+  house_west_c: createPlacedBuilding(
+    { x: 1, y: 9 },
+    {
+      id: 'house_west_c',
+      npcId: 'none',
+      name: 'Worker Housing',
+      type: 'HOME',
+      isDiscovered: true,
+      voxels: GENERIC_HOUSE_B_VOXELS,
+    },
+    occupiedCityCells
+  ),
+
+  // ── Foliage / green spaces ─────────────────────────────────────────
+  tree_sw_1: createPlacedBuilding(
+    { x: 1, y: 1 },
+    {
+      id: 'tree_sw_1',
+      npcId: 'none',
+      name: 'Dusty Oak',
+      type: 'PARK',
+      isDiscovered: true,
+      voxels: TREE_A_VOXELS,
+    },
+    occupiedCityCells
+  ),
+  tree_se_1: createPlacedBuilding(
+    { x: 9, y: 1 },
+    {
+      id: 'tree_se_1',
+      npcId: 'none',
+      name: 'Roadside Pine',
+      type: 'PARK',
+      isDiscovered: true,
+      voxels: TREE_B_VOXELS,
+    },
+    occupiedCityCells
+  ),
+  garden_east: createPlacedBuilding(
+    { x: 9, y: 6 },
+    {
+      id: 'garden_east',
+      npcId: 'none',
+      name: 'East Gardens',
+      type: 'PARK',
+      isDiscovered: true,
+      voxels: GARDEN_VOXELS,
+    },
+    occupiedCityCells
+  ),
+  tree_ne_1: createPlacedBuilding(
+    { x: 9, y: 10 },
+    {
+      id: 'tree_ne_1',
+      npcId: 'none',
+      name: 'Northern Pine',
+      type: 'PARK',
+      isDiscovered: true,
+      voxels: TREE_A_VOXELS,
+    },
+    occupiedCityCells
+  ),
+  bush_w_1: createPlacedBuilding(
+    { x: 1, y: 4 },
+    {
+      id: 'bush_w_1',
+      npcId: 'none',
+      name: 'Wild Brush',
+      type: 'PARK',
+      isDiscovered: true,
+      voxels: BUSH_VOXELS,
+    },
+    occupiedCityCells
+  ),
+  tree_nw_1: createPlacedBuilding(
+    { x: 1, y: 10 },
+    {
+      id: 'tree_nw_1',
+      npcId: 'none',
+      name: 'Withered Tree',
+      type: 'PARK',
+      isDiscovered: true,
+      voxels: TREE_B_VOXELS,
+    },
+    occupiedCityCells
+  ),
+  garden_center: createPlacedBuilding(
+    { x: 3, y: 4 },
+    {
+      id: 'garden_center',
+      npcId: 'none',
+      name: 'Median Garden',
+      type: 'PARK',
+      isDiscovered: true,
+      voxels: GARDEN_VOXELS,
+    },
+    occupiedCityCells
+  ),
+  tree_mid_east: createPlacedBuilding(
+    { x: 7, y: 6 },
+    {
+      id: 'tree_mid_east',
+      npcId: 'none',
+      name: 'Lone Oak',
+      type: 'PARK',
+      isDiscovered: true,
+      voxels: TREE_A_VOXELS,
+    },
+    occupiedCityCells
+  ),
+
   ...cityStreets,
 };
 
