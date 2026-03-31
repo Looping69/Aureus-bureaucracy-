@@ -119,7 +119,7 @@ export const MineWorldScene = ({
 
   // ── analog stick movement ────────────────────────────────────────────────
   const issueAnalogMove = React.useCallback(() => {
-    if (path.length > 0 || analogInput.magnitude < 0.35) return;
+    if (path.length > 1 || analogInput.magnitude < 0.35) return;
     const sv = -analogInput.y;
     const wx = camRight.x * analogInput.x + camForward.x * sv;
     const wy = camRight.y * analogInput.x + camForward.y * sv;
@@ -127,8 +127,8 @@ export const MineWorldScene = ({
     const sy = wy > 0.35 ? 1 : wy < -0.35 ? -1 : 0;
     if (sx === 0 && sy === 0) return;
     const next = {
-      x: Math.max(0, Math.min(WORLD_SIZE - 1, Math.round(playerPos.x) + sx)),
-      y: Math.max(0, Math.min(WORLD_SIZE - 1, Math.round(playerPos.y) + sy)),
+      x: Math.max(0, Math.min(WORLD_SIZE - 1, Math.round(playerPos.x) + sx * 3)),
+      y: Math.max(0, Math.min(WORLD_SIZE - 1, Math.round(playerPos.y) + sy * 3)),
     };
     if (next.x === Math.round(playerPos.x) && next.y === Math.round(playerPos.y)) return;
     const p = findPath(playerPos, next, MINE_WORLD_BUILDINGS, WORLD_SIZE);
@@ -137,7 +137,7 @@ export const MineWorldScene = ({
   }, [analogInput, camForward, camRight, path.length, playerPos]);
 
   React.useEffect(() => {
-    if (!analogInput.active || analogInput.magnitude < 0.35 || path.length > 0) return;
+    if (!analogInput.active || analogInput.magnitude < 0.35 || path.length > 1) return;
     issueAnalogMove();
     const id = setInterval(issueAnalogMove, 180);
     return () => clearInterval(id);
