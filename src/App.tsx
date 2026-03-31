@@ -561,6 +561,7 @@ export default function App() {
       <GameSceneRouter
         state={state}
         showMinePicker={showMinePicker}
+        showDebug={showDebugPanel}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}

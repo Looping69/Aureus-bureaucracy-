@@ -20,6 +20,7 @@ const CityPlanner = React.lazy(() =>
 interface GameSceneRouterProps {
   state: GameState;
   showMinePicker: boolean;
+  showDebug?: boolean;
   onPointerDown: (e: React.PointerEvent) => void;
   onPointerMove: (e: React.PointerEvent) => void;
   onPointerUp: (e: React.PointerEvent) => void;
@@ -51,6 +52,7 @@ interface GameSceneRouterProps {
 export const GameSceneRouter: React.FC<GameSceneRouterProps> = ({
   state,
   showMinePicker,
+  showDebug,
   onPointerDown,
   onPointerMove,
   onPointerUp,
@@ -133,6 +135,7 @@ export const GameSceneRouter: React.FC<GameSceneRouterProps> = ({
                 onEnterMine={onOpenMine}
                 onRecenter={onRecenter}
                 onTravel={onTravel}
+                showDebug={showDebug}
               />
             </React.Suspense>
           </motion.div>
