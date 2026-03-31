@@ -485,25 +485,133 @@ export class VoxelEngine {
 
   /**
    * Build edge decorations from background.json motifs.
-   * Places semi-random structures in a ring around the world boundary so that
-   * the playable area is surrounded by a distant-looking horizon that fades
-   * into fog.
+   * Procedurally generates tall skyscraper / building silhouettes in a ring
+   * around the world boundary so the playable area is surrounded by a dense
+   * city skyline that fades into fog.
    */
   private buildEdgeDecorations() {
     const cfg = backgroundData.edgeConfig;
-    const motifs = backgroundData.motifs;
+    const motifs = backgroundData.motifs as Array<{
+      name: string; width: number; depth: number; floors: number; style: string;
+    }>;
     if (!motifs || motifs.length === 0) return;
 
-    // Collect all voxel data for the edge ring, then mesh it in one pass
     const edgeVoxels: VoxelData[] = [];
 
-    // Simple seeded pseudo-random based on position
+    // Deterministic pseudo-random from two seed values
     const seededRandom = (a: number, b: number) => {
       const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453;
       return s - Math.floor(s);
     };
+    const seededRandom2 = (a: number, b: number) => {
+      const s = Math.sin(a * 269.3 + b * 183.1) * 31415.9265;
+      return s - Math.floor(s);
+    };
 
-    // Walk the perimeter ring and scatter motifs
+    // Colour palettes for different building styles
+    const WALL_DARK  = 0x374151;  // dark grey concrete
+    const WALL_MID   = 0x4b5563;  // mid grey
+    const WALL_LIGHT = 0x6b7280;  // light grey
+    const GLASS_BLUE = 0x5b7fa5;  // blue-tinted glass
+    const GLASS_CYAN = 0x4a8c99;  // cyan tint
+    const WINDOW_LIT = 0xfcd34d;  // warm yellow lit window
+    const ROOF_DARK  = 0x1f2937;  // dark roof
+    const STEEL      = 0x9ca3af;  // steel / antenna
+    const RED_LIGHT  = 0xef4444;  // aviation warning light
+
+    /**
+     * Generate voxels for a single skyscraper at world position (ox, oz).
+     */
+    const generateBuilding = (
+      ox: number, oz: number,
+      w: number, d: number, floors: number,
+      style: string, rng: number
+    ) => {
+      const baseY = cfg.baseY;
+      // Height jitter: vary the number of floors per-instance
+      const jitter = cfg.heightJitter;
+      const actualFloors = Math.max(8, Math.round(floors * (1 - jitter / 2 + rng * jitter)));
+
+      // Pick wall / accent colours based on style
+      let wallColor = WALL_MID;
+      let accentColor = GLASS_BLUE;
+      let roofColor = ROOF_DARK;
+      if (style === 'glass_tower')    { wallColor = WALL_LIGHT; accentColor = GLASS_CYAN; }
+      if (style === 'office')         { wallColor = WALL_MID;   accentColor = GLASS_BLUE; }
+      if (style === 'slim_highrise')  { wallColor = WALL_LIGHT; accentColor = GLASS_BLUE; }
+      if (style === 'wide_complex')   { wallColor = WALL_DARK;  accentColor = GLASS_BLUE; }
+      if (style === 'industrial')     { wallColor = WALL_DARK;  accentColor = STEEL;      roofColor = WALL_DARK; }
+      if (style === 'residential')    { wallColor = WALL_MID;   accentColor = WINDOW_LIT; }
+      if (style === 'mega')           { wallColor = WALL_MID;   accentColor = GLASS_CYAN; }
+      if (style === 'stepped')        { wallColor = WALL_LIGHT; accentColor = GLASS_BLUE; }
+
+      // For "stepped" buildings, taper width/depth every N floors
+      let curW = w;
+      let curD = d;
+      const stepInterval = style === 'stepped' ? Math.max(4, Math.floor(actualFloors / 3)) : actualFloors + 1;
+
+      for (let floor = 0; floor < actualFloors; floor++) {
+        // Stepped reduction
+        if (style === 'stepped' && floor > 0 && floor % stepInterval === 0) {
+          if (curW > 2) curW--;
+          if (curD > 2) curD--;
+        }
+
+        const y = baseY + floor;
+        const isWindowFloor = floor > 0 && floor % 3 === 1;  // every 3rd floor has window accents
+        const xOff = Math.floor((w - curW) / 2);  // centre narrowed section
+        const zOff = Math.floor((d - curD) / 2);
+
+        for (let lx = 0; lx < curW; lx++) {
+          for (let lz = 0; lz < curD; lz++) {
+            const isEdge = lx === 0 || lx === curW - 1 || lz === 0 || lz === curD - 1;
+            // Only build the shell (outer walls), not interior
+            if (!isEdge && curW > 2 && curD > 2) continue;
+
+            let color = wallColor;
+            // Window band on edges
+            if (isWindowFloor && isEdge) {
+              color = accentColor;
+            }
+            // Ground floor darker
+            if (floor === 0) color = WALL_DARK;
+
+            edgeVoxels.push({
+              x: ox + lx + xOff,
+              y,
+              z: oz + lz + zOff,
+              color,
+            });
+          }
+        }
+      }
+
+      // === Roof details ===
+      const roofY = baseY + actualFloors;
+
+      // Flat roof cap
+      const rxOff = Math.floor((w - curW) / 2);
+      const rzOff = Math.floor((d - curD) / 2);
+      for (let lx = 0; lx < curW; lx++) {
+        for (let lz = 0; lz < curD; lz++) {
+          edgeVoxels.push({ x: ox + lx + rxOff, y: roofY, z: oz + lz + rzOff, color: roofColor });
+        }
+      }
+
+      // Antenna / spire on tall buildings
+      if (actualFloors >= 20) {
+        const ax = ox + Math.floor(w / 2);
+        const az = oz + Math.floor(d / 2);
+        const antennaH = Math.min(6, Math.floor(actualFloors / 6));
+        for (let i = 1; i <= antennaH; i++) {
+          edgeVoxels.push({ x: ax, y: roofY + i, z: az, color: STEEL });
+        }
+        // Red warning light at top
+        edgeVoxels.push({ x: ax, y: roofY + antennaH + 1, z: az, color: RED_LIGHT });
+      }
+    };
+
+    // Walk the perimeter ring and place buildings
     const step = cfg.spacing;
     for (let wx = -cfg.ringEnd; wx <= cfg.ringEnd; wx += step) {
       for (let wz = -cfg.ringEnd; wz <= cfg.ringEnd; wz += step) {
@@ -511,27 +619,20 @@ export class VoxelEngine {
         if (dist < cfg.ringStart || dist > cfg.ringEnd) continue;
 
         const r = seededRandom(wx, wz);
-        // Only place a structure ~60% of the time for variety
-        if (r < 0.4) continue;
+        const r2 = seededRandom2(wx, wz);
+        // ~75% fill rate for a dense skyline
+        if (r < 0.25) continue;
 
-        const motifIdx = Math.floor(r * motifs.length) % motifs.length;
+        const motifIdx = Math.floor(r2 * motifs.length) % motifs.length;
         const motif = motifs[motifIdx];
-        const scale = cfg.scaleRange[0] + r * (cfg.scaleRange[1] - cfg.scaleRange[0]);
 
-        for (const v of motif.voxels) {
-          edgeVoxels.push({
-            x: wx + Math.round(v.x * scale),
-            y: cfg.baseY + Math.round(v.y * scale),
-            z: wz + Math.round(v.z * scale),
-            color: parseInt(v.color),
-          });
-        }
+        generateBuilding(wx, wz, motif.width, motif.depth, motif.floors, motif.style, r);
       }
     }
 
     if (edgeVoxels.length === 0) return;
 
-    // Use the GreedyMesher to build optimised geometry
+    // Use the GreedyMesher to build optimised geometry in chunks
     const CHUNK = 64;
     const chunks = new Map<string, VoxelData[]>();
     for (const v of edgeVoxels) {
@@ -554,11 +655,10 @@ export class VoxelEngine {
 
       const material = new THREE.MeshStandardMaterial({
         vertexColors: true,
-        roughness: 0.9,
-        metalness: 0.05,
-        // slightly transparent so they feel ghostly / distant
+        roughness: 0.85,
+        metalness: 0.1,
         transparent: true,
-        opacity: 0.75,
+        opacity: 0.8,
       });
 
       const mesh = new THREE.Mesh(geometry, material);

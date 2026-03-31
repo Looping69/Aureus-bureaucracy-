@@ -1,98 +1,72 @@
 {
-  "description": "Edge decoration motifs placed around the world boundary to create a sense of distance",
+  "description": "Tall skyscraper and building silhouettes placed around the world boundary to create a dense city skyline horizon",
   "fogColor": {
     "day": "0xe2e8f0",
     "night": "0x020617"
   },
   "motifs": [
     {
-      "name": "distant_tower",
-      "voxels": [
-        { "x": 0, "y": 0, "z": 0, "color": "0x6b7280" },
-        { "x": 1, "y": 0, "z": 0, "color": "0x6b7280" },
-        { "x": 0, "y": 0, "z": 1, "color": "0x6b7280" },
-        { "x": 1, "y": 0, "z": 1, "color": "0x6b7280" },
-        { "x": 0, "y": 1, "z": 0, "color": "0x6b7280" },
-        { "x": 1, "y": 1, "z": 0, "color": "0x6b7280" },
-        { "x": 0, "y": 1, "z": 1, "color": "0x6b7280" },
-        { "x": 1, "y": 1, "z": 1, "color": "0x6b7280" },
-        { "x": 0, "y": 2, "z": 0, "color": "0x9ca3af" },
-        { "x": 1, "y": 2, "z": 0, "color": "0x9ca3af" },
-        { "x": 0, "y": 2, "z": 1, "color": "0x9ca3af" },
-        { "x": 1, "y": 2, "z": 1, "color": "0x9ca3af" },
-        { "x": 0, "y": 3, "z": 0, "color": "0x9ca3af" },
-        { "x": 1, "y": 3, "z": 0, "color": "0x9ca3af" },
-        { "x": 0, "y": 3, "z": 1, "color": "0x9ca3af" },
-        { "x": 1, "y": 3, "z": 1, "color": "0x9ca3af" },
-        { "x": 0, "y": 4, "z": 0, "color": "0xd1d5db" },
-        { "x": 1, "y": 4, "z": 0, "color": "0xd1d5db" },
-        { "x": 0, "y": 5, "z": 0, "color": "0xd1d5db" }
-      ]
+      "name": "glass_skyscraper",
+      "width": 3,
+      "depth": 3,
+      "floors": 28,
+      "style": "glass_tower"
     },
     {
-      "name": "distant_building_wide",
-      "voxels": [
-        { "x": 0, "y": 0, "z": 0, "color": "0x4b5563" },
-        { "x": 1, "y": 0, "z": 0, "color": "0x4b5563" },
-        { "x": 2, "y": 0, "z": 0, "color": "0x4b5563" },
-        { "x": 3, "y": 0, "z": 0, "color": "0x4b5563" },
-        { "x": 0, "y": 0, "z": 1, "color": "0x4b5563" },
-        { "x": 1, "y": 0, "z": 1, "color": "0x4b5563" },
-        { "x": 2, "y": 0, "z": 1, "color": "0x4b5563" },
-        { "x": 3, "y": 0, "z": 1, "color": "0x4b5563" },
-        { "x": 0, "y": 1, "z": 0, "color": "0x6b7280" },
-        { "x": 1, "y": 1, "z": 0, "color": "0x6b7280" },
-        { "x": 2, "y": 1, "z": 0, "color": "0x6b7280" },
-        { "x": 3, "y": 1, "z": 0, "color": "0x6b7280" },
-        { "x": 0, "y": 1, "z": 1, "color": "0x6b7280" },
-        { "x": 1, "y": 1, "z": 1, "color": "0x6b7280" },
-        { "x": 2, "y": 1, "z": 1, "color": "0x6b7280" },
-        { "x": 3, "y": 1, "z": 1, "color": "0x6b7280" },
-        { "x": 0, "y": 2, "z": 0, "color": "0x9ca3af" },
-        { "x": 1, "y": 2, "z": 0, "color": "0x9ca3af" },
-        { "x": 2, "y": 2, "z": 0, "color": "0x9ca3af" },
-        { "x": 3, "y": 2, "z": 0, "color": "0x9ca3af" }
-      ]
+      "name": "office_tower",
+      "width": 4,
+      "depth": 3,
+      "floors": 22,
+      "style": "office"
     },
     {
-      "name": "distant_hill",
-      "voxels": [
-        { "x": 0, "y": 0, "z": 0, "color": "0x374151" },
-        { "x": 1, "y": 0, "z": 0, "color": "0x374151" },
-        { "x": 2, "y": 0, "z": 0, "color": "0x374151" },
-        { "x": 0, "y": 0, "z": 1, "color": "0x374151" },
-        { "x": 1, "y": 0, "z": 1, "color": "0x374151" },
-        { "x": 2, "y": 0, "z": 1, "color": "0x374151" },
-        { "x": 1, "y": 1, "z": 0, "color": "0x4b5563" },
-        { "x": 1, "y": 1, "z": 1, "color": "0x4b5563" }
-      ]
+      "name": "slim_highrise",
+      "width": 2,
+      "depth": 2,
+      "floors": 32,
+      "style": "slim_highrise"
     },
     {
-      "name": "distant_smokestack",
-      "voxels": [
-        { "x": 0, "y": 0, "z": 0, "color": "0x4b5563" },
-        { "x": 1, "y": 0, "z": 0, "color": "0x4b5563" },
-        { "x": 0, "y": 0, "z": 1, "color": "0x4b5563" },
-        { "x": 1, "y": 0, "z": 1, "color": "0x4b5563" },
-        { "x": 0, "y": 1, "z": 0, "color": "0x6b7280" },
-        { "x": 1, "y": 1, "z": 0, "color": "0x6b7280" },
-        { "x": 0, "y": 1, "z": 1, "color": "0x6b7280" },
-        { "x": 1, "y": 1, "z": 1, "color": "0x6b7280" },
-        { "x": 0, "y": 2, "z": 0, "color": "0x9ca3af" },
-        { "x": 0, "y": 2, "z": 1, "color": "0x9ca3af" },
-        { "x": 0, "y": 3, "z": 0, "color": "0x9ca3af" },
-        { "x": 0, "y": 4, "z": 0, "color": "0xd1d5db" },
-        { "x": 0, "y": 5, "z": 0, "color": "0xd1d5db" },
-        { "x": 0, "y": 6, "z": 0, "color": "0xd1d5db" },
-        { "x": 0, "y": 7, "z": 0, "color": "0xe5e7eb" }
-      ]
+      "name": "wide_complex",
+      "width": 6,
+      "depth": 4,
+      "floors": 16,
+      "style": "wide_complex"
+    },
+    {
+      "name": "industrial_tower",
+      "width": 3,
+      "depth": 3,
+      "floors": 20,
+      "style": "industrial"
+    },
+    {
+      "name": "residential_block",
+      "width": 5,
+      "depth": 3,
+      "floors": 18,
+      "style": "residential"
+    },
+    {
+      "name": "mega_tower",
+      "width": 4,
+      "depth": 4,
+      "floors": 36,
+      "style": "mega"
+    },
+    {
+      "name": "stepped_tower",
+      "width": 5,
+      "depth": 4,
+      "floors": 24,
+      "style": "stepped"
     }
   ],
   "edgeConfig": {
-    "ringStart": 125,
-    "ringEnd": 180,
-    "spacing": 8,
-    "baseY": -3,
-    "scaleRange": [1.5, 3.0]
+    "ringStart": 122,
+    "ringEnd": 175,
+    "spacing": 6,
+    "baseY": -4,
+    "heightJitter": 0.6
   }
 }
