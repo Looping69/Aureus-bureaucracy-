@@ -26,7 +26,6 @@ export const useMovementLoop = ({ setState, setNotification, homePos, enabled = 
         let currentPos = prev.playerPos;
         let remainingPath = prev.path;
         let newEnergy = prev.energy;
-        let newTime = prev.time;
         let didAdvance = false;
 
         while (remainingPath.length > 0) {
@@ -40,11 +39,9 @@ export const useMovementLoop = ({ setState, setNotification, homePos, enabled = 
           }
 
           const energyCost = 0.35 * segmentDistance;
-          const timeCost = 0.08 * segmentDistance;
 
           movementBudget -= segmentDistance;
           newEnergy -= energyCost;
-          newTime = (newTime + timeCost) % 24;
           currentPos = nextPos;
           remainingPath = remainingPath.slice(1);
           didAdvance = true;
@@ -60,7 +57,6 @@ export const useMovementLoop = ({ setState, setNotification, homePos, enabled = 
             ...prev,
             energy: newEnergy,
             playerPos: currentPos,
-            time: newTime,
             path: remainingPath,
           });
           setNotification(collapsed.notification);
@@ -71,7 +67,6 @@ export const useMovementLoop = ({ setState, setNotification, homePos, enabled = 
           ...prev,
           playerPos: currentPos,
           energy: newEnergy,
-          time: newTime,
           path: remainingPath,
           targetPos: remainingPath.length === 0 ? null : prev.targetPos
         };
