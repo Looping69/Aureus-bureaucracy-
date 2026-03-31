@@ -260,13 +260,47 @@ genPark.addBox(-2, 2, 1, -1, 3, 1, TIMBER);
 genPark.addBox(-1, -1, 1, 1, 1, 1, BRASS);
 export const PARK_VOXELS = genPark.getVoxels();
 
-// 13/14. Unified street tile - one paving element with carriageway + shoulders.
-const genStreet = new BuildingGenerator();
-genStreet.addBox(-4, -4, 0, 4, 4, 0, PAVEMENT);
-genStreet.addBox(-2, -4, 0, 2, 4, 0, ASPHALT);
-genStreet.addBox(0, -4, 0, 0, 4, 0, OFF_WHITE);
-genStreet.addBox(-4, -4, 0, -3, 4, 0, CURB);
-genStreet.addBox(3, -4, 0, 4, 4, 0, CURB);
-export const STREET_VOXELS = genStreet.getVoxels();
-export const ROAD_VOXELS = STREET_VOXELS;
-export const SIDEWALK_VOXELS = STREET_VOXELS;
+// Street tiles – each tile spans 14 voxels (−7 … +6) along the travel
+// direction so that adjacent road cells connect seamlessly.  Three variants
+// are provided: north-south, east-west, and intersection.
+
+// North-South road (centre-line runs along Y)
+const genStreetNS = new BuildingGenerator();
+genStreetNS.addBox(-4, -7, 0, 4, 6, 0, PAVEMENT);      // sidewalk base
+genStreetNS.addBox(-2, -7, 0, 2, 6, 0, ASPHALT);       // carriageway
+genStreetNS.addBox(0, -7, 0, 0, 6, 0, OFF_WHITE);      // centre line
+genStreetNS.addBox(-4, -7, 0, -3, 6, 0, CURB);         // left curb
+genStreetNS.addBox(3, -7, 0, 4, 6, 0, CURB);           // right curb
+export const ROAD_NS_VOXELS = genStreetNS.getVoxels();
+
+// East-West road (centre-line runs along X)
+const genStreetEW = new BuildingGenerator();
+genStreetEW.addBox(-7, -4, 0, 6, 4, 0, PAVEMENT);
+genStreetEW.addBox(-7, -2, 0, 6, 2, 0, ASPHALT);
+genStreetEW.addBox(-7, 0, 0, 6, 0, 0, OFF_WHITE);      // centre line along X
+genStreetEW.addBox(-7, -4, 0, 6, -3, 0, CURB);         // top curb
+genStreetEW.addBox(-7, 3, 0, 6, 4, 0, CURB);           // bottom curb
+export const ROAD_EW_VOXELS = genStreetEW.getVoxels();
+
+// Intersection (centre-lines in both directions)
+const genStreetX = new BuildingGenerator();
+genStreetX.addBox(-7, -7, 0, 6, 6, 0, PAVEMENT);       // full paving slab
+genStreetX.addBox(-2, -7, 0, 2, 6, 0, ASPHALT);        // NS carriageway
+genStreetX.addBox(-7, -2, 0, 6, 2, 0, ASPHALT);        // EW carriageway
+genStreetX.addBox(0, -7, 0, 0, 6, 0, OFF_WHITE);       // NS centre line
+genStreetX.addBox(-7, 0, 0, 6, 0, 0, OFF_WHITE);       // EW centre line
+// curbs in the four corners only
+genStreetX.addBox(-7, -7, 0, -3, -3, 0, CURB);
+genStreetX.addBox(3, -7, 0, 6, -3, 0, CURB);
+genStreetX.addBox(-7, 3, 0, -3, 6, 0, CURB);
+genStreetX.addBox(3, 3, 0, 6, 6, 0, CURB);
+export const ROAD_CROSS_VOXELS = genStreetX.getVoxels();
+
+// Backwards-compatible aliases used by CityPlanner and cityLayout.
+// SIDEWALK_VOXELS uses the EW variant so that sidewalk tiles placed by
+// the legacy city-planner tool still render with reasonable lane markings;
+// the original single-tile design had no orientation, so either variant
+// is a valid stand-in.
+export const STREET_VOXELS = ROAD_NS_VOXELS;
+export const ROAD_VOXELS = ROAD_NS_VOXELS;
+export const SIDEWALK_VOXELS = ROAD_EW_VOXELS;

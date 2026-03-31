@@ -11,7 +11,9 @@ import {
   CHIEF_HUT_VOXELS, 
   HOTLINE_BOOTH_VOXELS,
   PARK_VOXELS,
-  ROAD_VOXELS
+  ROAD_NS_VOXELS,
+  ROAD_EW_VOXELS,
+  ROAD_CROSS_VOXELS,
 } from './buildings';
 
 export const generateGrid = (width: number, height: number, yieldRate: number = 0.2): Tile[] => {
@@ -1375,50 +1377,107 @@ const normalizeWorldLayout = (buildings: Record<string, Building>) => {
 
 const occupiedCityCells = new Set<string>();
 
+// ── Road network ─────────────────────────────────────────────────────
+// Two main roads form a connected cross through the centre of the grid.
+//   Main Avenue  (NS) : x = 5, y = 1 → 9   (9 tiles, vertical)
+//   Cross Street (EW) : y = 5, x = 1 → 9   (9 tiles, horizontal)
+// An additional north lane connects the upper buildings.
+//   North Lane   (EW) : y = 8, x = 2 → 8   (7 tiles, horizontal)
+// Intersections use a dedicated cross tile whose centre-lines point in
+// both directions so the lane markings match the connecting segments.
+
 const cityStreets: Record<string, Building> = {
+  // Main Avenue south of intersection (NS tiles)
   ...createPlacedTiles(
-    'main_avenue',
+    'main_ave_s',
     'ROAD',
-    createCityLine({ x: 5, y: 2 }, { x: 5, y: 10 }),
-    ROAD_VOXELS,
+    createCityLine({ x: 5, y: 1 }, { x: 5, y: 4 }),
+    ROAD_NS_VOXELS,
     occupiedCityCells
   ),
+  // Main Avenue / Cross Street intersection
   ...createPlacedTiles(
-    'bureau_road',
+    'main_cross',
     'ROAD',
-    createCityLine({ x: 6, y: 4 }, { x: 8, y: 4 }),
-    ROAD_VOXELS,
+    [{ x: 5, y: 5 }],
+    ROAD_CROSS_VOXELS,
     occupiedCityCells
   ),
+  // Main Avenue between the two EW roads (NS tiles)
   ...createPlacedTiles(
-    'market_road',
+    'main_ave_m',
     'ROAD',
-    createCityLine({ x: 2, y: 6 }, { x: 4, y: 6 }),
-    ROAD_VOXELS,
+    createCityLine({ x: 5, y: 6 }, { x: 5, y: 7 }),
+    ROAD_NS_VOXELS,
     occupiedCityCells
   ),
+  // Main Avenue / North Lane intersection
   ...createPlacedTiles(
-    'tower_link',
+    'main_north',
     'ROAD',
-    createCityLine({ x: 9, y: 2 }, { x: 9, y: 4 }),
-    ROAD_VOXELS,
+    [{ x: 5, y: 8 }],
+    ROAD_CROSS_VOXELS,
     occupiedCityCells
   ),
+  // Main Avenue north end (NS tile)
   ...createPlacedTiles(
-    'union_link',
+    'main_ave_n',
     'ROAD',
-    createCityLine({ x: 9, y: 6 }, { x: 9, y: 8 }),
-    ROAD_VOXELS,
+    [{ x: 5, y: 9 }],
+    ROAD_NS_VOXELS,
     occupiedCityCells
   ),
+  // Cross Street west of intersection (EW tiles)
   ...createPlacedTiles(
-    'fixer_link',
+    'cross_st_w',
     'ROAD',
-    [{ x: 10, y: 8 }],
-    ROAD_VOXELS,
+    createCityLine({ x: 1, y: 5 }, { x: 4, y: 5 }),
+    ROAD_EW_VOXELS,
+    occupiedCityCells
+  ),
+  // Cross Street east of intersection (EW tiles)
+  ...createPlacedTiles(
+    'cross_st_e',
+    'ROAD',
+    createCityLine({ x: 6, y: 5 }, { x: 9, y: 5 }),
+    ROAD_EW_VOXELS,
+    occupiedCityCells
+  ),
+  // North Lane west of intersection (EW tiles)
+  ...createPlacedTiles(
+    'north_ln_w',
+    'ROAD',
+    createCityLine({ x: 2, y: 8 }, { x: 4, y: 8 }),
+    ROAD_EW_VOXELS,
+    occupiedCityCells
+  ),
+  // North Lane east of intersection (EW tiles)
+  ...createPlacedTiles(
+    'north_ln_e',
+    'ROAD',
+    createCityLine({ x: 6, y: 8 }, { x: 8, y: 8 }),
+    ROAD_EW_VOXELS,
     occupiedCityCells
   ),
 };
+
+// ── Building placement ───────────────────────────────────────────────
+// Buildings are positioned on the 11 × 11 city grid so that every
+// structure sits directly adjacent to at least one road cell.
+// (Y increases upward in the diagram; top row = y 10.)
+//
+//    0  1  2  3  4  5  6  7  8  9  10
+// 10 .  .  .  .  .  ME .  .  .  .  .
+//  9 .  .  .  PH .  R  .  .  .  FD .
+//  8 .  .  R  R  R  +  R  R  R  .  .
+//  7 .  .  .  CP .  R  .  UH .  .  .
+//  6 .  .  .  .  .  R  .  .  .  .  .
+//  5 .  R  R  R  R  +  R  R  R  R  .
+//  4 .  .  HB .  .  R  .  LO .  .  .
+//  3 .  CH .  .  .  R  .  .  .  .  .
+//  2 .  .  .  .  .  R  .  .  IH .  .
+//  1 .  .  .  .  .  R  .  .  .  .  .
+//  0 .  .  .  .  .  .  .  .  .  .  .
 
 const baseBuildings: Record<string, Building> = {
   player_home: createPlacedBuilding(
@@ -1434,7 +1493,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   licensing_office: createPlacedBuilding(
-    { x: 8, y: 5 },
+    { x: 7, y: 4 },
     {
       id: 'licensing_office',
       npcId: 'licensing',
@@ -1447,7 +1506,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   union_hall: createPlacedBuilding(
-    { x: 8, y: 8 },
+    { x: 7, y: 7 },
     {
       id: 'union_hall',
       npcId: 'union',
@@ -1460,7 +1519,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   inspector_hq: createPlacedBuilding(
-    { x: 9, y: 1 },
+    { x: 8, y: 2 },
     {
       id: 'inspector_hq',
       npcId: 'inspector',
@@ -1473,7 +1532,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   fixer_den: createPlacedBuilding(
-    { x: 10, y: 9 },
+    { x: 9, y: 9 },
     {
       id: 'fixer_den',
       npcId: 'fixer',
@@ -1485,7 +1544,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   hotline_booth: createPlacedBuilding(
-    { x: 1, y: 8 },
+    { x: 2, y: 4 },
     {
       id: 'hotline_booth',
       npcId: 'journalist',
@@ -1497,7 +1556,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   chief_hut: createPlacedBuilding(
-    { x: 1, y: 2 },
+    { x: 1, y: 3 },
     {
       id: 'chief_hut',
       npcId: 'chief',
@@ -1509,7 +1568,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   mine_entrance: createPlacedBuilding(
-    { x: 5, y: 11 },
+    { x: 5, y: 10 },
     {
       id: 'mine_entrance',
       npcId: 'none',
@@ -1520,7 +1579,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   central_park: createPlacedBuilding(
-    { x: 2, y: 4 },
+    { x: 3, y: 7 },
     {
       id: 'central_park',
       npcId: 'none',
