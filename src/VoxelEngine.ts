@@ -412,7 +412,7 @@ export class VoxelEngine {
       const dx = targetX - x;
       const dz = targetZ - z;
       if (Math.abs(dx) > 0.01 || Math.abs(dz) > 0.01) {
-        this.targetRotationY = Math.atan2(dx, dz);
+        this.targetRotationY = Math.atan2(-dx, -dz);
       }
       this.targetIndicator.position.set(targetX, CONFIG.FLOOR_Y + 0.05, targetZ);
       this.targetIndicator.visible = true;
