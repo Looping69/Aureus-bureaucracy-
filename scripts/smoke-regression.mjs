@@ -3,6 +3,7 @@ import { createServer } from 'vite';
 
 const APP_URL = 'http://127.0.0.1:4173';
 const SAVE_KEY = 'aureus-save-v1';
+const ANALOG_STICK_DRAG_DISTANCE = 26;
 
 const assert = (condition, message) => {
   if (!condition) throw new Error(message);
@@ -104,7 +105,7 @@ const run = async () => {
 
     await page.mouse.move(stickCenterX, stickCenterY);
     await page.mouse.down();
-    await page.mouse.move(stickCenterX + 26, stickCenterY, { steps: 8 });
+    await page.mouse.move(stickCenterX + ANALOG_STICK_DRAG_DISTANCE, stickCenterY, { steps: 8 });
     await page.waitForTimeout(1000);
     await page.mouse.up();
     await page.waitForTimeout(900);
