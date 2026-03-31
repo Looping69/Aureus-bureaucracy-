@@ -1464,6 +1464,7 @@ const cityStreets: Record<string, Building> = {
 // ── Building placement ───────────────────────────────────────────────
 // Buildings are positioned on the 11 × 11 city grid so that every
 // structure sits directly adjacent to at least one road cell.
+// (Y increases upward in the diagram; top row = y 10.)
 //
 //    0  1  2  3  4  5  6  7  8  9  10
 // 10 .  .  .  .  .  ME .  .  .  .  .

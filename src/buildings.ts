@@ -296,7 +296,11 @@ genStreetX.addBox(-7, 3, 0, -3, 6, 0, CURB);
 genStreetX.addBox(3, 3, 0, 6, 6, 0, CURB);
 export const ROAD_CROSS_VOXELS = genStreetX.getVoxels();
 
-// Backwards-compatible aliases used by CityPlanner and cityLayout
+// Backwards-compatible aliases used by CityPlanner and cityLayout.
+// SIDEWALK_VOXELS uses the EW variant so that sidewalk tiles placed by
+// the legacy city-planner tool still render with reasonable lane markings;
+// the original single-tile design had no orientation, so either variant
+// is a valid stand-in.
 export const STREET_VOXELS = ROAD_NS_VOXELS;
 export const ROAD_VOXELS = ROAD_NS_VOXELS;
 export const SIDEWALK_VOXELS = ROAD_EW_VOXELS;
