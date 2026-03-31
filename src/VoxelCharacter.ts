@@ -42,12 +42,12 @@ export class VoxelCharacter {
     this.rightLeg = this.createLeg(colors);
 
     // Position body parts
-    this.leftLeg.position.set(-0.15, 0.3, 0);
-    this.rightLeg.position.set(0.15, 0.3, 0);
+    this.leftLeg.position.set(-0.15, 0.45, 0);
+    this.rightLeg.position.set(0.15, 0.45, 0);
     this.body.position.set(0, 1.0, 0);
     this.head.position.set(0, 1.65, 0);
-    this.leftArm.position.set(-0.42, 1.3, 0);
-    this.rightArm.position.set(0.42, 1.3, 0);
+    this.leftArm.position.set(-0.38, 1.2, 0);
+    this.rightArm.position.set(0.38, 1.2, 0);
 
     // Pivot points for limb animation
     this.setupPivot(this.leftArm, 0, 0.3, 0);
