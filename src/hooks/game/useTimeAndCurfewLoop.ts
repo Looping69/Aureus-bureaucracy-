@@ -18,7 +18,7 @@ export const useTimeAndCurfewLoop = ({ setState, setNotification, homePos, enabl
     if (!enabled) return;
     const timer = setInterval(() => {
       setState(prev => {
-        const ambientTimeStep = (prev.time >= 20 || prev.time < 6 ? 0.2 : 0.1) * DAY_NIGHT_TIME_SCALE;
+        const ambientTimeStep = (prev.time >= 20 || prev.time < 6 ? 0.2 : 0.04) * DAY_NIGHT_TIME_SCALE;
         let newTime = prev.time + ambientTimeStep;
         let newDay = prev.day;
         let newExposure = prev.meters.exposure;
