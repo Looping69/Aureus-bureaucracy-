@@ -304,3 +304,45 @@ export const ROAD_CROSS_VOXELS = genStreetX.getVoxels();
 export const STREET_VOXELS = ROAD_NS_VOXELS;
 export const ROAD_VOXELS = ROAD_NS_VOXELS;
 export const SIDEWALK_VOXELS = ROAD_EW_VOXELS;
+
+// ── Foliage / trees ──────────────────────────────────────────────────
+
+// 13. Oak-style tree – larger standalone tree for decorating empty lots.
+const genTreeA = new BuildingGenerator();
+genTreeA.addBox(0, 0, 0, 0, 0, 0, CHARCOAL);   // base
+genTreeA.addBox(0, 0, 1, 0, 0, 4, TIMBER);      // trunk
+genTreeA.addBox(-2, -2, 5, 2, 2, 7, MOSS);      // canopy core
+genTreeA.addBox(-1, -1, 8, 1, 1, 8, MOSS);      // canopy top
+genTreeA.addBox(-3, 0, 6, 3, 0, 6, MOSS);       // canopy spread X
+genTreeA.addBox(0, -3, 6, 0, 3, 6, MOSS);       // canopy spread Y
+export const TREE_A_VOXELS = genTreeA.getVoxels();
+
+// 14. Pine-style tree – tall narrow evergreen.
+const genTreeB = new BuildingGenerator();
+genTreeB.addBox(0, 0, 0, 0, 0, 0, CHARCOAL);
+genTreeB.addBox(0, 0, 1, 0, 0, 3, TIMBER);
+genTreeB.addBox(-1, -1, 4, 1, 1, 5, '#3a5a3a');
+genTreeB.addBox(0, 0, 6, 0, 0, 7, '#3a5a3a');
+genTreeB.addBox(-2, -2, 3, 2, 2, 4, '#4a6a4a');
+export const TREE_B_VOXELS = genTreeB.getVoxels();
+
+// 15. Bush / shrub cluster – low foliage filler.
+const genBush = new BuildingGenerator();
+genBush.addBox(-1, -1, 0, 1, 1, 0, '#4e6a4f');  // ground
+genBush.addBox(-1, -1, 1, 1, 1, 2, MOSS);       // bush body
+genBush.addBox(0, 0, 3, 0, 0, 3, '#5a7a5a');    // top tuft
+export const BUSH_VOXELS = genBush.getVoxels();
+
+// 16. Small garden plot – decorative mini-park tile.
+const genGarden = new BuildingGenerator();
+genGarden.addBox(-3, -3, 0, 3, 3, 0, '#4e6a4f'); // grass base
+genGarden.addBox(-1, -1, 0, 1, 1, 0, CURB);      // stone path
+// Trees at corners
+genGarden.addBox(-2, -2, 1, -2, -2, 3, TIMBER);
+genGarden.addBox(-3, -3, 4, -1, -1, 5, MOSS);
+genGarden.addBox(2, 2, 1, 2, 2, 3, TIMBER);
+genGarden.addBox(1, 1, 4, 3, 3, 5, MOSS);
+// Flower bed
+genGarden.addBox(-2, 1, 1, -1, 2, 1, '#a85858'); // red flowers
+genGarden.addBox(1, -2, 1, 2, -1, 1, '#8a7a4a'); // yellow flowers
+export const GARDEN_VOXELS = genGarden.getVoxels();

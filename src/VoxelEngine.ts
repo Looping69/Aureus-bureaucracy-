@@ -197,8 +197,12 @@ export class VoxelEngine {
     const planeMat = new THREE.MeshBasicMaterial({ color: 0xe2e8f0 });
     this.floor = new THREE.Mesh(new THREE.PlaneGeometry(WORLD_SIZE * 4, WORLD_SIZE * 4), planeMat);
     this.floor.rotation.x = -Math.PI / 2;
-    this.floor.position.y = CONFIG.FLOOR_Y - 5.01; // Below the sand layer
+    this.floor.position.y = CONFIG.FLOOR_Y - 3.01; // Just below terrain + edge buildings
     this.scene.add(this.floor);
+
+    // Ground ring – covers the gap between the terrain edge and the edge
+    // building ring so background buildings no longer appear to float.
+    this.buildGroundRing();
 
     this.worldGrid = new THREE.GridHelper(
       WORLD_SIZE,
@@ -230,7 +234,7 @@ export class VoxelEngine {
       shape: new CANNON.Plane(),
     });
     floorBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
-    floorBody.position.set(0, CONFIG.FLOOR_Y - 5.51, 0);
+    floorBody.position.set(0, CONFIG.FLOOR_Y - 3.51, 0);
     this.physicsWorld.addBody(floorBody);
 
     // Ghost Voxels
@@ -484,6 +488,54 @@ export class VoxelEngine {
   }
 
   /**
+   * Build a ground ring that fills the gap between the playable terrain
+   * (radius WORLD_HALF_SIZE) and the edge‑building ring so the skyline
+   * no longer appears to float in mid‑air.
+   */
+  private buildGroundRing() {
+    const innerRadius = WORLD_HALF_SIZE;
+    const outerRadius = backgroundData.edgeConfig.ringEnd + 10;
+    const GROUND_Y = CONFIG.FLOOR_Y - 2; // sits at terrain base level
+
+    // Dark ground colour that reads as distant wasteland / outskirts
+    const ringMat = new THREE.MeshStandardMaterial({
+      color: 0x3b4a3a,   // dark olive ground
+      roughness: 1,
+      metalness: 0,
+    });
+
+    // Build a flat ring with a shape path
+    const shape = new THREE.Shape();
+    const segments = 64;
+    // Outer path (CW)
+    for (let i = 0; i <= segments; i++) {
+      const angle = (i / segments) * Math.PI * 2;
+      const x = Math.cos(angle) * outerRadius;
+      const z = Math.sin(angle) * outerRadius;
+      if (i === 0) shape.moveTo(x, z);
+      else shape.lineTo(x, z);
+    }
+    // Inner hole (CCW)
+    const hole = new THREE.Path();
+    for (let i = 0; i <= segments; i++) {
+      const angle = (i / segments) * Math.PI * 2;
+      const x = Math.cos(angle) * innerRadius;
+      const z = Math.sin(angle) * innerRadius;
+      if (i === 0) hole.moveTo(x, z);
+      else hole.lineTo(x, z);
+    }
+    shape.holes.push(hole);
+
+    const geom = new THREE.ShapeGeometry(shape, 1);
+    // ShapeGeometry lies in XY – rotate to XZ
+    geom.rotateX(-Math.PI / 2);
+    const mesh = new THREE.Mesh(geom, ringMat);
+    mesh.position.y = GROUND_Y;
+    mesh.receiveShadow = true;
+    this.scene.add(mesh);
+  }
+
+  /**
    * Build edge decorations from background.json motifs.
    * Procedurally generates tall skyscraper / building silhouettes in a ring
    * around the world boundary so the playable area is surrounded by a dense
@@ -531,6 +583,10 @@ export class VoxelEngine {
       // Height jitter: vary the number of floors per-instance
       const jitter = cfg.heightJitter;
       const actualFloors = Math.max(8, Math.round(floors * (1 - jitter / 2 + rng * jitter)));
+
+      // Foundation depth – extend below baseY so buildings merge into
+      // the ground ring and never appear to float.
+      const FOUNDATION_DEPTH = 4;
 
       // Pick wall / accent colours based on style
       let wallColor = WALL_MID;
@@ -581,6 +637,22 @@ export class VoxelEngine {
               y,
               z: oz + lz + zOff,
               color,
+            });
+          }
+        }
+      }
+
+      // === Foundation below baseY ===
+      // Solid block below the building footprint so it visually connects
+      // to the ground ring mesh.
+      for (let fy = 1; fy <= FOUNDATION_DEPTH; fy++) {
+        for (let lx = 0; lx < w; lx++) {
+          for (let lz = 0; lz < d; lz++) {
+            edgeVoxels.push({
+              x: ox + lx,
+              y: baseY - fy,
+              z: oz + lz,
+              color: WALL_DARK,
             });
           }
         }
