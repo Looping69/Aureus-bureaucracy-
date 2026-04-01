@@ -2,15 +2,15 @@
  * MineWorldScene – a fully walkable 3-D mine environment.
  *
  * The player spawns near the mine entrance and can physically navigate to:
- *   • Extraction nodes (iron ore, coal, gems)  → collect resources
- *   • Loading zone (truck bay)                 → triggers a loading animation
- *   • Unloading zone (smelter / crusher)        → triggers an unloading animation
- *   • Delivery zone (storage warehouse)         → deposit collected resources
+ *   • Extraction nodes (iron ore, coal, gems)  → auto-collect resources
+ *   • Loading zone (truck bay)                 → brief loading indicator
+ *   • Unloading zone (smelter / crusher)        → auto-smelt (needs ore+coal)
+ *   • Delivery zone (storage warehouse)         → auto-deposit refined metal
  */
 
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowLeft, Hammer, Package, Truck, Flame, Boxes } from 'lucide-react';
+import { ArrowLeft, Hammer, Package, Flame, Boxes, Zap } from 'lucide-react';
 import { GameState, WorldHoverInfo, WorldPosition } from '../types';
 import { WORLD_CAMERA_AZIMUTH } from '../VoxelEngine';
 import { VoxelWorldContainer } from './VoxelWorldContainer';
@@ -27,11 +27,29 @@ import {
 } from '../mineWorldData';
 
 // ─── types ────────────────────────────────────────────────────────────────────
-type AnimationType = 'LOADING' | 'UNLOADING' | null;
-
 interface NodeState {
   lastHarvested: number;  // timestamp ms
 }
+
+/** Local mine inventory – separate resource types tracked in-scene */
+interface MineInventory {
+  rawOre: number;
+  coal: number;
+  gems: number;
+  refinedMetal: number;
+}
+
+/** Floating resource particle */
+interface ResourceParticle {
+  id: number;
+  label: string;
+  color: string;
+}
+
+/** How many units of each raw resource the smelter consumes per smelt cycle */
+const SMELT_COST = { rawOre: 2, coal: 1 } as const;
+/** How many refined metal units a single smelt cycle produces */
+const SMELT_OUTPUT = 3;
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 const isNear = (a: WorldPosition, b: WorldPosition, radius: number) =>
@@ -39,6 +57,8 @@ const isNear = (a: WorldPosition, b: WorldPosition, radius: number) =>
 
 // All buildings in the mine world (stable reference – never changes)
 const MINE_BUILDINGS_LIST = Object.values(MINE_WORLD_BUILDINGS);
+
+let _particleId = 0;
 
 // ─── component ────────────────────────────────────────────────────────────────
 export const MineWorldScene = ({
@@ -65,9 +85,11 @@ export const MineWorldScene = ({
   const [path, setPath]           = React.useState<WorldPosition[]>([]);
   const [targetPos, setTargetPos] = React.useState<WorldPosition | null>(null);
 
+  // ── local mine inventory ───────────────────────────────────────────────
+  const [inventory, setInventory] = React.useState<MineInventory>({ rawOre: 0, coal: 0, gems: 0, refinedMetal: 0 });
+  const [particles, setParticles] = React.useState<ResourceParticle[]>([]);
+
   // ── interaction state ───────────────────────────────────────────────────
-  const [animation, setAnimation]       = React.useState<AnimationType>(null);
-  const [animProgress, setAnimProgress] = React.useState(0);
   const [nodeStates, setNodeStates]     = React.useState<Record<string, NodeState>>({});
   const [nearNode, setNearNode]         = React.useState<string | null>(null);
   const [nearZone, setNearZone]         = React.useState<'LOADING' | 'UNLOADING' | 'DELIVERY' | null>(null);
@@ -77,14 +99,19 @@ export const MineWorldScene = ({
   const [hoverInfo, setHoverInfo]       = React.useState<WorldHoverInfo | null>(null);
   const hoverRafRef = React.useRef<number | null>(null);
   const pendingHoverRef = React.useRef<WorldHoverInfo | null>(null);
-  const animTimerRef  = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-  const animIntervalRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
 
   // ── voxels for the mine world terrain ───────────────────────────────────
   const allVoxels = React.useMemo(
     () => buildWorldTerrainVoxels(MINE_WORLD_BUILDINGS, WORLD_SIZE).voxels,
     []
   );
+
+  // ── spawn resource particle animation ──────────────────────────────────
+  const spawnParticle = React.useCallback((label: string, color: string) => {
+    const id = ++_particleId;
+    setParticles(prev => [...prev, { id, label, color }]);
+    setTimeout(() => setParticles(prev => prev.filter(p => p.id !== id)), 900);
+  }, []);
 
   // ── movement loop ────────────────────────────────────────────────────────
   React.useEffect(() => {
@@ -158,7 +185,7 @@ export const MineWorldScene = ({
     }
     setNearNode(found);
 
-    // Loading zone
+    // Zones
     const loadB = MINE_WORLD_BUILDINGS['loading_zone'];
     const unloadB = MINE_WORLD_BUILDINGS['unloading_zone'];
     const deliverB = MINE_WORLD_BUILDINGS['delivery_zone'];
@@ -174,57 +201,81 @@ export const MineWorldScene = ({
     }
   }, [playerPos]);
 
-  // ── zone animations (auto-trigger) ──────────────────────────────────────
+  // ── auto-harvest extraction nodes on proximity ─────────────────────────
   React.useEffect(() => {
-    if (!nearZone || nearZone === 'DELIVERY' || animation) return;
-    const type: AnimationType = nearZone === 'LOADING' ? 'LOADING' : 'UNLOADING';
-    triggerAnimation(type);
-  // Only trigger when nearZone first becomes non-null
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nearZone]);
-
-  const triggerAnimation = (type: AnimationType) => {
-    if (animTimerRef.current) clearTimeout(animTimerRef.current);
-    if (animIntervalRef.current) clearInterval(animIntervalRef.current);
-
-    setAnimation(type);
-    setAnimProgress(0);
-
-    let progress = 0;
-    animIntervalRef.current = setInterval(() => {
-      progress += 4;
-      setAnimProgress(Math.min(progress, 100));
-      if (progress >= 100) {
-        clearInterval(animIntervalRef.current!);
-        animIntervalRef.current = null;
-        animTimerRef.current = setTimeout(() => {
-          setAnimation(null);
-          setAnimProgress(0);
-        }, 1200);
-      }
-    }, 120);
-  };
-
-  React.useEffect(() => {
-    return () => {
-      if (animTimerRef.current) clearTimeout(animTimerRef.current);
-      if (animIntervalRef.current) clearInterval(animIntervalRef.current);
+    if (!nearNode) return;
+    const tryHarvest = () => {
+      const ns = nodeStates[nearNode];
+      const ready = !ns || (Date.now() - ns.lastHarvested >= NODE_HARVEST_COOLDOWN_MS);
+      if (!ready) return;
+      const yieldAmt = MINE_NODE_YIELDS[nearNode] ?? 1;
+      // Add to local mine inventory based on node type
+      setInventory(prev => {
+        switch (nearNode) {
+          case 'ore_node':  return { ...prev, rawOre: prev.rawOre + yieldAmt };
+          case 'coal_node': return { ...prev, coal:   prev.coal   + yieldAmt };
+          case 'gem_node':  return { ...prev, gems:   prev.gems   + yieldAmt };
+          default:          return prev;
+        }
+      });
+      setNodeStates(prev => ({ ...prev, [nearNode]: { lastHarvested: Date.now() } }));
+      // Spawn flying particle
+      const info = nodeInfo(nearNode);
+      spawnParticle(`+${yieldAmt} ${info.label}`, info.hex);
     };
-  }, []);
+    // Harvest immediately, then repeat while standing near
+    tryHarvest();
+    const id = setInterval(tryHarvest, NODE_HARVEST_COOLDOWN_MS + 200);
+    return () => clearInterval(id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nearNode, spawnParticle]);
 
-  // ── resource harvest ─────────────────────────────────────────────────────
-  const canHarvest = (nodeId: string) => {
-    const ns = nodeStates[nodeId];
-    if (!ns) return true;
-    return Date.now() - ns.lastHarvested >= NODE_HARVEST_COOLDOWN_MS;
-  };
+  // ── auto-smelt at unloading zone (requires rawOre + coal) ──────────────
+  React.useEffect(() => {
+    if (nearZone !== 'UNLOADING') return;
+    const trySmelt = () => {
+      setInventory(prev => {
+        if (prev.rawOre >= SMELT_COST.rawOre && prev.coal >= SMELT_COST.coal) {
+          spawnParticle(`+${SMELT_OUTPUT} Refined`, '#f59e0b');
+          return {
+            ...prev,
+            rawOre: prev.rawOre - SMELT_COST.rawOre,
+            coal:   prev.coal   - SMELT_COST.coal,
+            refinedMetal: prev.refinedMetal + SMELT_OUTPUT,
+          };
+        }
+        return prev;
+      });
+    };
+    trySmelt();
+    const id = setInterval(trySmelt, 2500);
+    return () => clearInterval(id);
+  }, [nearZone, spawnParticle]);
 
-  const handleHarvest = (nodeId: string) => {
-    if (!canHarvest(nodeId)) return;
-    const yieldAmount = MINE_NODE_YIELDS[nodeId] ?? 1;
-    onCollectResource(yieldAmount);
-    setNodeStates(prev => ({ ...prev, [nodeId]: { lastHarvested: Date.now() } }));
-  };
+  // ── auto-deposit at delivery zone → global state ──────────────────────
+  React.useEffect(() => {
+    if (nearZone !== 'DELIVERY') return;
+    const tryDeposit = () => {
+      setInventory(prev => {
+        if (prev.refinedMetal > 0) {
+          onCollectResource(prev.refinedMetal);
+          spawnParticle(`+${prev.refinedMetal} stored`, '#10b981');
+          return { ...prev, refinedMetal: 0 };
+        }
+        // Also deposit raw gems directly (no smelting needed)
+        if (prev.gems > 0) {
+          onCollectResource(prev.gems);
+          spawnParticle(`+${prev.gems} gems stored`, '#9b59b6');
+          return { ...prev, gems: 0 };
+        }
+        return prev;
+      });
+    };
+    tryDeposit();
+    const id = setInterval(tryDeposit, 1500);
+    return () => clearInterval(id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nearZone, spawnParticle, onCollectResource]);
 
   // ── world click / select ─────────────────────────────────────────────────
   const handleWorldSelect = React.useCallback((target: WorldHoverInfo) => {
@@ -269,14 +320,23 @@ export const MineWorldScene = ({
 
   const isNight = state.time >= 20 || state.time < 6;
 
-  // ── node label helper ─────────────────────────────────────────────────────
-  const nodeLabel = (id: string) => {
+  // ── node info helper ──────────────────────────────────────────────────────
+  const nodeInfo = (id: string) => {
     switch (id) {
-      case 'ore_node':  return { icon: <Hammer size={16} />, label: 'Iron Ore', color: 'bg-amber-500' };
-      case 'coal_node': return { icon: <Hammer size={16} />, label: 'Coal',     color: 'bg-gray-700'  };
-      case 'gem_node':  return { icon: <Hammer size={16} />, label: 'Gems',     color: 'bg-purple-600'};
-      default:          return { icon: <Hammer size={16} />, label: 'Resource', color: 'bg-stone-500' };
+      case 'ore_node':  return { icon: <Hammer size={10} />, label: 'Ore', color: 'bg-amber-500', hex: '#f59e0b' };
+      case 'coal_node': return { icon: <Hammer size={10} />, label: 'Coal', color: 'bg-gray-700', hex: '#374151' };
+      case 'gem_node':  return { icon: <Hammer size={10} />, label: 'Gems', color: 'bg-purple-600', hex: '#9333ea' };
+      default:          return { icon: <Hammer size={10} />, label: 'Resource', color: 'bg-stone-500', hex: '#78716c' };
     }
+  };
+
+  // ── cooldown remaining helper ──────────────────────────────────────────
+  const cooldownPct = (nodeId: string) => {
+    const ns = nodeStates[nodeId];
+    if (!ns) return 0;
+    const elapsed = Date.now() - ns.lastHarvested;
+    if (elapsed >= NODE_HARVEST_COOLDOWN_MS) return 0;
+    return Math.round(100 - (elapsed / NODE_HARVEST_COOLDOWN_MS) * 100);
   };
 
   // ── render ────────────────────────────────────────────────────────────────
@@ -317,248 +377,164 @@ export const MineWorldScene = ({
       {/* ── Exit button (top-left) ───────────────────────────────────────── */}
       <button
         onClick={onExit}
-        className="absolute top-3 left-3 z-[200] flex items-center gap-2 rounded-2xl bg-black/70 px-4 py-2 text-xs font-black uppercase tracking-widest text-white shadow-lg backdrop-blur-sm active:scale-95 transition-all"
+        className="absolute top-3 left-3 z-[200] flex items-center gap-1 rounded-full bg-black/70 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-white shadow-lg backdrop-blur-sm active:scale-95 transition-all"
       >
-        <ArrowLeft size={14} />
-        Leave Mine
+        <ArrowLeft size={12} />
+        Leave
       </button>
 
-      {/* ── Resource HUD (ore carried) ───────────────────────────────────── */}
-      <div className="absolute top-3 right-3 z-[200] flex items-center gap-2 rounded-2xl bg-black/70 px-3 py-2 text-xs font-black text-white shadow-lg backdrop-blur-sm">
-        <Boxes size={14} className="text-amber-400" />
-        <span className="text-amber-300">{state.ore}</span>
-        <span className="text-white/50 font-normal">ore</span>
+      {/* ── Resource HUD (carried inventory) ─────────────────────────────── */}
+      <div className="absolute top-3 right-3 z-[200] flex items-center gap-1.5 rounded-full bg-black/70 px-2.5 py-1.5 text-[10px] font-bold text-white shadow-lg backdrop-blur-sm">
+        {inventory.rawOre > 0 && (
+          <span className="flex items-center gap-0.5 text-amber-300">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />{inventory.rawOre}
+          </span>
+        )}
+        {inventory.coal > 0 && (
+          <span className="flex items-center gap-0.5 text-gray-300">
+            <span className="w-1.5 h-1.5 rounded-full bg-gray-500 inline-block" />{inventory.coal}
+          </span>
+        )}
+        {inventory.gems > 0 && (
+          <span className="flex items-center gap-0.5 text-purple-300">
+            <span className="w-1.5 h-1.5 rounded-full bg-purple-400 inline-block" />{inventory.gems}
+          </span>
+        )}
+        {inventory.refinedMetal > 0 && (
+          <span className="flex items-center gap-0.5 text-yellow-200">
+            <Zap size={10} />{inventory.refinedMetal}
+          </span>
+        )}
+        <span className="text-white/40">|</span>
+        <span className="flex items-center gap-0.5 text-emerald-300">
+          <Boxes size={10} />{state.ore}
+        </span>
       </div>
 
-      {/* ── Extraction node prompt ───────────────────────────────────────── */}
+      {/* ── Flying resource particles ────────────────────────────────────── */}
       <AnimatePresence>
-        {nearNode && !animation && (
+        {particles.map(p => (
           <motion.div
-            key="node-prompt"
-            initial={{ opacity: 0, y: 20 }}
+            key={p.id}
+            initial={{ opacity: 1, y: 0, x: 0, scale: 1 }}
+            animate={{ opacity: 0, y: -60, x: 30, scale: 0.6 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.8, ease: 'easeOut' }}
+            className="absolute z-[300] pointer-events-none"
+            style={{ bottom: '50%', left: '50%' }}
+          >
+            <span
+              className="inline-block rounded-full px-2 py-0.5 text-[10px] font-black text-white shadow-lg"
+              style={{ backgroundColor: p.color }}
+            >
+              {p.label}
+            </span>
+          </motion.div>
+        ))}
+      </AnimatePresence>
+
+      {/* ── Compact floating labels (near buildings) ─────────────────────── */}
+      <AnimatePresence>
+        {/* Extraction node: compact tag */}
+        {nearNode && (
+          <motion.div
+            key="node-tag"
+            initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            className="absolute inset-x-4 bottom-40 z-[110] rounded-3xl border-2 border-black bg-white/95 p-5 shadow-2xl backdrop-blur-sm"
+            exit={{ opacity: 0, y: 8 }}
+            className="absolute left-1/2 -translate-x-1/2 bottom-36 z-[110] pointer-events-none"
           >
             {(() => {
-              const { icon, label, color } = nodeLabel(nearNode);
-              const ready = canHarvest(nearNode);
-              const building = MINE_WORLD_BUILDINGS[nearNode];
+              const info = nodeInfo(nearNode);
+              const cd = cooldownPct(nearNode);
               return (
-                <>
-                  <div className="flex items-start gap-3">
-                    <div className={`flex-shrink-0 rounded-xl ${color} p-2 text-white`}>
-                      {icon}
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-[0.24em] text-black/40">Extraction Node</p>
-                      <h3 className="mt-0.5 text-lg font-black leading-none">{building?.name ?? label}</h3>
-                      <p className="mt-1 text-sm text-black/60">{building?.description ?? 'A source of raw materials.'}</p>
-                      {!ready && (
-                        <p className="mt-1 text-xs text-amber-600 font-medium">Cooldown – wait before harvesting again.</p>
-                      )}
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => handleHarvest(nearNode)}
-                    disabled={!ready}
-                    className={`mt-4 w-full rounded-2xl px-4 py-3 text-xs font-black uppercase tracking-[0.22em] transition-all active:scale-95 ${
-                      ready
-                        ? 'bg-black text-white hover:bg-zinc-800'
-                        : 'bg-black/20 text-black/40 cursor-not-allowed'
-                    }`}
-                  >
-                    {ready ? `Extract ${MINE_NODE_YIELDS[nearNode] ?? 1} unit(s)` : 'On Cooldown'}
-                  </button>
-                </>
+                <div className="flex items-center gap-1.5 rounded-full bg-black/80 pl-1.5 pr-2.5 py-1 shadow-lg backdrop-blur-sm">
+                  <div className={`rounded-full ${info.color} p-1 text-white`}>{info.icon}</div>
+                  <span className="text-[10px] font-bold text-white">{MINE_WORLD_BUILDINGS[nearNode]?.name ?? info.label}</span>
+                  {cd > 0 ? (
+                    <span className="text-[9px] text-amber-300 font-medium ml-1">⏳ {cd}%</span>
+                  ) : (
+                    <span className="text-[9px] text-emerald-300 font-medium ml-1">✓ ready</span>
+                  )}
+                </div>
               );
             })()}
           </motion.div>
         )}
 
-        {/* ── Loading animation overlay ───────────────────────────────────── */}
-        {animation === 'LOADING' && (
+        {/* Loading zone: compact tag */}
+        {nearZone === 'LOADING' && (
           <motion.div
-            key="loading-anim"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            className="absolute inset-x-4 bottom-40 z-[120] rounded-3xl border-2 border-amber-400 bg-stone-900/95 p-5 shadow-2xl backdrop-blur-sm text-white"
-          >
-            <div className="flex items-center gap-3 mb-3">
-              <div className="rounded-xl bg-amber-500 p-2">
-                <Truck size={20} />
-              </div>
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.24em] text-white/50">Loading Sequence</p>
-                <h3 className="text-lg font-black leading-none text-amber-300">Truck Bay Loading</h3>
-              </div>
-            </div>
-
-            {/* Mechanical arm animation */}
-            <div className="relative h-16 mb-3 rounded-xl bg-stone-800 overflow-hidden">
-              <div className="absolute inset-0 flex items-center gap-1 px-2">
-                {Array.from({ length: 10 }).map((_, i) => (
-                  <motion.div
-                    key={i}
-                    className={`h-6 flex-1 rounded-sm ${i % 2 === 0 ? 'bg-amber-500' : 'bg-amber-700'}`}
-                    animate={{ scaleY: [1, 0.4, 1] }}
-                    transition={{ duration: 0.6, delay: i * 0.06, repeat: Infinity }}
-                  />
-                ))}
-              </div>
-              {/* Moving arm */}
-              <motion.div
-                className="absolute top-2 h-4 w-6 rounded-sm border-2 border-white/20"
-                style={{ backgroundColor: '#9ca3af' }}
-                animate={{ x: ['0%', '85%', '0%'] }}
-                transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
-              />
-            </div>
-
-            {/* Particle effects */}
-            <div className="relative h-8 mb-3 overflow-hidden">
-              {Array.from({ length: 8 }).map((_, i) => (
-                <motion.div
-                  key={i}
-                  className="absolute w-2 h-2 rounded-full bg-amber-400"
-                  style={{ left: `${10 + i * 12}%`, top: '50%' }}
-                  animate={{ y: [-8, 8, -8], opacity: [0.4, 1, 0.4] }}
-                  transition={{ duration: 0.8, delay: i * 0.1, repeat: Infinity }}
-                />
-              ))}
-            </div>
-
-            {/* Progress bar */}
-            <div className="rounded-full bg-stone-700 h-3 overflow-hidden">
-              <motion.div
-                className="h-full rounded-full bg-gradient-to-r from-amber-500 to-yellow-300"
-                style={{ width: `${animProgress}%` }}
-              />
-            </div>
-            <p className="mt-2 text-center text-xs text-white/60 font-medium">
-              {animProgress < 100 ? 'Loading cargo onto transport vehicle…' : '✓ Loading complete'}
-            </p>
-          </motion.div>
-        )}
-
-        {/* ── Unloading animation overlay ─────────────────────────────────── */}
-        {animation === 'UNLOADING' && (
-          <motion.div
-            key="unloading-anim"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            className="absolute inset-x-4 bottom-40 z-[120] rounded-3xl border-2 border-orange-500 bg-stone-900/95 p-5 shadow-2xl backdrop-blur-sm text-white"
-          >
-            <div className="flex items-center gap-3 mb-3">
-              <div className="rounded-xl bg-orange-600 p-2">
-                <Flame size={20} />
-              </div>
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.24em] text-white/50">Processing</p>
-                <h3 className="text-lg font-black leading-none text-orange-300">Smelter Active</h3>
-              </div>
-            </div>
-
-            {/* Furnace fire animation */}
-            <div className="relative h-16 mb-3 rounded-xl bg-stone-800 overflow-hidden">
-              <div className="absolute bottom-0 inset-x-0 flex justify-center gap-1">
-                {Array.from({ length: 12 }).map((_, i) => (
-                  <motion.div
-                    key={i}
-                    className="w-3 rounded-t-full"
-                    style={{ backgroundColor: i % 3 === 0 ? '#ef4444' : i % 3 === 1 ? '#f97316' : '#fbbf24' }}
-                    animate={{ height: [8, 24 + (i % 4) * 6, 8] }}
-                    transition={{ duration: 0.4 + i * 0.05, repeat: Infinity, ease: 'easeInOut' }}
-                  />
-                ))}
-              </div>
-              {/* Sparks */}
-              {Array.from({ length: 6 }).map((_, i) => (
-                <motion.div
-                  key={`sp-${i}`}
-                  className="absolute w-1 h-1 rounded-full bg-yellow-200"
-                  style={{ left: `${15 + i * 14}%`, bottom: '30%' }}
-                  animate={{ y: [0, -20], opacity: [1, 0] }}
-                  transition={{ duration: 0.5, delay: i * 0.12, repeat: Infinity }}
-                />
-              ))}
-            </div>
-
-            {/* Sorting bins indicator */}
-            <div className="flex gap-2 mb-3">
-              {['Iron', 'Slag', 'Gas'].map((label, i) => (
-                <motion.div
-                  key={label}
-                  className="flex-1 rounded-lg bg-stone-700 p-2 text-center"
-                  animate={{ scale: [1, 1.05, 1] }}
-                  transition={{ duration: 1, delay: i * 0.33, repeat: Infinity }}
-                >
-                  <div className="text-[10px] text-white/50 uppercase">{label}</div>
-                  <motion.div
-                    className="mt-1 h-1 rounded-full bg-orange-400"
-                    animate={{ width: ['20%', '80%', '20%'] }}
-                    transition={{ duration: 2, delay: i * 0.4, repeat: Infinity }}
-                  />
-                </motion.div>
-              ))}
-            </div>
-
-            {/* Progress bar */}
-            <div className="rounded-full bg-stone-700 h-3 overflow-hidden">
-              <motion.div
-                className="h-full rounded-full bg-gradient-to-r from-orange-600 to-yellow-400"
-                style={{ width: `${animProgress}%` }}
-              />
-            </div>
-            <p className="mt-2 text-center text-xs text-white/60 font-medium">
-              {animProgress < 100 ? 'Smelting and sorting ore…' : '✓ Processing complete'}
-            </p>
-          </motion.div>
-        )}
-
-        {/* ── Delivery zone prompt ─────────────────────────────────────────── */}
-        {nearZone === 'DELIVERY' && !animation && (
-          <motion.div
-            key="delivery-prompt"
-            initial={{ opacity: 0, y: 20 }}
+            key="load-tag"
+            initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            className="absolute inset-x-4 bottom-40 z-[110] rounded-3xl border-2 border-black bg-white/95 p-5 shadow-2xl backdrop-blur-sm"
+            exit={{ opacity: 0, y: 8 }}
+            className="absolute left-1/2 -translate-x-1/2 bottom-36 z-[110] pointer-events-none"
           >
-            <div className="flex items-start gap-3">
-              <div className="flex-shrink-0 rounded-xl bg-emerald-600 p-2 text-white">
-                <Boxes size={16} />
-              </div>
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.24em] text-black/40">Storage Warehouse</p>
-                <h3 className="mt-0.5 text-lg font-black leading-none">Deposit Resources</h3>
-                <p className="mt-1 text-sm text-black/60">
-                  You are carrying <strong>{state.ore}</strong> unit(s) of ore. Resources are stored here for export.
-                </p>
-              </div>
+            <div className="flex items-center gap-1.5 rounded-full bg-black/80 pl-1.5 pr-2.5 py-1 shadow-lg backdrop-blur-sm">
+              <div className="rounded-full bg-blue-600 p-1 text-white"><Package size={10} /></div>
+              <span className="text-[10px] font-bold text-white">Loading Bay</span>
             </div>
-            <p className="mt-3 text-xs text-emerald-700 font-medium">
-              ✓ Resources automatically accounted for in your inventory.
-            </p>
+          </motion.div>
+        )}
+
+        {/* Smelter: compact tag with requirement hint */}
+        {nearZone === 'UNLOADING' && (
+          <motion.div
+            key="smelt-tag"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 8 }}
+            className="absolute left-1/2 -translate-x-1/2 bottom-36 z-[110] pointer-events-none"
+          >
+            <div className="flex items-center gap-1.5 rounded-full bg-black/80 pl-1.5 pr-2.5 py-1 shadow-lg backdrop-blur-sm">
+              <div className="rounded-full bg-orange-600 p-1 text-white"><Flame size={10} /></div>
+              <span className="text-[10px] font-bold text-white">Smelter</span>
+              {inventory.rawOre >= SMELT_COST.rawOre && inventory.coal >= SMELT_COST.coal ? (
+                <span className="text-[9px] text-emerald-300 font-medium ml-1">⚡ smelting</span>
+              ) : (
+                <span className="text-[9px] text-amber-300 font-medium ml-1">
+                  need {SMELT_COST.rawOre}ore+{SMELT_COST.coal}coal
+                </span>
+              )}
+            </div>
+          </motion.div>
+        )}
+
+        {/* Delivery: compact tag */}
+        {nearZone === 'DELIVERY' && (
+          <motion.div
+            key="deliver-tag"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 8 }}
+            className="absolute left-1/2 -translate-x-1/2 bottom-36 z-[110] pointer-events-none"
+          >
+            <div className="flex items-center gap-1.5 rounded-full bg-black/80 pl-1.5 pr-2.5 py-1 shadow-lg backdrop-blur-sm">
+              <div className="rounded-full bg-emerald-600 p-1 text-white"><Boxes size={10} /></div>
+              <span className="text-[10px] font-bold text-white">Warehouse</span>
+              {inventory.refinedMetal > 0 || inventory.gems > 0 ? (
+                <span className="text-[9px] text-emerald-300 font-medium ml-1">✓ storing</span>
+              ) : (
+                <span className="text-[9px] text-white/40 font-medium ml-1">nothing to deposit</span>
+              )}
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
 
       {/* ── Legend overlay (top-center, compact) ───────────────────────── */}
-      <div className="absolute top-12 inset-x-4 z-[100] flex justify-center pointer-events-none">
-        <div className="flex gap-2 flex-wrap justify-center">
+      <div className="absolute top-10 inset-x-4 z-[100] flex justify-center pointer-events-none">
+        <div className="flex gap-1 flex-wrap justify-center">
           {[
             { color: 'bg-amber-500', label: 'Ore' },
             { color: 'bg-gray-700',  label: 'Coal' },
             { color: 'bg-purple-600',label: 'Gems' },
-            { color: 'bg-blue-600',  label: 'Loading' },
             { color: 'bg-orange-600',label: 'Smelter' },
             { color: 'bg-emerald-600',label: 'Storage' },
           ].map(({ color, label }) => (
-            <span key={label} className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-bold text-white uppercase tracking-wider ${color}/80 backdrop-blur-sm`}>
-              <span className={`w-1.5 h-1.5 rounded-full bg-white/80 inline-block`} />
+            <span key={label} className={`flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[8px] font-bold text-white uppercase tracking-wider ${color}/80 backdrop-blur-sm`}>
+              <span className="w-1 h-1 rounded-full bg-white/80 inline-block" />
               {label}
             </span>
           ))}
