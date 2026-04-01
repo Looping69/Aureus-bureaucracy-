@@ -13,6 +13,7 @@ import { WORLD_SIZE } from '../utils/voxelConstants';
 export const WorldScene = ({ 
   state, 
   onMove, 
+  onDirectMove,
   onInteract,
   onEnterHome,
   onEnterMine,
@@ -22,6 +23,7 @@ export const WorldScene = ({
 }: { 
   state: GameState, 
   onMove: (pos: WorldPosition, options?: { ignoreDrag?: boolean }) => void,
+  onDirectMove: (pos: WorldPosition) => void,
   onInteract: (npcId: string, buildingId: string) => void,
   onEnterHome: () => void,
   onEnterMine: () => void,
@@ -204,7 +206,7 @@ export const WorldScene = ({
   }, []);
 
   const issueAnalogMove = React.useCallback(() => {
-    if (state.path.length > 1 || analogInput.magnitude < 0.35) return;
+    if (analogInput.magnitude < 0.35) return;
 
     const screenVertical = -analogInput.y;
     const worldX = (fixedCameraRightWorldXY.x * analogInput.x) + (fixedCameraForwardWorldXY.x * screenVertical);
@@ -215,20 +217,20 @@ export const WorldScene = ({
     if (stepX === 0 && stepY === 0) return;
 
     const nextPos = {
-      x: Math.max(0, Math.min(WORLD_SIZE - 1, Math.round(state.playerPos.x) + stepX * 3)),
-      y: Math.max(0, Math.min(WORLD_SIZE - 1, Math.round(state.playerPos.y) + stepY * 3))
+      x: Math.max(0, Math.min(WORLD_SIZE - 1, Math.round(state.playerPos.x) + stepX)),
+      y: Math.max(0, Math.min(WORLD_SIZE - 1, Math.round(state.playerPos.y) + stepY))
     };
 
     if (nextPos.x === Math.round(state.playerPos.x) && nextPos.y === Math.round(state.playerPos.y)) return;
-    onMove(nextPos, { ignoreDrag: true });
-  }, [analogInput.magnitude, analogInput.x, analogInput.y, fixedCameraForwardWorldXY.x, fixedCameraForwardWorldXY.y, fixedCameraRightWorldXY.x, fixedCameraRightWorldXY.y, onMove, state.path.length, state.playerPos.x, state.playerPos.y]);
+    onDirectMove(nextPos);
+  }, [analogInput.magnitude, analogInput.x, analogInput.y, fixedCameraForwardWorldXY.x, fixedCameraForwardWorldXY.y, fixedCameraRightWorldXY.x, fixedCameraRightWorldXY.y, onDirectMove, state.playerPos.x, state.playerPos.y]);
 
   React.useEffect(() => {
-    if (!analogInput.active || analogInput.magnitude < 0.35 || state.path.length > 1) return;
+    if (!analogInput.active || analogInput.magnitude < 0.35) return;
     issueAnalogMove();
-    const interval = window.setInterval(issueAnalogMove, 180);
+    const interval = window.setInterval(issueAnalogMove, 120);
     return () => window.clearInterval(interval);
-  }, [analogInput.active, analogInput.magnitude, issueAnalogMove, state.path.length]);
+  }, [analogInput.active, analogInput.magnitude, issueAnalogMove]);
 
   return (
     <div className={`flex-1 relative overflow-hidden transition-colors duration-1000 ${isNight ? 'bg-slate-950' : 'bg-slate-200'} cursor-crosshair`}>

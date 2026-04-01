@@ -23,6 +23,8 @@ import { UtilityDrawer } from './components/UtilityDrawer';
 import { SideNavPanel } from './components/SideNavPanel';
 import { getBuildingAccessPosition } from './utils/buildingAccess';
 import { findPath } from './utils/pathfinding';
+import { buildWorldSurfaceMap, getWorldSurfaceTile } from './utils/worldSurface';
+import { WORLD_SIZE } from './utils/voxelConstants';
 import { applyMineSceneAction, applyMineTileInteraction } from './game/actions/mineActions';
 import { applyMiniGameCompletion, applyPermitOverlayAction } from './game/actions/permitActions';
 import { applyFoundItem, applyTakePhoto } from './game/actions/evidenceActions';
@@ -324,6 +326,27 @@ export default function App() {
     });
   };
 
+  const handleDirectMove = (pos: WorldPosition) => {
+    setState(prev => {
+      if (prev.playerPos.x === pos.x && prev.playerPos.y === pos.y) return prev;
+
+      const surfaceMap = buildWorldSurfaceMap(prev.buildings, WORLD_SIZE);
+      const tile = getWorldSurfaceTile(surfaceMap, pos.x, pos.y);
+      if (!tile || !tile.walkable) return prev;
+
+      const energyCost = 0.35;
+      if (prev.energy <= energyCost) return prev;
+
+      return {
+        ...prev,
+        playerPos: pos,
+        path: [],
+        targetPos: null,
+        energy: prev.energy - energyCost
+      };
+    });
+  };
+
   const handleRecenter = () => {
     // Recenter is handled by VoxelWorldContainer via recenterTrigger.
   };
@@ -536,6 +559,20 @@ export default function App() {
     }));
   };
 
+  const handleOpenMineWorld = () => {
+    const mineEntrance = state.buildings.mine_entrance;
+    if (!mineEntrance) {
+      setNotification({ title: 'Unavailable', msg: 'No mine entrance found.' });
+      return;
+    }
+    beginTrackedAction('enter_mine_world:mine_entrance');
+    setState(s => ({
+      ...s,
+      activeBuildingId: 'mine_entrance',
+      currentScene: 'MINE_WORLD' as const
+    }));
+  };
+
   const handleWorldInteract = (npcId: string, bId: string) => {
     if (npcId !== 'none') {
       beginTrackedAction(`world_interact_npc:${npcId}`);
@@ -590,6 +627,7 @@ export default function App() {
         onPointerUp={handlePointerUp}
         onWheel={handleWheel}
         onMove={handleMove}
+        onDirectMove={handleDirectMove}
         onMine={handleMine}
         onMineAction={handleMineAction}
         onOpenMine={openMineScene}
@@ -642,6 +680,7 @@ export default function App() {
         isOpen={showNavigationPanel}
         onToggle={() => setShowNavigationPanel(v => !v)}
         onOpenMine={openMineScene}
+        onOpenMineWorld={handleOpenMineWorld}
         onOpenWorld={handleOpenWorldScene}
         onOpenOffice={() => {
           beginTrackedAction('open_office');
