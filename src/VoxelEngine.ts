@@ -23,6 +23,8 @@ export class VoxelEngine {
   private static readonly FOG_FAR_DAY = 280;
   private static readonly FOG_NEAR_NIGHT = 80;
   private static readonly FOG_FAR_NIGHT = 220;
+  private static readonly ANALOG_MOVE_CONVERGE_THRESHOLD = 0.05;
+  private static readonly PLAYER_MOVE_SPEED = 12; // world units per second (XZ only)
   private container: HTMLElement;
   private scene: THREE.Scene;
   private camera: THREE.PerspectiveCamera;
@@ -82,6 +84,7 @@ export class VoxelEngine {
   private currentPlayerPos = new THREE.Vector3(0, CONFIG.FLOOR_Y + 0.5, 0);
   private targetRotationY: number = 0;
   private firstPositionSet: boolean = false;
+  private analogMoving: boolean = false;
 
   constructor(
     container: HTMLElement, 
@@ -403,6 +406,10 @@ export class VoxelEngine {
     targetZ?: number,
     path?: {x: number, y: number}[]
   ) {
+    // Save old target to detect analog stick position changes
+    const prevX = this.targetPlayerPos.x;
+    const prevZ = this.targetPlayerPos.z;
+
     this.targetPlayerPos.set(x, surfaceY, z);
     
     if (!this.firstPositionSet) {
@@ -412,9 +419,10 @@ export class VoxelEngine {
       this.firstPositionSet = true;
     }
     
-    this.entities.player.setMoving(isMoving);
-    
     if (isMoving && targetX !== undefined && targetZ !== undefined) {
+      // Path-based movement (click-to-move): use target direction
+      this.analogMoving = false;
+      this.entities.player.setMoving(true);
       const dx = targetX - x;
       const dz = targetZ - z;
       if (Math.abs(dx) > 0.01 || Math.abs(dz) > 0.01) {
@@ -436,6 +444,21 @@ export class VoxelEngine {
         this.pathLine.visible = false;
       }
     } else {
+      // Check if position changed (analog stick movement)
+      const dx = x - prevX;
+      const dz = z - prevZ;
+      const posChanged = Math.abs(dx) > 0.01 || Math.abs(dz) > 0.01;
+
+      if (posChanged) {
+        // Analog stick movement: face the movement direction and start walking
+        this.targetRotationY = Math.atan2(-dx, -dz);
+        this.entities.player.setMoving(true);
+        this.analogMoving = true;
+      } else if (!this.analogMoving) {
+        // Truly idle: no path-based or analog movement
+        this.entities.player.setMoving(false);
+      }
+
       this.targetIndicator.visible = false;
       this.pathLine.visible = false;
     }
@@ -1552,12 +1575,35 @@ export class VoxelEngine {
     const deltaTime = this.lastTime ? (now - this.lastTime) / 1000 : 0.016;
     this.lastTime = now;
 
-    // Smoothly interpolate player position and camera target
-    const lerpFactor = 1 - Math.pow(0.00001, deltaTime); // Frame-rate independent lerp
-    this.currentPlayerPos.lerp(this.targetPlayerPos, Math.min(lerpFactor, 0.5));
+    // Snap Y to target surface height immediately so character stays on terrain
+    this.currentPlayerPos.y = this.targetPlayerPos.y;
+
+    // Interpolate only X/Z at constant speed so movement is horizontal
+    const dx = this.targetPlayerPos.x - this.currentPlayerPos.x;
+    const dz = this.targetPlayerPos.z - this.currentPlayerPos.z;
+    const distXZ = Math.sqrt(dx * dx + dz * dz);
+    if (distXZ > VoxelEngine.ANALOG_MOVE_CONVERGE_THRESHOLD) {
+      const step = VoxelEngine.PLAYER_MOVE_SPEED * deltaTime;
+      if (step >= distXZ) {
+        this.currentPlayerPos.x = this.targetPlayerPos.x;
+        this.currentPlayerPos.z = this.targetPlayerPos.z;
+      } else {
+        this.currentPlayerPos.x += (dx / distXZ) * step;
+        this.currentPlayerPos.z += (dz / distXZ) * step;
+      }
+    } else {
+      this.currentPlayerPos.x = this.targetPlayerPos.x;
+      this.currentPlayerPos.z = this.targetPlayerPos.z;
+    }
     this.entities.player.group.position.copy(this.currentPlayerPos);
     this.controls.target.copy(this.currentPlayerPos);
     this.playerLight.position.copy(this.currentPlayerPos).y += 2;
+
+    // Stop analog walking animation once XZ position converges to target
+    if (this.analogMoving && distXZ <= VoxelEngine.ANALOG_MOVE_CONVERGE_THRESHOLD) {
+      this.entities.player.setMoving(false);
+      this.analogMoving = false;
+    }
 
     // Smoothly interpolate rotation
     const rotationLerpFactor = 1 - Math.pow(0.000001, deltaTime);

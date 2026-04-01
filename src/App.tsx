@@ -627,7 +627,6 @@ export default function App() {
         onPointerUp={handlePointerUp}
         onWheel={handleWheel}
         onMove={handleMove}
-        onDirectMove={handleDirectMove}
         onMine={handleMine}
         onMineAction={handleMineAction}
         onOpenMine={openMineScene}
