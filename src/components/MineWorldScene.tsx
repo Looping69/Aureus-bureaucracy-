@@ -50,6 +50,12 @@ interface ResourceParticle {
 const SMELT_COST = { rawOre: 2, coal: 1 } as const;
 /** How many refined metal units a single smelt cycle produces */
 const SMELT_OUTPUT = 3;
+/** Small buffer added to harvest-check interval so it fires just after cooldown ends */
+const HARVEST_CHECK_BUFFER_MS = 200;
+/** How often (ms) the smelter checks for available raw materials */
+const SMELT_CHECK_INTERVAL_MS = 2500;
+/** How often (ms) the delivery zone checks for depositable resources */
+const DEPOSIT_CHECK_INTERVAL_MS = 1500;
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 const isNear = (a: WorldPosition, b: WorldPosition, radius: number) =>
@@ -225,7 +231,7 @@ export const MineWorldScene = ({
     };
     // Harvest immediately, then repeat while standing near
     tryHarvest();
-    const id = setInterval(tryHarvest, NODE_HARVEST_COOLDOWN_MS + 200);
+    const id = setInterval(tryHarvest, NODE_HARVEST_COOLDOWN_MS + HARVEST_CHECK_BUFFER_MS);
     return () => clearInterval(id);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nearNode, spawnParticle]);
@@ -248,7 +254,7 @@ export const MineWorldScene = ({
       });
     };
     trySmelt();
-    const id = setInterval(trySmelt, 2500);
+    const id = setInterval(trySmelt, SMELT_CHECK_INTERVAL_MS);
     return () => clearInterval(id);
   }, [nearZone, spawnParticle]);
 
@@ -272,7 +278,7 @@ export const MineWorldScene = ({
       });
     };
     tryDeposit();
-    const id = setInterval(tryDeposit, 1500);
+    const id = setInterval(tryDeposit, DEPOSIT_CHECK_INTERVAL_MS);
     return () => clearInterval(id);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nearZone, spawnParticle, onCollectResource]);
@@ -494,7 +500,7 @@ export const MineWorldScene = ({
                 <span className="text-[9px] text-emerald-300 font-medium ml-1">⚡ smelting</span>
               ) : (
                 <span className="text-[9px] text-amber-300 font-medium ml-1">
-                  need {SMELT_COST.rawOre}ore+{SMELT_COST.coal}coal
+                  need {SMELT_COST.rawOre} ore + {SMELT_COST.coal} coal
                 </span>
               )}
             </div>
