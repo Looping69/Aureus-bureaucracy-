@@ -23,6 +23,7 @@ export class VoxelEngine {
   private static readonly FOG_FAR_DAY = 280;
   private static readonly FOG_NEAR_NIGHT = 80;
   private static readonly FOG_FAR_NIGHT = 220;
+  private static readonly ANALOG_MOVE_CONVERGE_THRESHOLD = 0.05;
   private container: HTMLElement;
   private scene: THREE.Scene;
   private camera: THREE.PerspectiveCamera;
@@ -82,6 +83,7 @@ export class VoxelEngine {
   private currentPlayerPos = new THREE.Vector3(0, CONFIG.FLOOR_Y + 0.5, 0);
   private targetRotationY: number = 0;
   private firstPositionSet: boolean = false;
+  private analogMoving: boolean = false;
 
   constructor(
     container: HTMLElement, 
@@ -403,6 +405,10 @@ export class VoxelEngine {
     targetZ?: number,
     path?: {x: number, y: number}[]
   ) {
+    // Save old target to detect analog stick position changes
+    const prevX = this.targetPlayerPos.x;
+    const prevZ = this.targetPlayerPos.z;
+
     this.targetPlayerPos.set(x, surfaceY, z);
     
     if (!this.firstPositionSet) {
@@ -412,9 +418,10 @@ export class VoxelEngine {
       this.firstPositionSet = true;
     }
     
-    this.entities.player.setMoving(isMoving);
-    
     if (isMoving && targetX !== undefined && targetZ !== undefined) {
+      // Path-based movement (click-to-move): use target direction
+      this.analogMoving = false;
+      this.entities.player.setMoving(true);
       const dx = targetX - x;
       const dz = targetZ - z;
       if (Math.abs(dx) > 0.01 || Math.abs(dz) > 0.01) {
@@ -436,6 +443,21 @@ export class VoxelEngine {
         this.pathLine.visible = false;
       }
     } else {
+      // Check if position changed (analog stick movement)
+      const dx = x - prevX;
+      const dz = z - prevZ;
+      const posChanged = Math.abs(dx) > 0.01 || Math.abs(dz) > 0.01;
+
+      if (posChanged) {
+        // Analog stick movement: face the movement direction and start walking
+        this.targetRotationY = Math.atan2(dx, -dz);
+        this.entities.player.setMoving(true);
+        this.analogMoving = true;
+      } else if (!this.analogMoving) {
+        // Truly idle: no path-based or analog movement
+        this.entities.player.setMoving(false);
+      }
+
       this.targetIndicator.visible = false;
       this.pathLine.visible = false;
     }
@@ -1558,6 +1580,15 @@ export class VoxelEngine {
     this.entities.player.group.position.copy(this.currentPlayerPos);
     this.controls.target.copy(this.currentPlayerPos);
     this.playerLight.position.copy(this.currentPlayerPos).y += 2;
+
+    // Stop analog walking animation once position converges to target
+    if (this.analogMoving) {
+      const dist = this.currentPlayerPos.distanceTo(this.targetPlayerPos);
+      if (dist < VoxelEngine.ANALOG_MOVE_CONVERGE_THRESHOLD) {
+        this.entities.player.setMoving(false);
+        this.analogMoving = false;
+      }
+    }
 
     // Smoothly interpolate rotation
     const rotationLerpFactor = 1 - Math.pow(0.000001, deltaTime);
