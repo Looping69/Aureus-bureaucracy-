@@ -24,7 +24,7 @@ export class VoxelEngine {
   private static readonly FOG_NEAR_NIGHT = 80;
   private static readonly FOG_FAR_NIGHT = 220;
   private static readonly ANALOG_MOVE_CONVERGE_THRESHOLD = 0.05;
-  private static readonly PLAYER_MOVE_SPEED = 8; // world units per second
+  private static readonly PLAYER_MOVE_SPEED = 12; // world units per second (XZ only)
   private container: HTMLElement;
   private scene: THREE.Scene;
   private camera: THREE.PerspectiveCamera;
@@ -85,7 +85,6 @@ export class VoxelEngine {
   private targetRotationY: number = 0;
   private firstPositionSet: boolean = false;
   private analogMoving: boolean = false;
-  private readonly moveDir = new THREE.Vector3();
 
   constructor(
     container: HTMLElement, 
@@ -1576,29 +1575,34 @@ export class VoxelEngine {
     const deltaTime = this.lastTime ? (now - this.lastTime) / 1000 : 0.016;
     this.lastTime = now;
 
-    // Move player toward target at constant speed
-    const dist = this.currentPlayerPos.distanceTo(this.targetPlayerPos);
-    if (dist > VoxelEngine.ANALOG_MOVE_CONVERGE_THRESHOLD) {
+    // Snap Y to target surface height immediately so character stays on terrain
+    this.currentPlayerPos.y = this.targetPlayerPos.y;
+
+    // Interpolate only X/Z at constant speed so movement is horizontal
+    const dx = this.targetPlayerPos.x - this.currentPlayerPos.x;
+    const dz = this.targetPlayerPos.z - this.currentPlayerPos.z;
+    const distXZ = Math.sqrt(dx * dx + dz * dz);
+    if (distXZ > VoxelEngine.ANALOG_MOVE_CONVERGE_THRESHOLD) {
       const step = VoxelEngine.PLAYER_MOVE_SPEED * deltaTime;
-      if (step >= dist) {
-        this.currentPlayerPos.copy(this.targetPlayerPos);
+      if (step >= distXZ) {
+        this.currentPlayerPos.x = this.targetPlayerPos.x;
+        this.currentPlayerPos.z = this.targetPlayerPos.z;
       } else {
-        const dir = this.moveDir.subVectors(this.targetPlayerPos, this.currentPlayerPos).normalize();
-        this.currentPlayerPos.addScaledVector(dir, step);
+        this.currentPlayerPos.x += (dx / distXZ) * step;
+        this.currentPlayerPos.z += (dz / distXZ) * step;
       }
     } else {
-      this.currentPlayerPos.copy(this.targetPlayerPos);
+      this.currentPlayerPos.x = this.targetPlayerPos.x;
+      this.currentPlayerPos.z = this.targetPlayerPos.z;
     }
     this.entities.player.group.position.copy(this.currentPlayerPos);
     this.controls.target.copy(this.currentPlayerPos);
     this.playerLight.position.copy(this.currentPlayerPos).y += 2;
 
-    // Stop analog walking animation once position converges to target
-    if (this.analogMoving) {
-      if (this.currentPlayerPos.distanceTo(this.targetPlayerPos) < VoxelEngine.ANALOG_MOVE_CONVERGE_THRESHOLD) {
-        this.entities.player.setMoving(false);
-        this.analogMoving = false;
-      }
+    // Stop analog walking animation once XZ position converges to target
+    if (this.analogMoving && distXZ <= VoxelEngine.ANALOG_MOVE_CONVERGE_THRESHOLD) {
+      this.entities.player.setMoving(false);
+      this.analogMoving = false;
     }
 
     // Smoothly interpolate rotation
