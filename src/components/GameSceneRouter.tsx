@@ -29,7 +29,6 @@ interface GameSceneRouterProps {
   onPointerUp: (e: React.PointerEvent) => void;
   onWheel: (e: React.WheelEvent) => void;
   onMove: (pos: WorldPosition, options?: { ignoreDrag?: boolean }) => void;
-  onDirectMove: (pos: WorldPosition) => void;
   onMine: (tileId: string) => void;
   onMineAction: (action: string) => void;
   onOpenMine: () => void;
@@ -63,7 +62,6 @@ export const GameSceneRouter: React.FC<GameSceneRouterProps> = ({
   onPointerUp,
   onWheel,
   onMove,
-  onDirectMove,
   onMine,
   onMineAction,
   onOpenMine,
@@ -157,7 +155,6 @@ export const GameSceneRouter: React.FC<GameSceneRouterProps> = ({
               <WorldScene
                 state={state}
                 onMove={onMove}
-                onDirectMove={onDirectMove}
                 onInteract={onWorldInteract}
                 onEnterHome={onRest}
                 onEnterMine={onOpenMine}
