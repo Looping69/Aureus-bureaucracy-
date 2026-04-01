@@ -204,7 +204,7 @@ export const WorldScene = ({
   }, []);
 
   const issueAnalogMove = React.useCallback(() => {
-    if (state.path.length > 0 || analogInput.magnitude < 0.35) return;
+    if (state.path.length > 1 || analogInput.magnitude < 0.35) return;
 
     const screenVertical = -analogInput.y;
     const worldX = (fixedCameraRightWorldXY.x * analogInput.x) + (fixedCameraForwardWorldXY.x * screenVertical);
@@ -215,8 +215,8 @@ export const WorldScene = ({
     if (stepX === 0 && stepY === 0) return;
 
     const nextPos = {
-      x: Math.max(0, Math.min(WORLD_SIZE - 1, Math.round(state.playerPos.x) + stepX)),
-      y: Math.max(0, Math.min(WORLD_SIZE - 1, Math.round(state.playerPos.y) + stepY))
+      x: Math.max(0, Math.min(WORLD_SIZE - 1, Math.round(state.playerPos.x) + stepX * 3)),
+      y: Math.max(0, Math.min(WORLD_SIZE - 1, Math.round(state.playerPos.y) + stepY * 3))
     };
 
     if (nextPos.x === Math.round(state.playerPos.x) && nextPos.y === Math.round(state.playerPos.y)) return;
@@ -224,7 +224,7 @@ export const WorldScene = ({
   }, [analogInput.magnitude, analogInput.x, analogInput.y, fixedCameraForwardWorldXY.x, fixedCameraForwardWorldXY.y, fixedCameraRightWorldXY.x, fixedCameraRightWorldXY.y, onMove, state.path.length, state.playerPos.x, state.playerPos.y]);
 
   React.useEffect(() => {
-    if (!analogInput.active || analogInput.magnitude < 0.35 || state.path.length > 0) return;
+    if (!analogInput.active || analogInput.magnitude < 0.35 || state.path.length > 1) return;
     issueAnalogMove();
     const interval = window.setInterval(issueAnalogMove, 180);
     return () => window.clearInterval(interval);

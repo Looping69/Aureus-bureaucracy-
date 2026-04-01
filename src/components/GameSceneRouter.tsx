@@ -10,6 +10,9 @@ const WorldScene = React.lazy(() =>
 const MineScene = React.lazy(() =>
   import('./MineScene').then((module) => ({ default: module.MineScene }))
 );
+const MineWorldScene = React.lazy(() =>
+  import('./MineWorldScene').then((module) => ({ default: module.MineWorldScene }))
+);
 const OfficeScene = React.lazy(() =>
   import('./OfficeScene').then((module) => ({ default: module.OfficeScene }))
 );
@@ -39,6 +42,7 @@ interface GameSceneRouterProps {
   onUpdateBuildings: (newBuildings: GameState['buildings']) => void;
   onClosePlanner: () => void;
   onReturnMineToWorld: () => void;
+  onCollectMineResource: (amount: number) => void;
   onSelectNPC: (id: string) => void;
   onSelectPermit: (id: string) => void;
   onFoundItem: (itemId: string) => void;
@@ -71,6 +75,7 @@ export const GameSceneRouter: React.FC<GameSceneRouterProps> = ({
   onUpdateBuildings,
   onClosePlanner,
   onReturnMineToWorld,
+  onCollectMineResource,
   onSelectNPC,
   onSelectPermit,
   onFoundItem,
@@ -89,7 +94,27 @@ export const GameSceneRouter: React.FC<GameSceneRouterProps> = ({
   return (
     <>
       <AnimatePresence mode="wait">
-        {state.currentScene === 'MINE' ? (
+        {state.currentScene === 'MINE_WORLD' ? (
+          <motion.div
+            key="mine-world"
+            initial={{ opacity: 0, scale: 1.05 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="flex-1 flex flex-col overflow-hidden touch-none"
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onWheel={onWheel}
+          >
+            <React.Suspense fallback={sceneLoading}>
+              <MineWorldScene
+                state={state}
+                onCollectResource={onCollectMineResource}
+                onExit={onReturnMineToWorld}
+              />
+            </React.Suspense>
+          </motion.div>
+        ) : state.currentScene === 'MINE' ? (
           <motion.div
             key="mine"
             initial={{ opacity: 0, x: -20 }}

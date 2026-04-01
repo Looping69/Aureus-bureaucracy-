@@ -19,6 +19,9 @@ const WALKABLE_BUILDING_TYPES = new Set<Building['type']>([
   'SIDEWALK',
   'PARK',
   'MINE_ENTRANCE',
+  'LOADING_ZONE',
+  'UNLOADING_ZONE',
+  'DELIVERY_ZONE',
 ]);
 
 export const PLAYER_CLEARANCE_HEIGHT = 2.25;
