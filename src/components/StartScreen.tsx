@@ -40,6 +40,7 @@ export const StartScreen: React.FC<StartScreenProps> = ({
     let progress = 0;
     let msgIdx = 0;
     const interval = setInterval(() => {
+      // Increment between 12-30% per tick for varied pacing
       progress += 12 + Math.random() * 18;
       if (progress >= 100) {
         progress = 100;
@@ -48,6 +49,7 @@ export const StartScreen: React.FC<StartScreenProps> = ({
           pendingCallbackRef.current?.();
         }, 300);
       }
+      // Divide 100% across the 5 messages (~20% each)
       msgIdx = Math.min(Math.floor(progress / 22), LOADING_MESSAGES.length - 1);
       setLoadingProgress(Math.min(progress, 100));
       setLoadingMsgIndex(msgIdx);
