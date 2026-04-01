@@ -24,6 +24,7 @@ export class VoxelEngine {
   private static readonly FOG_NEAR_NIGHT = 80;
   private static readonly FOG_FAR_NIGHT = 220;
   private static readonly ANALOG_MOVE_CONVERGE_THRESHOLD = 0.05;
+  private static readonly PLAYER_MOVE_SPEED = 8; // world units per second
   private container: HTMLElement;
   private scene: THREE.Scene;
   private camera: THREE.PerspectiveCamera;
@@ -84,6 +85,7 @@ export class VoxelEngine {
   private targetRotationY: number = 0;
   private firstPositionSet: boolean = false;
   private analogMoving: boolean = false;
+  private readonly moveDir = new THREE.Vector3();
 
   constructor(
     container: HTMLElement, 
@@ -450,7 +452,7 @@ export class VoxelEngine {
 
       if (posChanged) {
         // Analog stick movement: face the movement direction and start walking
-        this.targetRotationY = Math.atan2(dx, -dz);
+        this.targetRotationY = Math.atan2(-dx, -dz);
         this.entities.player.setMoving(true);
         this.analogMoving = true;
       } else if (!this.analogMoving) {
@@ -1574,17 +1576,26 @@ export class VoxelEngine {
     const deltaTime = this.lastTime ? (now - this.lastTime) / 1000 : 0.016;
     this.lastTime = now;
 
-    // Smoothly interpolate player position and camera target
-    const lerpFactor = 1 - Math.pow(0.00001, deltaTime); // Frame-rate independent lerp
-    this.currentPlayerPos.lerp(this.targetPlayerPos, Math.min(lerpFactor, 0.5));
+    // Move player toward target at constant speed
+    const dist = this.currentPlayerPos.distanceTo(this.targetPlayerPos);
+    if (dist > VoxelEngine.ANALOG_MOVE_CONVERGE_THRESHOLD) {
+      const step = VoxelEngine.PLAYER_MOVE_SPEED * deltaTime;
+      if (step >= dist) {
+        this.currentPlayerPos.copy(this.targetPlayerPos);
+      } else {
+        const dir = this.moveDir.subVectors(this.targetPlayerPos, this.currentPlayerPos).normalize();
+        this.currentPlayerPos.addScaledVector(dir, step);
+      }
+    } else {
+      this.currentPlayerPos.copy(this.targetPlayerPos);
+    }
     this.entities.player.group.position.copy(this.currentPlayerPos);
     this.controls.target.copy(this.currentPlayerPos);
     this.playerLight.position.copy(this.currentPlayerPos).y += 2;
 
     // Stop analog walking animation once position converges to target
     if (this.analogMoving) {
-      const dist = this.currentPlayerPos.distanceTo(this.targetPlayerPos);
-      if (dist < VoxelEngine.ANALOG_MOVE_CONVERGE_THRESHOLD) {
+      if (this.currentPlayerPos.distanceTo(this.targetPlayerPos) < VoxelEngine.ANALOG_MOVE_CONVERGE_THRESHOLD) {
         this.entities.player.setMoving(false);
         this.analogMoving = false;
       }
