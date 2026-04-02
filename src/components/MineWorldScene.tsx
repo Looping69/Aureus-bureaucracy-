@@ -105,6 +105,7 @@ export const MineWorldScene = ({
   const [hoverInfo, setHoverInfo]       = React.useState<WorldHoverInfo | null>(null);
   const hoverRafRef = React.useRef<number | null>(null);
   const pendingHoverRef = React.useRef<WorldHoverInfo | null>(null);
+  const lastPathIssueRef = React.useRef<number>(0);
 
   // ── voxels for the mine world terrain ───────────────────────────────────
   const allVoxels = React.useMemo(
@@ -153,6 +154,10 @@ export const MineWorldScene = ({
   // ── analog stick movement ────────────────────────────────────────────────
   const issueAnalogMove = React.useCallback(() => {
     if (path.length > 1 || analogInput.magnitude < 0.35) return;
+
+    const now = performance.now();
+    if (now - lastPathIssueRef.current < 350) return;
+
     const sv = -analogInput.y;
     const wx = camRight.x * analogInput.x + camForward.x * sv;
     const wy = camRight.y * analogInput.x + camForward.y * sv;
@@ -160,10 +165,11 @@ export const MineWorldScene = ({
     const sy = wy > 0.35 ? 1 : wy < -0.35 ? -1 : 0;
     if (sx === 0 && sy === 0) return;
     const next = {
-      x: Math.max(0, Math.min(WORLD_SIZE - 1, Math.round(playerPos.x) + sx * 3)),
-      y: Math.max(0, Math.min(WORLD_SIZE - 1, Math.round(playerPos.y) + sy * 3)),
+      x: Math.max(0, Math.min(WORLD_SIZE - 1, Math.round(playerPos.x) + sx * 6)),
+      y: Math.max(0, Math.min(WORLD_SIZE - 1, Math.round(playerPos.y) + sy * 6)),
     };
     if (next.x === Math.round(playerPos.x) && next.y === Math.round(playerPos.y)) return;
+    lastPathIssueRef.current = now;
     const p = findPath(playerPos, next, MINE_WORLD_BUILDINGS, WORLD_SIZE);
     setPath(p);
     setTargetPos(next);
@@ -172,7 +178,7 @@ export const MineWorldScene = ({
   React.useEffect(() => {
     if (!analogInput.active || analogInput.magnitude < 0.35 || path.length > 1) return;
     issueAnalogMove();
-    const id = setInterval(issueAnalogMove, 180);
+    const id = setInterval(issueAnalogMove, 400);
     return () => clearInterval(id);
   }, [analogInput.active, analogInput.magnitude, issueAnalogMove, path.length]);
 

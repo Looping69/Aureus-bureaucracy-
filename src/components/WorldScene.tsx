@@ -51,6 +51,7 @@ export const WorldScene = ({
   const [analogInput, setAnalogInput] = React.useState<AnalogStickVector>({ x: 0, y: 0, magnitude: 0, active: false });
   const pendingHoverPosRef = React.useRef<WorldHoverInfo | null>(null);
   const hoverRafRef = React.useRef<number | null>(null);
+  const lastPathIssueRef = React.useRef<number>(0);
   const isNight = state.time >= 20 || state.time < 6;
   const playerGridPos = React.useMemo(
     () => ({
@@ -206,6 +207,9 @@ export const WorldScene = ({
   const issueAnalogMove = React.useCallback(() => {
     if (state.path.length > 1 || analogInput.magnitude < 0.35) return;
 
+    const now = performance.now();
+    if (now - lastPathIssueRef.current < 350) return;
+
     const screenVertical = -analogInput.y;
     const worldX = (fixedCameraRightWorldXY.x * analogInput.x) + (fixedCameraForwardWorldXY.x * screenVertical);
     const worldY = (fixedCameraRightWorldXY.y * analogInput.x) + (fixedCameraForwardWorldXY.y * screenVertical);
@@ -215,18 +219,19 @@ export const WorldScene = ({
     if (stepX === 0 && stepY === 0) return;
 
     const nextPos = {
-      x: Math.max(0, Math.min(WORLD_SIZE - 1, Math.round(state.playerPos.x) + stepX * 3)),
-      y: Math.max(0, Math.min(WORLD_SIZE - 1, Math.round(state.playerPos.y) + stepY * 3))
+      x: Math.max(0, Math.min(WORLD_SIZE - 1, Math.round(state.playerPos.x) + stepX * 6)),
+      y: Math.max(0, Math.min(WORLD_SIZE - 1, Math.round(state.playerPos.y) + stepY * 6))
     };
 
     if (nextPos.x === Math.round(state.playerPos.x) && nextPos.y === Math.round(state.playerPos.y)) return;
+    lastPathIssueRef.current = now;
     onMove(nextPos, { ignoreDrag: true });
   }, [state.path.length, analogInput.magnitude, analogInput.x, analogInput.y, fixedCameraForwardWorldXY.x, fixedCameraForwardWorldXY.y, fixedCameraRightWorldXY.x, fixedCameraRightWorldXY.y, onMove, state.playerPos.x, state.playerPos.y]);
 
   React.useEffect(() => {
     if (!analogInput.active || analogInput.magnitude < 0.35 || state.path.length > 1) return;
     issueAnalogMove();
-    const interval = window.setInterval(issueAnalogMove, 180);
+    const interval = window.setInterval(issueAnalogMove, 400);
     return () => window.clearInterval(interval);
   }, [analogInput.active, analogInput.magnitude, issueAnalogMove, state.path.length]);
 
