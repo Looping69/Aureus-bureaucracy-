@@ -13,6 +13,8 @@ import { DialogueOverlay } from './components/DialogueOverlay';
 import { PermitOverlay } from './components/PermitOverlay';
 import { FormMiniGame } from './components/FormMiniGame';
 import { StartScreen } from './components/StartScreen';
+import { LightLoadingOverlay } from './components/LightLoadingOverlay';
+import { LoadingScreen } from './components/LoadingScreen';
 import { TutorialOverlay } from './components/TutorialOverlay';
 import { GameSceneRouter } from './components/GameSceneRouter';
 import { ActionLogEntry, ActionLogPanel } from './components/ActionLogPanel';
@@ -44,6 +46,14 @@ import { EMPTY_WORLD_EFFECTS } from './game/dialogue/worldEffects';
 // --- Main App ---
 
 const NOTIFICATION_AUTO_DISMISS_MS = 2800;
+const STARTUP_OVERLAY_HIDE_MS = 180;
+
+type StartupLoadingState = {
+  visible: boolean;
+  progress: number;
+  phase: string;
+  awaitingWorldBoot: boolean;
+};
 
 const buildHydratedBuildings = (savedBuildings?: GameState['buildings']): GameState['buildings'] =>
   Object.fromEntries(
@@ -136,15 +146,77 @@ export default function App() {
   const [stateUpdateCount, setStateUpdateCount] = useState(0);
   const [lastActionName, setLastActionName] = useState('none');
   const [lastActionMs, setLastActionMs] = useState(0);
+  const [hasCompletedInitialWorldBoot, setHasCompletedInitialWorldBoot] = useState(false);
+  const [showSceneTransitionLoading, setShowSceneTransitionLoading] = useState(false);
+  const [startupLoading, setStartupLoading] = useState<StartupLoadingState>({
+    visible: false,
+    progress: 0,
+    phase: 'Opening archive file...',
+    awaitingWorldBoot: false
+  });
   const queuedFeedbackRef = useRef<RelationshipFeedback[]>([]);
   const isDraggingRef = useRef(false);
   const dragDistanceRef = useRef(0);
   const lastPointerPosRef = useRef({ x: 0, y: 0 });
   const pendingActionRef = useRef<{ name: string; startedAt: number } | null>(null);
+  const previousSceneRef = useRef<GameState['currentScene'] | null>(null);
+  const startupDismissTimerRef = useRef<number | null>(null);
   const pushNotification = (n: { title: string; msg: string } | null) => {
     if (!n) return;
     setNotification(n);
   };
+
+  const clearStartupDismissTimer = React.useCallback(() => {
+    if (startupDismissTimerRef.current !== null) {
+      window.clearTimeout(startupDismissTimerRef.current);
+      startupDismissTimerRef.current = null;
+    }
+  }, []);
+
+  const updateStartupLoading = React.useCallback((progress: number, phase: string) => {
+    setStartupLoading((prev) => {
+      if (!prev.visible) return prev;
+      const nextProgress = Math.max(prev.progress, Math.min(100, Math.round(progress)));
+      if (nextProgress === prev.progress && phase === prev.phase) return prev;
+      return {
+        ...prev,
+        progress: nextProgress,
+        phase
+      };
+    });
+  }, []);
+
+  const finishStartupLoading = React.useCallback((phase = 'Access Granted') => {
+    clearStartupDismissTimer();
+    setStartupLoading((prev) => {
+      if (!prev.visible) return prev;
+      return {
+        ...prev,
+        progress: 100,
+        phase,
+        awaitingWorldBoot: false
+      };
+    });
+
+    startupDismissTimerRef.current = window.setTimeout(() => {
+      setStartupLoading((prev) => ({
+        ...prev,
+        visible: false,
+        awaitingWorldBoot: false
+      }));
+      startupDismissTimerRef.current = null;
+    }, STARTUP_OVERLAY_HIDE_MS);
+  }, [clearStartupDismissTimer]);
+
+  const beginStartupLoading = React.useCallback((awaitingWorldBoot: boolean, phase: string) => {
+    clearStartupDismissTimer();
+    setStartupLoading({
+      visible: true,
+      progress: awaitingWorldBoot ? 4 : 12,
+      phase,
+      awaitingWorldBoot
+    });
+  }, [clearStartupDismissTimer]);
 
   const appendActionLog = (title: string, msg: string) => {
     const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -159,6 +231,42 @@ export default function App() {
     setHasSave(hasSavedGameState());
     setSavePreview(saved);
   }, []);
+
+  useEffect(() => {
+    if (!gameStarted) {
+      previousSceneRef.current = null;
+      setShowSceneTransitionLoading(false);
+      return;
+    }
+
+    if (!hasCompletedInitialWorldBoot) {
+      previousSceneRef.current = state.currentScene;
+      return;
+    }
+
+    if (previousSceneRef.current === null) {
+      previousSceneRef.current = state.currentScene;
+      return;
+    }
+
+    if (previousSceneRef.current === state.currentScene) {
+      return;
+    }
+
+    previousSceneRef.current = state.currentScene;
+    setShowSceneTransitionLoading(true);
+    const timer = window.setTimeout(() => {
+      setShowSceneTransitionLoading(false);
+    }, 450);
+
+    return () => window.clearTimeout(timer);
+  }, [gameStarted, hasCompletedInitialWorldBoot, state.currentScene]);
+
+  useEffect(() => {
+    return () => {
+      clearStartupDismissTimer();
+    };
+  }, [clearStartupDismissTimer]);
 
   useEffect(() => {
     if (!gameStarted) return;
@@ -252,7 +360,9 @@ export default function App() {
 
   const handleStartNewGame = React.useCallback(() => {
     clearSavedGameState();
+    beginStartupLoading(true, 'Opening new archive file...');
     setState(buildInitialGameState());
+    setHasCompletedInitialWorldBoot(false);
     setNotification(null);
     setActionLog([]);
     setShowActionLog(false);
@@ -266,7 +376,7 @@ export default function App() {
     setHasSave(false);
     setSavePreview(null);
     setGameStarted(true);
-  }, []);
+  }, [beginStartupLoading]);
 
   const handleContinueGame = React.useCallback(() => {
     let saved: GameState | null = null;
@@ -277,12 +387,36 @@ export default function App() {
       return;
     }
     if (!saved) return;
+    const bootingWorld = saved.currentScene === 'WORLD';
+    beginStartupLoading(bootingWorld, bootingWorld ? 'Opening archived world state...' : 'Restoring case file...');
+    setHasCompletedInitialWorldBoot(!bootingWorld);
     setState(hydrateSavedState(saved));
     setSavePreview(saved);
     setHasSave(true);
     setGameStarted(true);
     setNotification({ title: 'Save Loaded', msg: 'Resumed your previous session.' });
-  }, [hydrateSavedState]);
+  }, [beginStartupLoading, hydrateSavedState]);
+
+  const handleInitialSceneMounted = React.useCallback((scene: GameState['currentScene']) => {
+    if (!startupLoading.visible) return;
+
+    if (startupLoading.awaitingWorldBoot || scene === 'WORLD') {
+      updateStartupLoading(12, 'Preparing voxel renderer...');
+      return;
+    }
+
+    updateStartupLoading(100, 'Scene Ready');
+    finishStartupLoading('Scene Ready');
+  }, [finishStartupLoading, startupLoading.awaitingWorldBoot, startupLoading.visible, updateStartupLoading]);
+
+  const handleInitialWorldLoadingProgress = React.useCallback((progress: number, phase: string) => {
+    updateStartupLoading(progress, phase);
+  }, [updateStartupLoading]);
+
+  const handleInitialWorldReady = React.useCallback(() => {
+    setHasCompletedInitialWorldBoot(true);
+    finishStartupLoading();
+  }, [finishStartupLoading]);
 
   const triggerFeedback = (npcId: string, amount: number, type: 'TRUST' | 'LEVERAGE') => {
     queueFeedback(queuedFeedbackRef.current, npcId, amount, type);
@@ -328,14 +462,24 @@ export default function App() {
 
   const handleDirectMove = (pos: WorldPosition) => {
     setState(prev => {
-      if (prev.playerPos.x === pos.x && prev.playerPos.y === pos.y) return prev;
+      const sameTile = prev.playerPos.x === pos.x && prev.playerPos.y === pos.y;
+      const shouldClearPath = prev.path.length > 0 || prev.targetPos !== null;
+
+      if (sameTile && !shouldClearPath) return prev;
 
       const surfaceMap = buildWorldSurfaceMap(prev.buildings, WORLD_SIZE);
       const tile = getWorldSurfaceTile(surfaceMap, pos.x, pos.y);
-      if (!tile || !tile.walkable) return prev;
+      if (!tile || !tile.walkable) {
+        if (!shouldClearPath) return prev;
+        return {
+          ...prev,
+          path: [],
+          targetPos: null,
+        };
+      }
 
-      const energyCost = 0.35;
-      if (prev.energy <= energyCost) return prev;
+      const energyCost = sameTile ? 0 : 0.35;
+      if (energyCost > 0 && prev.energy <= energyCost) return prev;
 
       return {
         ...prev,
@@ -627,6 +771,7 @@ export default function App() {
         onPointerUp={handlePointerUp}
         onWheel={handleWheel}
         onMove={handleMove}
+        onDirectMove={handleDirectMove}
         onMine={handleMine}
         onMineAction={handleMineAction}
         onOpenMine={openMineScene}
@@ -664,7 +809,19 @@ export default function App() {
           beginTrackedAction('back_to_directory');
           setState(s => ({ ...s, activeBuildingId: null }));
         }}
+        suppressInitialWorldFallback={!hasCompletedInitialWorldBoot}
+        showInitialWorldLoadingOverlay={false}
+        onInitialWorldReady={handleInitialWorldReady}
+        onInitialWorldLoadingProgress={handleInitialWorldLoadingProgress}
+        onInitialSceneMounted={handleInitialSceneMounted}
       />
+
+      <LoadingScreen
+        visible={startupLoading.visible}
+        progress={startupLoading.progress}
+        phase={startupLoading.phase}
+      />
+      <LightLoadingOverlay visible={showSceneTransitionLoading} />
 
       <TutorialOverlay
         tutorialStep={state.tutorialStep}

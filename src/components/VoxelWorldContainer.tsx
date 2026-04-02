@@ -4,10 +4,7 @@ import { Building, NPC, AppState, VoxelData, WorldHoverInfo } from '../types';
 import { useCameraControls } from '../hooks/useCameraControls';
 import { WORLD_HALF_SIZE } from '../utils/voxelConstants';
 import { buildWorldSurfaceMap, getWorldSurfaceHeight } from '../utils/worldSurface';
-import { LoadingScreen, PROGRESS_DURATION_MS } from './LoadingScreen';
-
-/** Slightly longer than PROGRESS_DURATION_MS so the bar reaches 100% before fade-out. */
-const MIN_LOADING_DISPLAY_MS = PROGRESS_DURATION_MS + 400;
+import { LoadingScreen } from './LoadingScreen';
 
 interface VoxelWorldProps {
   voxels: VoxelData[];
@@ -23,6 +20,9 @@ interface VoxelWorldProps {
   onCountChange: (count: number) => void;
   onHoverPosition?: (pos: WorldHoverInfo | null) => void;
   onSelect?: (target: WorldHoverInfo, tapCount: number) => void;
+  showLoadingOverlay?: boolean;
+  onReady?: () => void;
+  onProgress?: (progress: number, phase: string) => void;
 }
 
 export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({ 
@@ -38,13 +38,20 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
   onStateChange, 
   onCountChange,
   onHoverPosition,
-  onSelect
+  onSelect,
+  showLoadingOverlay = true,
+  onReady,
+  onProgress
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<VoxelEngine | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(showLoadingOverlay);
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [loadingPhase, setLoadingPhase] = useState('Booting render pipeline...');
   const engineReadyRef = useRef(false);
-  const minTimeElapsedRef = useRef(false);
+  const readyReportedRef = useRef(false);
+  const onReadyRef = useRef(onReady);
+  const onProgressRef = useRef(onProgress);
   const surfaceMap = React.useMemo(() => buildWorldSurfaceMap(buildings), [buildings]);
   const playerSurfaceY = React.useMemo(
     () => getWorldSurfaceHeight(playerPos, surfaceMap),
@@ -53,14 +60,17 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
 
   useCameraControls(engineRef);
 
-  // Minimum display time for loading screen so progress animation completes
   useEffect(() => {
-    const timer = setTimeout(() => {
-      minTimeElapsedRef.current = true;
-      if (engineReadyRef.current) setLoading(false);
-    }, MIN_LOADING_DISPLAY_MS);
-    return () => clearTimeout(timer);
-  }, []);
+    onReadyRef.current = onReady;
+  }, [onReady]);
+
+  useEffect(() => {
+    onProgressRef.current = onProgress;
+  }, [onProgress]);
+
+  useEffect(() => {
+    setLoading(showLoadingOverlay && !engineReadyRef.current);
+  }, [showLoadingOverlay]);
 
   useEffect(() => {
     if (engineRef.current && recenterTrigger !== undefined) {
@@ -69,7 +79,15 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
   }, [recenterTrigger]);
 
   useEffect(() => {
+    const reportProgress = (progress: number, phase: string) => {
+      const nextProgress = Math.max(0, Math.min(100, progress));
+      setLoadingProgress((prev) => Math.max(prev, nextProgress));
+      setLoadingPhase(phase);
+      onProgressRef.current?.(nextProgress, phase);
+    };
+
     if (containerRef.current) {
+      reportProgress(8, 'Booting render pipeline...');
       engineRef.current = new VoxelEngine(
         containerRef.current,
         onStateChange,
@@ -78,7 +96,10 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
         onHoverPosition,
         onSelect
       );
+      reportProgress(18, 'Allocating render systems...');
+
       engineRef.current.loadInitialModel(voxels);
+      reportProgress(58, 'Meshing terrain volume...');
       
       // Add buildings
       buildings.forEach(b => {
@@ -89,13 +110,16 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
           engineRef.current?.entities.addNPC(npcs[b.npcId], b.pos);
         }
       });
+      reportProgress(74, 'Registering city structures...');
 
       // Initialise NPC commuting routes
       const buildingsMap: Record<string, Building> = {};
       buildings.forEach(b => { buildingsMap[b.id] = b; });
       engineRef.current.entities.initNpcMovement(npcs, buildingsMap);
+      reportProgress(86, 'Deploying field personnel...');
 
       engineRef.current.updateTime(time);
+      reportProgress(92, 'Syncing daylight cycle...');
       engineRef.current.setPlayerPosition(
         playerPos.x - WORLD_HALF_SIZE, 
         playerPos.y - WORLD_HALF_SIZE, 
@@ -105,13 +129,17 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
         targetPos ? targetPos.y - WORLD_HALF_SIZE : undefined,
         path
       );
+      reportProgress(97, 'Authorizing sector access...');
 
-      // Hide loading screen after engine has rendered at least one frame
-      // AND minimum display time has elapsed
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           engineReadyRef.current = true;
-          if (minTimeElapsedRef.current) setLoading(false);
+          reportProgress(100, 'Access Granted');
+          setLoading(false);
+          if (!readyReportedRef.current) {
+            readyReportedRef.current = true;
+            onReadyRef.current?.();
+          }
         });
       });
 
@@ -125,6 +153,9 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
         engineRef.current?.cleanup();
       };
     }
+  // The engine owns its lifetime; we initialize it once and drive later updates
+  // through the dedicated effects below.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -194,7 +225,7 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
 
   return (
     <div ref={containerRef} className="w-full h-full relative">
-      <LoadingScreen visible={loading} />
+      <LoadingScreen visible={loading} progress={loadingProgress} phase={loadingPhase} />
     </div>
   );
 };

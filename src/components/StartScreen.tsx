@@ -1,5 +1,5 @@
 import React from 'react';
-import { AnimatePresence, motion } from 'motion/react';
+import { motion } from 'motion/react';
 import { ChevronRight, FolderClock, Pickaxe, Save } from 'lucide-react';
 import { GameState } from '../types';
 
@@ -16,54 +16,12 @@ const formatTime = (time: number) => {
   return `${hour.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
 };
 
-const LOADING_MESSAGES = [
-  'Accessing bureau archives…',
-  'Verifying extraction permits…',
-  'Surveying mineral deposits…',
-  'Calibrating instruments…',
-  'Entering the basin…',
-];
-
 export const StartScreen: React.FC<StartScreenProps> = ({
   hasSave,
   savePreview,
   onNewGame,
   onContinue
 }) => {
-  const [loading, setLoading] = React.useState(false);
-  const [loadingProgress, setLoadingProgress] = React.useState(0);
-  const [loadingMsgIndex, setLoadingMsgIndex] = React.useState(0);
-  const pendingCallbackRef = React.useRef<(() => void) | null>(null);
-
-  React.useEffect(() => {
-    if (!loading) return;
-    let progress = 0;
-    let msgIdx = 0;
-    const interval = setInterval(() => {
-      // Increment between 12-30% per tick for varied pacing
-      progress += 12 + Math.random() * 18;
-      if (progress >= 100) {
-        progress = 100;
-        clearInterval(interval);
-        setTimeout(() => {
-          pendingCallbackRef.current?.();
-        }, 300);
-      }
-      // Divide 100% across the 5 messages (~20% each)
-      msgIdx = Math.min(Math.floor(progress / 22), LOADING_MESSAGES.length - 1);
-      setLoadingProgress(Math.min(progress, 100));
-      setLoadingMsgIndex(msgIdx);
-    }, 200);
-    return () => clearInterval(interval);
-  }, [loading]);
-
-  const handleStart = (cb: () => void) => {
-    pendingCallbackRef.current = cb;
-    setLoading(true);
-    setLoadingProgress(0);
-    setLoadingMsgIndex(0);
-  };
-
   return (
     <div className="min-h-[100dvh] bg-[#d7dbdf] text-slate-950 overflow-hidden">
       <div className="absolute inset-0 pointer-events-none">
@@ -74,58 +32,13 @@ export const StartScreen: React.FC<StartScreenProps> = ({
       </div>
 
       <div className="relative z-10 min-h-[100dvh] max-w-md mx-auto px-5 py-8 flex flex-col">
-        <AnimatePresence mode="wait">
-          {loading ? (
-            <motion.div
-              key="loading"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0, scale: 1.05 }}
-              transition={{ duration: 0.3 }}
-              className="flex-1 flex flex-col items-center justify-center gap-6"
-            >
-              <motion.div
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ duration: 0.4, delay: 0.1 }}
-                className="w-16 h-16 rounded-3xl bg-slate-950 text-white flex items-center justify-center shadow-xl"
-              >
-                <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
-                >
-                  <Pickaxe size={28} />
-                </motion.div>
-              </motion.div>
-
-              <div className="w-56 space-y-3">
-                <div className="h-1.5 rounded-full bg-black/10 overflow-hidden">
-                  <motion.div
-                    className="h-full rounded-full bg-slate-900"
-                    initial={{ width: '0%' }}
-                    animate={{ width: `${loadingProgress}%` }}
-                    transition={{ duration: 0.15 }}
-                  />
-                </div>
-                <motion.p
-                  key={loadingMsgIndex}
-                  initial={{ opacity: 0, y: 4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="text-center text-[10px] font-mono uppercase tracking-[0.24em] text-slate-500"
-                >
-                  {LOADING_MESSAGES[loadingMsgIndex]}
-                </motion.p>
-              </div>
-            </motion.div>
-          ) : (
-            <motion.div
-              key="menu"
-              initial={{ opacity: 0, y: 18 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -18 }}
-              transition={{ duration: 0.35 }}
-              className="flex-1 flex flex-col justify-center gap-6"
-            >
+        <motion.div
+          key="menu"
+          initial={{ opacity: 0, y: 18 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35 }}
+          className="flex-1 flex flex-col justify-center gap-6"
+        >
               <div className="rounded-[28px] border border-black/10 bg-white/70 backdrop-blur-md shadow-[0_20px_80px_rgba(15,23,42,0.12)] overflow-hidden">
                 <div className="px-6 pt-6 pb-5 border-b border-black/10 bg-gradient-to-r from-slate-950 via-slate-800 to-[#334155] text-white">
                   <div className="flex items-start justify-between gap-4">
@@ -181,7 +94,7 @@ export const StartScreen: React.FC<StartScreenProps> = ({
 
                   <div className="space-y-3">
                     <button
-                      onClick={() => handleStart(onNewGame)}
+                      onClick={onNewGame}
                       className="w-full rounded-2xl border-2 border-slate-950 bg-slate-950 text-white px-4 py-4 shadow-lg flex items-center justify-between gap-3 active:scale-[0.99] transition-transform"
                     >
                       <span className="flex items-center gap-3">
@@ -199,7 +112,7 @@ export const StartScreen: React.FC<StartScreenProps> = ({
                     </button>
 
                     <button
-                      onClick={() => handleStart(onContinue)}
+                      onClick={onContinue}
                       disabled={!hasSave}
                       className={`w-full rounded-2xl border px-4 py-4 flex items-center justify-between gap-3 transition-all ${
                         hasSave
@@ -227,9 +140,7 @@ export const StartScreen: React.FC<StartScreenProps> = ({
               <div className="px-2 text-center text-[10px] font-mono uppercase tracking-[0.26em] text-slate-500">
                 Extraction rights are temporary. Consequences are not.
               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        </motion.div>
       </div>
     </div>
   );

@@ -25,6 +25,8 @@ export class VoxelEngine {
   private static readonly FOG_FAR_NIGHT = 220;
   private static readonly ANALOG_MOVE_CONVERGE_THRESHOLD = 0.05;
   private static readonly PLAYER_MOVE_SPEED = 12; // world units per second (XZ only)
+  private static readonly CAMERA_FOLLOW_DAMPING_XZ = 22;
+  private static readonly CAMERA_FOLLOW_DAMPING_Y = 14;
   private container: HTMLElement;
   private scene: THREE.Scene;
   private camera: THREE.PerspectiveCamera;
@@ -38,7 +40,6 @@ export class VoxelEngine {
   private ambientLight: THREE.AmbientLight;
   private dirLight: THREE.DirectionalLight;
   private hemiLight: THREE.HemisphereLight;
-  private playerLight: THREE.PointLight;
   private targetIndicator: THREE.Mesh;
   private pathLine: THREE.Line;
   private skyDome: THREE.Mesh;
@@ -82,9 +83,11 @@ export class VoxelEngine {
   private time: number = 12;
   private targetPlayerPos = new THREE.Vector3(0, CONFIG.FLOOR_Y + 0.5, 0);
   private currentPlayerPos = new THREE.Vector3(0, CONFIG.FLOOR_Y + 0.5, 0);
+  private targetCameraFocus = new THREE.Vector3(0, CONFIG.FLOOR_Y + 0.5, 0);
+  private currentCameraFocus = new THREE.Vector3(0, CONFIG.FLOOR_Y + 0.5, 0);
   private targetRotationY: number = 0;
   private firstPositionSet: boolean = false;
-  private analogMoving: boolean = false;
+  private requestedPlayerMoving: boolean = false;
 
   constructor(
     container: HTMLElement, 
@@ -164,10 +167,6 @@ export class VoxelEngine {
     this.dirLight.shadow.camera.far = 400;
     this.dirLight.shadow.bias = -0.0003;
     this.scene.add(this.dirLight);
-
-    this.playerLight = new THREE.PointLight(0xffffff, 0.8, 10);
-    this.playerLight.castShadow = false;
-    this.scene.add(this.playerLight);
 
     // Target Indicator
     const targetGeom = new THREE.RingGeometry(0.4, 0.5, 32);
@@ -409,19 +408,21 @@ export class VoxelEngine {
     // Save old target to detect analog stick position changes
     const prevX = this.targetPlayerPos.x;
     const prevZ = this.targetPlayerPos.z;
+    this.requestedPlayerMoving = isMoving;
 
     this.targetPlayerPos.set(x, surfaceY, z);
     
     if (!this.firstPositionSet) {
       this.currentPlayerPos.copy(this.targetPlayerPos);
       this.entities.player.group.position.copy(this.currentPlayerPos);
-      this.controls.target.copy(this.currentPlayerPos);
+      this.targetCameraFocus.copy(this.currentPlayerPos);
+      this.currentCameraFocus.copy(this.currentPlayerPos);
+      this.controls.target.copy(this.currentCameraFocus);
       this.firstPositionSet = true;
     }
     
     if (isMoving && targetX !== undefined && targetZ !== undefined) {
       // Path-based movement (click-to-move): use target direction
-      this.analogMoving = false;
       this.entities.player.setMoving(true);
       const dx = targetX - x;
       const dz = targetZ - z;
@@ -452,12 +453,9 @@ export class VoxelEngine {
       if (posChanged) {
         // Analog stick movement: face the movement direction and start walking
         this.targetRotationY = Math.atan2(-dx, -dz);
-        this.entities.player.setMoving(true);
-        this.analogMoving = true;
-      } else if (!this.analogMoving) {
-        // Truly idle: no path-based or analog movement
-        this.entities.player.setMoving(false);
       }
+
+      this.entities.player.setMoving(isMoving || posChanged);
 
       this.targetIndicator.visible = false;
       this.pathLine.visible = false;
@@ -474,10 +472,37 @@ export class VoxelEngine {
   }
 
   public recenterOnPlayer() {
-    this.controls.target.copy(this.currentPlayerPos);
-    this.camera.position.copy(this.currentPlayerPos).add(WORLD_CAMERA_OFFSET);
+    this.targetCameraFocus.copy(this.currentPlayerPos);
+    this.currentCameraFocus.copy(this.currentPlayerPos);
+    this.controls.target.copy(this.currentCameraFocus);
+    this.camera.position.copy(this.currentCameraFocus).add(WORLD_CAMERA_OFFSET);
     this.enforceCameraBounds();
     this.controls.update();
+  }
+
+  private updateCameraFollow(deltaTime: number) {
+    this.targetCameraFocus.copy(this.currentPlayerPos);
+
+    this.currentCameraFocus.x = THREE.MathUtils.damp(
+      this.currentCameraFocus.x,
+      this.targetCameraFocus.x,
+      VoxelEngine.CAMERA_FOLLOW_DAMPING_XZ,
+      deltaTime
+    );
+    this.currentCameraFocus.z = THREE.MathUtils.damp(
+      this.currentCameraFocus.z,
+      this.targetCameraFocus.z,
+      VoxelEngine.CAMERA_FOLLOW_DAMPING_XZ,
+      deltaTime
+    );
+    this.currentCameraFocus.y = THREE.MathUtils.damp(
+      this.currentCameraFocus.y,
+      this.targetCameraFocus.y,
+      VoxelEngine.CAMERA_FOLLOW_DAMPING_Y,
+      deltaTime
+    );
+
+    this.controls.target.copy(this.currentCameraFocus);
   }
 
   private enforceCameraBounds() {
@@ -559,9 +584,8 @@ export class VoxelEngine {
 
   /**
    * Build edge decorations from background.json motifs.
-   * Procedurally generates tall skyscraper / building silhouettes in a ring
-   * around the world boundary so the playable area is surrounded by a dense
-   * city skyline that fades into fog.
+   * Keep them cheap, but layered enough that the horizon reads like an
+   * intentional distant city instead of a test scene.
    */
   private buildEdgeDecorations() {
     const cfg = backgroundData.edgeConfig;
@@ -569,8 +593,6 @@ export class VoxelEngine {
       name: string; width: number; depth: number; floors: number; style: string;
     }>;
     if (!motifs || motifs.length === 0) return;
-
-    const edgeVoxels: VoxelData[] = [];
 
     // Deterministic pseudo-random from two seed values
     const seededRandom = (a: number, b: number) => {
@@ -582,185 +604,176 @@ export class VoxelEngine {
       return s - Math.floor(s);
     };
 
-    // Colour palettes for different building styles
-    const WALL_DARK  = 0x374151;  // dark grey concrete
-    const WALL_MID   = 0x4b5563;  // mid grey
-    const WALL_LIGHT = 0x6b7280;  // light grey
-    const GLASS_BLUE = 0x5b7fa5;  // blue-tinted glass
-    const GLASS_CYAN = 0x4a8c99;  // cyan tint
-    const WINDOW_LIT = 0xfcd34d;  // warm yellow lit window
-    const ROOF_DARK  = 0x1f2937;  // dark roof
-    const STEEL      = 0x9ca3af;  // steel / antenna
-    const RED_LIGHT  = 0xef4444;  // aviation warning light
-
-    /**
-     * Generate voxels for a single skyscraper at world position (ox, oz).
-     */
-    const generateBuilding = (
-      ox: number, oz: number,
-      w: number, d: number, floors: number,
-      style: string, rng: number
-    ) => {
-      const baseY = cfg.baseY;
-      // Height jitter: vary the number of floors per-instance
-      const jitter = cfg.heightJitter;
-      const actualFloors = Math.max(8, Math.round(floors * (1 - jitter / 2 + rng * jitter)));
-
-      // Foundation depth – extend below baseY so buildings merge into
-      // the ground ring and never appear to float.
-      const FOUNDATION_DEPTH = 4;
-
-      // Pick wall / accent colours based on style
-      let wallColor = WALL_MID;
-      let accentColor = GLASS_BLUE;
-      let roofColor = ROOF_DARK;
-      if (style === 'glass_tower')    { wallColor = WALL_LIGHT; accentColor = GLASS_CYAN; }
-      if (style === 'office')         { wallColor = WALL_MID;   accentColor = GLASS_BLUE; }
-      if (style === 'slim_highrise')  { wallColor = WALL_LIGHT; accentColor = GLASS_BLUE; }
-      if (style === 'wide_complex')   { wallColor = WALL_DARK;  accentColor = GLASS_BLUE; }
-      if (style === 'industrial')     { wallColor = WALL_DARK;  accentColor = STEEL;      roofColor = WALL_DARK; }
-      if (style === 'residential')    { wallColor = WALL_MID;   accentColor = WINDOW_LIT; }
-      if (style === 'mega')           { wallColor = WALL_MID;   accentColor = GLASS_CYAN; }
-      if (style === 'stepped')        { wallColor = WALL_LIGHT; accentColor = GLASS_BLUE; }
-
-      // For "stepped" buildings, taper width/depth every N floors
-      let curW = w;
-      let curD = d;
-      const stepInterval = style === 'stepped' ? Math.max(4, Math.floor(actualFloors / 3)) : actualFloors + 1;
-
-      for (let floor = 0; floor < actualFloors; floor++) {
-        // Stepped reduction
-        if (style === 'stepped' && floor > 0 && floor % stepInterval === 0) {
-          if (curW > 2) curW--;
-          if (curD > 2) curD--;
-        }
-
-        const y = baseY + floor;
-        const isWindowFloor = floor > 0 && floor % 3 === 1;  // every 3rd floor has window accents
-        const xOff = Math.floor((w - curW) / 2);  // centre narrowed section
-        const zOff = Math.floor((d - curD) / 2);
-
-        for (let lx = 0; lx < curW; lx++) {
-          for (let lz = 0; lz < curD; lz++) {
-            const isEdge = lx === 0 || lx === curW - 1 || lz === 0 || lz === curD - 1;
-            // Only build the shell (outer walls), not interior
-            if (!isEdge && curW > 2 && curD > 2) continue;
-
-            let color = wallColor;
-            // Window band on edges
-            if (isWindowFloor && isEdge) {
-              color = accentColor;
-            }
-            // Ground floor darker
-            if (floor === 0) color = WALL_DARK;
-
-            edgeVoxels.push({
-              x: ox + lx + xOff,
-              y,
-              z: oz + lz + zOff,
-              color,
-            });
-          }
-        }
-      }
-
-      // === Foundation below baseY ===
-      // Solid block below the building footprint so it visually connects
-      // to the ground ring mesh.
-      for (let fy = 1; fy <= FOUNDATION_DEPTH; fy++) {
-        for (let lx = 0; lx < w; lx++) {
-          for (let lz = 0; lz < d; lz++) {
-            edgeVoxels.push({
-              x: ox + lx,
-              y: baseY - fy,
-              z: oz + lz,
-              color: WALL_DARK,
-            });
-          }
-        }
-      }
-
-      // === Roof details ===
-      const roofY = baseY + actualFloors;
-
-      // Flat roof cap
-      const rxOff = Math.floor((w - curW) / 2);
-      const rzOff = Math.floor((d - curD) / 2);
-      for (let lx = 0; lx < curW; lx++) {
-        for (let lz = 0; lz < curD; lz++) {
-          edgeVoxels.push({ x: ox + lx + rxOff, y: roofY, z: oz + lz + rzOff, color: roofColor });
-        }
-      }
-
-      // Antenna / spire on tall buildings
-      if (actualFloors >= 20) {
-        const ax = ox + Math.floor(w / 2);
-        const az = oz + Math.floor(d / 2);
-        const antennaH = Math.min(6, Math.floor(actualFloors / 6));
-        for (let i = 1; i <= antennaH; i++) {
-          edgeVoxels.push({ x: ax, y: roofY + i, z: az, color: STEEL });
-        }
-        // Red warning light at top
-        edgeVoxels.push({ x: ax, y: roofY + antennaH + 1, z: az, color: RED_LIGHT });
-      }
+    type Placement = {
+      x: number;
+      y: number;
+      z: number;
+      sx: number;
+      sy: number;
+      sz: number;
+      lightnessShift: number;
     };
 
-    // Walk the perimeter ring and place buildings
-    const step = cfg.spacing;
-    for (let wx = -cfg.ringEnd; wx <= cfg.ringEnd; wx += step) {
-      for (let wz = -cfg.ringEnd; wz <= cfg.ringEnd; wz += step) {
-        const dist = Math.max(Math.abs(wx), Math.abs(wz));
-        if (dist < cfg.ringStart || dist > cfg.ringEnd) continue;
+    type LayerConfig = {
+      id: number;
+      ringStart: number;
+      ringEnd: number;
+      step: number;
+      spawnChance: number;
+      clusterChance: number;
+      widthScale: number;
+      depthScale: number;
+      minHeightScale: number;
+      maxHeightScale: number;
+      opacity: number;
+      color: number;
+      yOffset: number;
+      jitter: number;
+    };
 
-        const r = seededRandom(wx, wz);
-        const r2 = seededRandom2(wx, wz);
-        // ~75% fill rate for a dense skyline
-        if (r < 0.25) continue;
-
-        const motifIdx = Math.floor(r2 * motifs.length) % motifs.length;
-        const motif = motifs[motifIdx];
-
-        generateBuilding(wx, wz, motif.width, motif.depth, motif.floors, motif.style, r);
+    const geometry = new THREE.BoxGeometry(1, 1, 1);
+    const layerConfigs: LayerConfig[] = [
+      {
+        id: 1,
+        ringStart: cfg.ringStart,
+        ringEnd: cfg.ringStart + 18,
+        step: Math.max(cfg.spacing * 1.7, 10),
+        spawnChance: 0.78,
+        clusterChance: 0.58,
+        widthScale: 2.1,
+        depthScale: 1.85,
+        minHeightScale: 0.18,
+        maxHeightScale: 0.32,
+        opacity: 0.36,
+        color: 0x49545f,
+        yOffset: -2.5,
+        jitter: 0.42
+      },
+      {
+        id: 2,
+        ringStart: cfg.ringStart + 10,
+        ringEnd: cfg.ringEnd - 10,
+        step: Math.max(cfg.spacing * 2.1, 13),
+        spawnChance: 0.64,
+        clusterChance: 0.46,
+        widthScale: 1.45,
+        depthScale: 1.35,
+        minHeightScale: 0.28,
+        maxHeightScale: 0.48,
+        opacity: 0.28,
+        color: 0x5a6673,
+        yOffset: -1.5,
+        jitter: 0.34
+      },
+      {
+        id: 3,
+        ringStart: cfg.ringStart + 26,
+        ringEnd: cfg.ringEnd,
+        step: Math.max(cfg.spacing * 2.6, 16),
+        spawnChance: 0.42,
+        clusterChance: 0.22,
+        widthScale: 0.92,
+        depthScale: 0.96,
+        minHeightScale: 0.42,
+        maxHeightScale: 0.72,
+        opacity: 0.18,
+        color: 0x88919b,
+        yOffset: 1.25,
+        jitter: 0.22
       }
-    }
+    ];
 
-    if (edgeVoxels.length === 0) return;
+    const buildLayer = (layer: LayerConfig) => {
+      const placements: Placement[] = [];
+      const tangentSpread = layer.step * 0.42;
 
-    // Use the GreedyMesher to build optimised geometry in chunks
-    const CHUNK = 64;
-    const chunks = new Map<string, VoxelData[]>();
-    for (const v of edgeVoxels) {
-      const cx = Math.floor(v.x / CHUNK);
-      const cz = Math.floor(v.z / CHUNK);
-      const key = `${cx},${cz}`;
-      if (!chunks.has(key)) chunks.set(key, []);
-      chunks.get(key)!.push(v);
-    }
+      for (let wx = -layer.ringEnd; wx <= layer.ringEnd; wx += layer.step) {
+        for (let wz = -layer.ringEnd; wz <= layer.ringEnd; wz += layer.step) {
+          const dist = Math.max(Math.abs(wx), Math.abs(wz));
+          if (dist < layer.ringStart || dist > layer.ringEnd) continue;
 
-    chunks.forEach((voxels) => {
-      const meshData = GreedyMesher.mesh(voxels);
-      const geometry = new THREE.BufferGeometry();
-      geometry.setAttribute('position', new THREE.Float32BufferAttribute(meshData.positions, 3));
-      geometry.setAttribute('normal', new THREE.Float32BufferAttribute(meshData.normals, 3));
-      geometry.setAttribute('color', new THREE.Float32BufferAttribute(meshData.colors, 3));
-      geometry.setIndex(meshData.indices);
-      geometry.computeBoundingSphere();
-      geometry.computeBoundingBox();
+          const edgeT = (dist - layer.ringStart) / Math.max(1, layer.ringEnd - layer.ringStart);
+          const r = seededRandom(wx + layer.id * 17.3, wz - layer.id * 11.9);
+          if (r > THREE.MathUtils.lerp(layer.spawnChance, layer.spawnChance * 0.72, edgeT)) continue;
+
+          const motifSeed = seededRandom2(wx + layer.id * 7.1, wz + layer.id * 13.7);
+          const motif = motifs[Math.floor(motifSeed * motifs.length) % motifs.length];
+          const clusterRoll = seededRandom(wx - layer.id * 5.3, wz + layer.id * 3.1);
+          const clusterCount =
+            clusterRoll < layer.clusterChance * 0.45 ? 3 :
+            clusterRoll < layer.clusterChance ? 2 :
+            1;
+
+          const tangentX = Math.abs(wz) > Math.abs(wx) ? 1 : 0;
+          const tangentZ = Math.abs(wx) >= Math.abs(wz) ? 1 : 0;
+
+          for (let clusterIndex = 0; clusterIndex < clusterCount; clusterIndex += 1) {
+            const offsetSeed = seededRandom2(
+              wx + clusterIndex * 13.1 + layer.id * 2.9,
+              wz - clusterIndex * 9.7 - layer.id * 4.3
+            );
+            const lateralOffset = ((clusterIndex - (clusterCount - 1) / 2) * tangentSpread)
+              + ((offsetSeed - 0.5) * layer.step * layer.jitter);
+            const depthOffset = (seededRandom(wx + clusterIndex * 4.1, wz - clusterIndex * 6.7) - 0.5)
+              * layer.step * 0.16;
+            const baseX = wx + tangentX * lateralOffset + (1 - tangentX) * depthOffset;
+            const baseZ = wz + tangentZ * lateralOffset + (1 - tangentZ) * depthOffset;
+
+            const widthSeed = seededRandom(baseX + layer.id, baseZ - layer.id);
+            const depthSeed = seededRandom2(baseX - layer.id, baseZ + layer.id);
+            const heightSeed = seededRandom(baseX + 3.7, baseZ - 5.1);
+            const width = Math.max(6, Math.round(motif.width * layer.widthScale * (0.92 + widthSeed * 0.95)));
+            const depth = Math.max(6, Math.round(motif.depth * layer.depthScale * (0.92 + depthSeed * 0.95)));
+            const heightScale = THREE.MathUtils.lerp(layer.minHeightScale, layer.maxHeightScale, heightSeed);
+            const height = Math.max(9, Math.round(motif.floors * heightScale));
+
+            placements.push({
+              x: baseX,
+              y: cfg.baseY + (height / 2) - 2 + layer.yOffset,
+              z: baseZ,
+              sx: width,
+              sy: height,
+              sz: depth,
+              lightnessShift: THREE.MathUtils.lerp(-0.08, 0.06, seededRandom2(baseX + 1.9, baseZ + 2.7))
+            });
+          }
+        }
+      }
+
+      if (placements.length === 0) return;
 
       const material = new THREE.MeshStandardMaterial({
-        vertexColors: true,
-        roughness: 0.85,
-        metalness: 0.1,
+        color: layer.color,
+        roughness: 1,
+        metalness: 0,
         transparent: true,
-        opacity: 0.8,
+        opacity: layer.opacity,
+        fog: true,
+        vertexColors: true
       });
 
-      const mesh = new THREE.Mesh(geometry, material);
-      mesh.castShadow = false;
-      mesh.receiveShadow = false;
-      mesh.frustumCulled = true;
-      this.edgeGroup.add(mesh);
-    });
+      const instanced = new THREE.InstancedMesh(geometry, material, placements.length);
+      instanced.castShadow = false;
+      instanced.receiveShadow = false;
+      instanced.frustumCulled = true;
+
+      const instanceColor = new THREE.Color(layer.color);
+      placements.forEach((placement, index) => {
+        this.dummy.position.set(placement.x, placement.y, placement.z);
+        this.dummy.scale.set(placement.sx, placement.sy, placement.sz);
+        this.dummy.updateMatrix();
+        instanced.setMatrixAt(index, this.dummy.matrix);
+
+        const color = instanceColor.clone().offsetHSL(0, 0, placement.lightnessShift);
+        instanced.setColorAt(index, color);
+      });
+
+      instanced.instanceMatrix.needsUpdate = true;
+      if (instanced.instanceColor) instanced.instanceColor.needsUpdate = true;
+      this.edgeGroup.add(instanced);
+    };
+
+    layerConfigs.forEach(buildLayer);
   }
 
   private collectTerrainObjects() {
@@ -1596,14 +1609,9 @@ export class VoxelEngine {
       this.currentPlayerPos.z = this.targetPlayerPos.z;
     }
     this.entities.player.group.position.copy(this.currentPlayerPos);
-    this.controls.target.copy(this.currentPlayerPos);
-    this.playerLight.position.copy(this.currentPlayerPos).y += 2;
-
-    // Stop analog walking animation once XZ position converges to target
-    if (this.analogMoving && distXZ <= VoxelEngine.ANALOG_MOVE_CONVERGE_THRESHOLD) {
-      this.entities.player.setMoving(false);
-      this.analogMoving = false;
-    }
+    this.entities.player.setMoving(
+      this.requestedPlayerMoving || distXZ > VoxelEngine.ANALOG_MOVE_CONVERGE_THRESHOLD
+    );
 
     // Smoothly interpolate rotation
     const rotationLerpFactor = 1 - Math.pow(0.000001, deltaTime);
@@ -1612,6 +1620,7 @@ export class VoxelEngine {
     while (diff > Math.PI) diff -= Math.PI * 2;
     this.entities.player.group.rotation.y += diff * Math.min(rotationLerpFactor, 0.5);
 
+    this.updateCameraFollow(deltaTime);
     this.enforceCameraBounds();
     this.controls.update();
     this.physicsWorld.step(1 / 60, deltaTime, 3);

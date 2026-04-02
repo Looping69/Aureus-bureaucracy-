@@ -9,40 +9,35 @@ import { getBuildingAccessPosition } from '../utils/buildingAccess';
 import { getBuildingFootprint } from '../utils/worldNavigation';
 import { buildWorldTerrainVoxels } from '../utils/worldSurface';
 import { WORLD_SIZE } from '../utils/voxelConstants';
+import { useContinuousAnalogMovement } from '../hooks/game/useContinuousAnalogMovement';
 
 export const WorldScene = ({ 
   state, 
   onMove, 
+  onDirectMove,
   onInteract,
   onEnterHome,
   onEnterMine,
   onRecenter,
   onTravel,
-  showDebug = false
+  showDebug = false,
+  showInitialLoadingOverlay = true,
+  onInitialSceneReady,
+  onInitialLoadingProgress
 }: { 
   state: GameState, 
   onMove: (pos: WorldPosition, options?: { ignoreDrag?: boolean }) => void,
+  onDirectMove: (pos: WorldPosition) => void,
   onInteract: (npcId: string, buildingId: string) => void,
   onEnterHome: () => void,
   onEnterMine: () => void,
   onRecenter: () => void,
   onTravel: (mineId: string) => void,
-  showDebug?: boolean
+  showDebug?: boolean,
+  showInitialLoadingOverlay?: boolean,
+  onInitialSceneReady?: () => void,
+  onInitialLoadingProgress?: (progress: number, phase: string) => void
 }) => {
-  const fixedCameraForwardWorldXY = React.useMemo(
-    () => ({
-      x: -Math.sin(WORLD_CAMERA_AZIMUTH),
-      y: -Math.cos(WORLD_CAMERA_AZIMUTH)
-    }),
-    []
-  );
-  const fixedCameraRightWorldXY = React.useMemo(
-    () => ({
-      x: Math.cos(WORLD_CAMERA_AZIMUTH),
-      y: -Math.sin(WORLD_CAMERA_AZIMUTH)
-    }),
-    []
-  );
   const [showTravelMenu, setShowTravelMenu] = React.useState(false);
   const [hoverInfo, setHoverInfo] = React.useState<WorldHoverInfo | null>(null);
   const [pendingSelection, setPendingSelection] = React.useState<WorldHoverInfo | null>(null);
@@ -51,15 +46,7 @@ export const WorldScene = ({
   const [analogInput, setAnalogInput] = React.useState<AnalogStickVector>({ x: 0, y: 0, magnitude: 0, active: false });
   const pendingHoverPosRef = React.useRef<WorldHoverInfo | null>(null);
   const hoverRafRef = React.useRef<number | null>(null);
-  const lastPathIssueRef = React.useRef<number>(0);
   const isNight = state.time >= 20 || state.time < 6;
-  const playerGridPos = React.useMemo(
-    () => ({
-      x: Math.round(state.playerPos.x),
-      y: Math.round(state.playerPos.y)
-    }),
-    [state.playerPos.x, state.playerPos.y]
-  );
   const homeFootprint = React.useMemo(
     () => state.buildings.player_home ? getBuildingFootprint(state.buildings.player_home) : null,
     [state.buildings]
@@ -115,9 +102,31 @@ export const WorldScene = ({
     [miniMapScale]
   );
 
-  const allVoxels = React.useMemo(
-    () => buildWorldTerrainVoxels(state.buildings, WORLD_SIZE).voxels,
+  const terrainData = React.useMemo(
+    () => buildWorldTerrainVoxels(state.buildings, WORLD_SIZE),
     [state.buildings]
+  );
+  const allVoxels = terrainData.voxels;
+
+  const analogController = useContinuousAnalogMovement({
+    input: analogInput,
+    authoritativePosition: state.playerPos,
+    movementSpeed: state.movementSpeed ?? 1,
+    surfaceMap: terrainData.surfaceMap,
+    cameraAzimuth: WORLD_CAMERA_AZIMUTH,
+    bounds: { min: 0, max: WORLD_SIZE - 1 },
+    onInputStart: onDirectMove,
+    onRoundedPositionChange: onDirectMove,
+    onMotionEnd: onDirectMove,
+  });
+  const usingAnalogMovement = analogController.hasDirectionalInput || analogController.isMoving;
+  const renderPlayerPos = usingAnalogMovement ? analogController.position : state.playerPos;
+  const playerGridPos = React.useMemo(
+    () => ({
+      x: Math.round(renderPlayerPos.x),
+      y: Math.round(renderPlayerPos.y)
+    }),
+    [renderPlayerPos.x, renderPlayerPos.y]
   );
 
   const worldBuildings = React.useMemo(
@@ -204,37 +213,6 @@ export const WorldScene = ({
     };
   }, []);
 
-  const issueAnalogMove = React.useCallback(() => {
-    if (state.path.length > 1 || analogInput.magnitude < 0.35) return;
-
-    const now = performance.now();
-    if (now - lastPathIssueRef.current < 350) return;
-
-    const screenVertical = -analogInput.y;
-    const worldX = (fixedCameraRightWorldXY.x * analogInput.x) + (fixedCameraForwardWorldXY.x * screenVertical);
-    const worldY = (fixedCameraRightWorldXY.y * analogInput.x) + (fixedCameraForwardWorldXY.y * screenVertical);
-
-    const stepX = worldX > 0.35 ? 1 : worldX < -0.35 ? -1 : 0;
-    const stepY = worldY > 0.35 ? 1 : worldY < -0.35 ? -1 : 0;
-    if (stepX === 0 && stepY === 0) return;
-
-    const nextPos = {
-      x: Math.max(0, Math.min(WORLD_SIZE - 1, Math.round(state.playerPos.x) + stepX * 6)),
-      y: Math.max(0, Math.min(WORLD_SIZE - 1, Math.round(state.playerPos.y) + stepY * 6))
-    };
-
-    if (nextPos.x === Math.round(state.playerPos.x) && nextPos.y === Math.round(state.playerPos.y)) return;
-    lastPathIssueRef.current = now;
-    onMove(nextPos, { ignoreDrag: true });
-  }, [state.path.length, analogInput.magnitude, analogInput.x, analogInput.y, fixedCameraForwardWorldXY.x, fixedCameraForwardWorldXY.y, fixedCameraRightWorldXY.x, fixedCameraRightWorldXY.y, onMove, state.playerPos.x, state.playerPos.y]);
-
-  React.useEffect(() => {
-    if (!analogInput.active || analogInput.magnitude < 0.35 || state.path.length > 1) return;
-    issueAnalogMove();
-    const interval = window.setInterval(issueAnalogMove, 400);
-    return () => window.clearInterval(interval);
-  }, [analogInput.active, analogInput.magnitude, issueAnalogMove, state.path.length]);
-
   return (
     <div className={`flex-1 relative overflow-hidden transition-colors duration-1000 ${isNight ? 'bg-slate-950' : 'bg-slate-200'} cursor-crosshair`}>
       <VoxelWorldContainer 
@@ -242,15 +220,18 @@ export const WorldScene = ({
         buildings={worldBuildings}
         npcs={state.npcs}
         time={state.time}
-        playerPos={state.playerPos}
-        isMoving={state.path.length > 0}
-        targetPos={state.targetPos}
-        path={state.path}
+        playerPos={renderPlayerPos}
+        isMoving={usingAnalogMovement || state.path.length > 0}
+        targetPos={usingAnalogMovement ? null : state.targetPos}
+        path={usingAnalogMovement ? [] : state.path}
         recenterTrigger={recenterTrigger}
         onStateChange={noopStateChange}
         onCountChange={noopCountChange}
         onHoverPosition={handleHoverPosition}
         onSelect={handleWorldSelect}
+        showLoadingOverlay={showInitialLoadingOverlay}
+        onReady={onInitialSceneReady}
+        onProgress={onInitialLoadingProgress}
       />
 
       {/* Coordinate Display (debug only) */}

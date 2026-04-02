@@ -18,6 +18,7 @@ import { AnalogStick, AnalogStickVector } from './AnalogStick';
 import { buildWorldTerrainVoxels } from '../utils/worldSurface';
 import { WORLD_SIZE } from '../utils/voxelConstants';
 import { findPath } from '../utils/pathfinding';
+import { useContinuousAnalogMovement } from '../hooks/game/useContinuousAnalogMovement';
 import {
   MINE_WORLD_BUILDINGS,
   MINE_WORLD_ENTRANCE_POS,
@@ -76,16 +77,6 @@ export const MineWorldScene = ({
   onCollectResource: (amount: number) => void;
   onExit: () => void;
 }) => {
-  // ── camera helpers ──────────────────────────────────────────────────────
-  const camRight = React.useMemo(() => ({
-    x:  Math.cos(WORLD_CAMERA_AZIMUTH),
-    y: -Math.sin(WORLD_CAMERA_AZIMUTH),
-  }), []);
-  const camForward = React.useMemo(() => ({
-    x: -Math.sin(WORLD_CAMERA_AZIMUTH),
-    y: -Math.cos(WORLD_CAMERA_AZIMUTH),
-  }), []);
-
   // ── local movement state (independent from global state.playerPos) ──────
   const [playerPos, setPlayerPos] = React.useState<WorldPosition>(MINE_WORLD_ENTRANCE_POS);
   const [path, setPath]           = React.useState<WorldPosition[]>([]);
@@ -105,13 +96,31 @@ export const MineWorldScene = ({
   const [hoverInfo, setHoverInfo]       = React.useState<WorldHoverInfo | null>(null);
   const hoverRafRef = React.useRef<number | null>(null);
   const pendingHoverRef = React.useRef<WorldHoverInfo | null>(null);
-  const lastPathIssueRef = React.useRef<number>(0);
 
   // ── voxels for the mine world terrain ───────────────────────────────────
-  const allVoxels = React.useMemo(
-    () => buildWorldTerrainVoxels(MINE_WORLD_BUILDINGS, WORLD_SIZE).voxels,
+  const terrainData = React.useMemo(
+    () => buildWorldTerrainVoxels(MINE_WORLD_BUILDINGS, WORLD_SIZE),
     []
   );
+  const allVoxels = terrainData.voxels;
+
+  const analogController = useContinuousAnalogMovement({
+    input: analogInput,
+    authoritativePosition: playerPos,
+    movementSpeed: state.movementSpeed ?? 1,
+    surfaceMap: terrainData.surfaceMap,
+    cameraAzimuth: WORLD_CAMERA_AZIMUTH,
+    bounds: { min: 0, max: WORLD_SIZE - 1 },
+    onInputStart: (roundedPos) => {
+      setPath([]);
+      setTargetPos(null);
+      setPlayerPos(roundedPos);
+    },
+    onRoundedPositionChange: setPlayerPos,
+    onMotionEnd: setPlayerPos,
+  });
+  const usingAnalogMovement = analogController.hasDirectionalInput || analogController.isMoving;
+  const currentPlayerPos = usingAnalogMovement ? analogController.position : playerPos;
 
   // ── spawn resource particle animation ──────────────────────────────────
   const spawnParticle = React.useCallback((label: string, color: string) => {
@@ -125,6 +134,10 @@ export const MineWorldScene = ({
     let budget = 0;
     const id = setInterval(() => {
       setPath(prev => {
+        if (usingAnalogMovement) {
+          budget = 0;
+          return prev;
+        }
         if (prev.length === 0) { budget = 0; return prev; }
         budget += Math.max(0.75, (state.movementSpeed ?? 1) * 0.75);
         let cur = playerPos;
@@ -149,38 +162,7 @@ export const MineWorldScene = ({
     }, 70);
     return () => clearInterval(id);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.movementSpeed, playerPos]);
-
-  // ── analog stick movement ────────────────────────────────────────────────
-  const issueAnalogMove = React.useCallback(() => {
-    if (path.length > 1 || analogInput.magnitude < 0.35) return;
-
-    const now = performance.now();
-    if (now - lastPathIssueRef.current < 350) return;
-
-    const sv = -analogInput.y;
-    const wx = camRight.x * analogInput.x + camForward.x * sv;
-    const wy = camRight.y * analogInput.x + camForward.y * sv;
-    const sx = wx > 0.35 ? 1 : wx < -0.35 ? -1 : 0;
-    const sy = wy > 0.35 ? 1 : wy < -0.35 ? -1 : 0;
-    if (sx === 0 && sy === 0) return;
-    const next = {
-      x: Math.max(0, Math.min(WORLD_SIZE - 1, Math.round(playerPos.x) + sx * 6)),
-      y: Math.max(0, Math.min(WORLD_SIZE - 1, Math.round(playerPos.y) + sy * 6)),
-    };
-    if (next.x === Math.round(playerPos.x) && next.y === Math.round(playerPos.y)) return;
-    lastPathIssueRef.current = now;
-    const p = findPath(playerPos, next, MINE_WORLD_BUILDINGS, WORLD_SIZE);
-    setPath(p);
-    setTargetPos(next);
-  }, [analogInput, camForward, camRight, path.length, playerPos]);
-
-  React.useEffect(() => {
-    if (!analogInput.active || analogInput.magnitude < 0.35 || path.length > 1) return;
-    issueAnalogMove();
-    const id = setInterval(issueAnalogMove, 400);
-    return () => clearInterval(id);
-  }, [analogInput.active, analogInput.magnitude, issueAnalogMove, path.length]);
+  }, [playerPos, state.movementSpeed, usingAnalogMovement]);
 
   // ── proximity checks ─────────────────────────────────────────────────────
   React.useEffect(() => {
@@ -190,7 +172,7 @@ export const MineWorldScene = ({
     let found: string | null = null;
     for (const id of Object.keys(MINE_NODE_YIELDS)) {
       const b = MINE_WORLD_BUILDINGS[id];
-      if (b && isNear(playerPos, b.pos, r)) {
+      if (b && isNear(currentPlayerPos, b.pos, r)) {
         found = id;
         break;
       }
@@ -202,16 +184,16 @@ export const MineWorldScene = ({
     const unloadB = MINE_WORLD_BUILDINGS['unloading_zone'];
     const deliverB = MINE_WORLD_BUILDINGS['delivery_zone'];
 
-    if (loadB && isNear(playerPos, loadB.pos, r)) {
+    if (loadB && isNear(currentPlayerPos, loadB.pos, r)) {
       setNearZone('LOADING');
-    } else if (unloadB && isNear(playerPos, unloadB.pos, r)) {
+    } else if (unloadB && isNear(currentPlayerPos, unloadB.pos, r)) {
       setNearZone('UNLOADING');
-    } else if (deliverB && isNear(playerPos, deliverB.pos, r)) {
+    } else if (deliverB && isNear(currentPlayerPos, deliverB.pos, r)) {
       setNearZone('DELIVERY');
     } else {
       setNearZone(null);
     }
-  }, [playerPos]);
+  }, [currentPlayerPos]);
 
   // ── auto-harvest extraction nodes on proximity ─────────────────────────
   React.useEffect(() => {
@@ -292,7 +274,7 @@ export const MineWorldScene = ({
   // ── world click / select ─────────────────────────────────────────────────
   const handleWorldSelect = React.useCallback((target: WorldHoverInfo) => {
     if (target.kind === 'GROUND') {
-      const p = findPath(playerPos, { x: target.x, y: target.y }, MINE_WORLD_BUILDINGS, WORLD_SIZE);
+      const p = findPath(currentPlayerPos, { x: target.x, y: target.y }, MINE_WORLD_BUILDINGS, WORLD_SIZE);
       setPath(p);
       setTargetPos({ x: target.x, y: target.y });
       return;
@@ -301,12 +283,12 @@ export const MineWorldScene = ({
       const building = MINE_WORLD_BUILDINGS[target.id];
       if (building) {
         const dest = { x: building.pos.x, y: building.pos.y + 6 };
-        const p = findPath(playerPos, dest, MINE_WORLD_BUILDINGS, WORLD_SIZE);
+        const p = findPath(currentPlayerPos, dest, MINE_WORLD_BUILDINGS, WORLD_SIZE);
         setPath(p);
         setTargetPos(dest);
       }
     }
-  }, [playerPos]);
+  }, [currentPlayerPos]);
 
   // ── hover debounce ───────────────────────────────────────────────────────
   const flushHover = React.useCallback(() => {
@@ -361,15 +343,16 @@ export const MineWorldScene = ({
         buildings={MINE_BUILDINGS_LIST}
         npcs={state.npcs}
         time={state.time}
-        playerPos={playerPos}
-        isMoving={path.length > 0}
-        targetPos={targetPos}
-        path={path}
+        playerPos={currentPlayerPos}
+        isMoving={usingAnalogMovement || path.length > 0}
+        targetPos={usingAnalogMovement ? null : targetPos}
+        path={usingAnalogMovement ? [] : path}
         recenterTrigger={recenterTrigger}
         onStateChange={() => {}}
         onCountChange={() => {}}
         onHoverPosition={handleHoverPosition}
         onSelect={handleWorldSelect}
+        showLoadingOverlay={false}
       />
 
       {/* ── Analog stick ────────────────────────────────────────────────── */}

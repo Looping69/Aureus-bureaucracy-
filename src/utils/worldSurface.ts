@@ -242,7 +242,7 @@ export const getWorldSurfaceHeight = (
   position: { x: number; y: number },
   surfaceMap: WorldSurfaceMap
 ) => {
-  const tile = getWorldSurfaceTile(surfaceMap, position.x, position.y);
+  const tile = getWorldSurfaceTile(surfaceMap, Math.round(position.x), Math.round(position.y));
   if (!tile) {
     return CONFIG.FLOOR_Y + 0.5;
   }

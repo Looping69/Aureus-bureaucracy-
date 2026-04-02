@@ -1,8 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface LoadingScreenProps {
   visible: boolean;
+  progress?: number;
+  phase?: string;
 }
 
 const LOADING_PHASES: { threshold: number; text: string }[] = [
@@ -14,31 +16,18 @@ const LOADING_PHASES: { threshold: number; text: string }[] = [
   { threshold: 100, text: 'Access Granted' },
 ];
 
-export const PROGRESS_DURATION_MS = 3000;
 const REVERSED_PHASES = [...LOADING_PHASES].reverse();
 
-export const LoadingScreen: React.FC<LoadingScreenProps> = ({ visible }) => {
-  const [progress, setProgress] = useState(0);
-  const [phase, setPhase] = useState(LOADING_PHASES[0].text);
-
-  useEffect(() => {
-    if (!visible) return;
-
-    const startTime = Date.now();
-
-    const interval = setInterval(() => {
-      const elapsed = Date.now() - startTime;
-      const pct = Math.min(Math.round((elapsed / PROGRESS_DURATION_MS) * 100), 100);
-      setProgress(pct);
-
-      const current = REVERSED_PHASES.find(p => pct >= p.threshold);
-      if (current) setPhase(current.text);
-
-      if (pct >= 100) clearInterval(interval);
-    }, 50);
-
-    return () => clearInterval(interval);
-  }, [visible]);
+export const LoadingScreen: React.FC<LoadingScreenProps> = ({
+  visible,
+  progress = 0,
+  phase,
+}) => {
+  const clampedProgress = Math.max(0, Math.min(100, Math.round(progress)));
+  const resolvedPhase =
+    phase ??
+    REVERSED_PHASES.find((entry) => clampedProgress >= entry.threshold)?.text ??
+    LOADING_PHASES[0].text;
 
   return (
     <AnimatePresence>
@@ -96,17 +85,17 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({ visible }) => {
                 <div className="w-full h-1.5 rounded-full bg-white/10 overflow-hidden">
                   <motion.div
                     className="h-full rounded-full bg-gradient-to-r from-amber-600 via-amber-400 to-amber-300"
-                    style={{ width: `${progress}%` }}
+                    style={{ width: `${clampedProgress}%` }}
                     transition={{ duration: 0.15 }}
                   />
                 </div>
                 {/* Progress text */}
                 <div className="flex justify-between items-center mt-2">
                   <p className="text-[11px] font-mono text-white/50 truncate mr-2">
-                    {phase}
+                    {resolvedPhase}
                   </p>
                   <p className="text-[11px] font-mono text-amber-400/80 tabular-nums shrink-0">
-                    {progress}%
+                    {clampedProgress}%
                   </p>
                 </div>
               </div>
@@ -117,14 +106,14 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({ visible }) => {
               className="border-2 border-dashed border-white/15 rounded-lg px-4 py-2"
               initial={{ opacity: 0, rotate: -6, scale: 0.8 }}
               animate={
-                progress >= 90
+                clampedProgress >= 90
                   ? { opacity: 1, rotate: 0, scale: 1 }
                   : { opacity: 0.3, rotate: -6, scale: 0.8 }
               }
               transition={{ duration: 0.35 }}
             >
               <p className="text-[9px] font-mono uppercase tracking-[0.24em] text-white/30 text-center">
-                {progress >= 100 ? '✓ Clearance Approved' : 'Sector 4 • Extraction Zone'}
+                {clampedProgress >= 100 ? '✓ Clearance Approved' : 'Sector 4 • Extraction Zone'}
               </p>
             </motion.div>
           </div>

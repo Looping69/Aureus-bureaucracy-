@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { GameState, WorldPosition } from '../types';
 import { MinePickerModal } from './MinePickerModal';
 import { MineSceneFallback } from './MineSceneFallback';
+import { LightLoadingOverlay } from './LightLoadingOverlay';
 
 const WorldScene = React.lazy(() =>
   import('./WorldScene').then((module) => ({ default: module.WorldScene }))
@@ -29,6 +30,7 @@ interface GameSceneRouterProps {
   onPointerUp: (e: React.PointerEvent) => void;
   onWheel: (e: React.WheelEvent) => void;
   onMove: (pos: WorldPosition, options?: { ignoreDrag?: boolean }) => void;
+  onDirectMove: (pos: WorldPosition) => void;
   onMine: (tileId: string) => void;
   onMineAction: (action: string) => void;
   onOpenMine: () => void;
@@ -51,7 +53,28 @@ interface GameSceneRouterProps {
   onStartExploration: () => void;
   onTravelTo: (buildingId: string) => void;
   onBackToDirectory: () => void;
+  suppressInitialWorldFallback?: boolean;
+  showInitialWorldLoadingOverlay?: boolean;
+  onInitialWorldReady?: () => void;
+  onInitialWorldLoadingProgress?: (progress: number, phase: string) => void;
+  onInitialSceneMounted?: (scene: GameState['currentScene']) => void;
 }
+
+const SceneMountSignal = ({
+  scene,
+  onMounted
+}: {
+  scene: GameState['currentScene'];
+  onMounted?: (scene: GameState['currentScene']) => void;
+}) => {
+  React.useEffect(() => {
+    onMounted?.(scene);
+    // This signal is intentionally mount-only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return null;
+};
 
 export const GameSceneRouter: React.FC<GameSceneRouterProps> = ({
   state,
@@ -62,6 +85,7 @@ export const GameSceneRouter: React.FC<GameSceneRouterProps> = ({
   onPointerUp,
   onWheel,
   onMove,
+  onDirectMove,
   onMine,
   onMineAction,
   onOpenMine,
@@ -83,13 +107,14 @@ export const GameSceneRouter: React.FC<GameSceneRouterProps> = ({
   onExplorationComplete,
   onStartExploration,
   onTravelTo,
-  onBackToDirectory
+  onBackToDirectory,
+  suppressInitialWorldFallback = false,
+  showInitialWorldLoadingOverlay = true,
+  onInitialWorldReady,
+  onInitialWorldLoadingProgress,
+  onInitialSceneMounted
 }) => {
-  const sceneLoading = (
-    <div className="flex-1 flex items-center justify-center text-xs uppercase tracking-widest text-slate-500 bg-slate-100">
-      Loading Scene...
-    </div>
-  );
+  const sceneLoading = <LightLoadingOverlay />;
 
   return (
     <>
@@ -107,6 +132,7 @@ export const GameSceneRouter: React.FC<GameSceneRouterProps> = ({
             onWheel={onWheel}
           >
             <React.Suspense fallback={sceneLoading}>
+              <SceneMountSignal scene="MINE_WORLD" onMounted={onInitialSceneMounted} />
               <MineWorldScene
                 state={state}
                 onCollectResource={onCollectMineResource}
@@ -124,6 +150,7 @@ export const GameSceneRouter: React.FC<GameSceneRouterProps> = ({
           >
             {state.activeMineId ? (
               <React.Suspense fallback={sceneLoading}>
+                <SceneMountSignal scene="MINE" onMounted={onInitialSceneMounted} />
                 <MineScene
                   state={state}
                   onMine={onMine}
@@ -151,16 +178,21 @@ export const GameSceneRouter: React.FC<GameSceneRouterProps> = ({
             onPointerUp={onPointerUp}
             onWheel={onWheel}
           >
-            <React.Suspense fallback={sceneLoading}>
+            <React.Suspense fallback={suppressInitialWorldFallback ? null : sceneLoading}>
+              <SceneMountSignal scene="WORLD" onMounted={onInitialSceneMounted} />
               <WorldScene
                 state={state}
                 onMove={onMove}
+                onDirectMove={onDirectMove}
                 onInteract={onWorldInteract}
                 onEnterHome={onRest}
                 onEnterMine={onOpenMine}
                 onRecenter={onRecenter}
                 onTravel={onTravel}
                 showDebug={showDebug}
+                showInitialLoadingOverlay={showInitialWorldLoadingOverlay}
+                onInitialSceneReady={onInitialWorldReady}
+                onInitialLoadingProgress={onInitialWorldLoadingProgress}
               />
             </React.Suspense>
           </motion.div>
@@ -173,6 +205,7 @@ export const GameSceneRouter: React.FC<GameSceneRouterProps> = ({
             className="flex-1 flex flex-col overflow-hidden z-50"
           >
             <React.Suspense fallback={sceneLoading}>
+              <SceneMountSignal scene="CITY_PLANNER" onMounted={onInitialSceneMounted} />
               <CityPlanner
                 state={state}
                 onUpdateBuildings={onUpdateBuildings}
@@ -189,6 +222,7 @@ export const GameSceneRouter: React.FC<GameSceneRouterProps> = ({
             className="flex-1 flex flex-col overflow-hidden"
           >
             <React.Suspense fallback={sceneLoading}>
+              <SceneMountSignal scene="OFFICE" onMounted={onInitialSceneMounted} />
               <OfficeScene
                 state={state}
                 onSelectNPC={onSelectNPC}

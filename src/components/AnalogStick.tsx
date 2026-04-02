@@ -30,9 +30,11 @@ export const AnalogStick: React.FC<AnalogStickProps> = ({ onChange, isNight = fa
   const stickRef = React.useRef<HTMLDivElement>(null);
   const activePointerIdRef = React.useRef<number | null>(null);
   const [thumbOffset, setThumbOffset] = React.useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = React.useState(false);
 
   const resetStick = React.useCallback(() => {
     activePointerIdRef.current = null;
+    setIsDragging(false);
     setThumbOffset({ x: 0, y: 0 });
     onChange(IDLE_VECTOR);
   }, [onChange]);
@@ -67,6 +69,7 @@ export const AnalogStick: React.FC<AnalogStickProps> = ({ onChange, isNight = fa
     event.preventDefault();
     event.stopPropagation();
     activePointerIdRef.current = event.pointerId;
+    setIsDragging(true);
     event.currentTarget.setPointerCapture(event.pointerId);
     updateFromPointer(event.clientX, event.clientY);
   };
@@ -114,13 +117,14 @@ export const AnalogStick: React.FC<AnalogStickProps> = ({ onChange, isNight = fa
           }`}
         />
         <div
-          className={`absolute rounded-full border shadow-lg transition-transform ${
+          className={`absolute rounded-full border shadow-lg ${
             isNight ? 'border-white/15 bg-white/20' : 'border-black/10 bg-white/90'
           }`}
           style={{
             width: THUMB_DIAMETER,
             height: THUMB_DIAMETER,
-            transform: `translate(${thumbOffset.x}px, ${thumbOffset.y}px)`
+            transform: `translate(${thumbOffset.x}px, ${thumbOffset.y}px)`,
+            transition: isDragging ? 'none' : 'transform 160ms cubic-bezier(0.22, 1, 0.36, 1)',
           }}
         />
         <div className="pointer-events-none absolute -top-5 left-1/2 -translate-x-1/2 rounded-full bg-black/65 px-2 py-1 text-[9px] font-black uppercase tracking-[0.24em] text-white">
