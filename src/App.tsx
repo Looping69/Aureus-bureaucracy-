@@ -4,7 +4,7 @@ import {
   ShieldAlert,
   X
 } from 'lucide-react';
-import { GameState, WorldPosition, RelationshipFeedback } from './types';
+import { GameState, WorldPosition, RelationshipFeedback, Building } from './types';
 import { INITIAL_NPCS, INITIAL_PERMITS, INITIAL_MINES, BUILDINGS } from './data';
 
 // Components
@@ -161,6 +161,7 @@ export default function App() {
   const pendingActionRef = useRef<{ name: string; startedAt: number } | null>(null);
   const previousSceneRef = useRef<GameState['currentScene'] | null>(null);
   const startupDismissTimerRef = useRef<number | null>(null);
+  const cachedSurfaceMapRef = useRef<{ buildings: Record<string, Building>; map: ReturnType<typeof buildWorldSurfaceMap> } | null>(null);
   const pushNotification = (n: { title: string; msg: string } | null) => {
     if (!n) return;
     setNotification(n);
@@ -467,7 +468,15 @@ export default function App() {
 
       if (sameTile && !shouldClearPath) return prev;
 
-      const surfaceMap = buildWorldSurfaceMap(prev.buildings, WORLD_SIZE);
+      // Reuse cached surface map when buildings haven't changed
+      const cached = cachedSurfaceMapRef.current;
+      const surfaceMap = cached && cached.buildings === prev.buildings
+        ? cached.map
+        : buildWorldSurfaceMap(prev.buildings, WORLD_SIZE);
+      if (!cached || cached.buildings !== prev.buildings) {
+        cachedSurfaceMapRef.current = { buildings: prev.buildings, map: surfaceMap };
+      }
+
       const tile = getWorldSurfaceTile(surfaceMap, pos.x, pos.y);
       if (!tile || !tile.walkable) {
         if (!shouldClearPath) return prev;
