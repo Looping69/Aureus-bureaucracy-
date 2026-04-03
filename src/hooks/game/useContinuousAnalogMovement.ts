@@ -4,12 +4,15 @@ import { WorldSurfaceMap, getWorldSurfaceTile } from '../../utils/worldSurface';
 import { AnalogStickVector } from '../../components/AnalogStick';
 
 const DEADZONE = 0.18;
-const RESPONSE_EXPONENT = 1.35;
-const BASE_MAX_SPEED = 3.75;
-const ACCELERATION = 18;
-const DECELERATION = 22;
+const RESPONSE_EXPONENT = 1.15;
+const BASE_MAX_SPEED = 5.5;
+const ACCELERATION = 28;
+const DECELERATION = 26;
 const STOP_THRESHOLD = 0.02;
-const MAX_FRAME_DELTA = 0.033;
+const MAX_FRAME_DELTA = 0.05;
+// Skip React state updates when position changed by less than this many world-units;
+// VoxelEngine's own 60 fps interpolation smooths the visual gap.
+const POSITION_UPDATE_TOLERANCE = 0.015;
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 
@@ -19,6 +22,9 @@ const roundPosition = (position: WorldPosition): WorldPosition => ({
 });
 
 const positionsEqual = (a: WorldPosition, b: WorldPosition) => a.x === b.x && a.y === b.y;
+
+const positionsNear = (a: WorldPosition, b: WorldPosition, tol: number) =>
+  Math.abs(a.x - b.x) < tol && Math.abs(a.y - b.y) < tol;
 
 const moveToward = (current: number, target: number, maxDelta: number) => {
   if (Math.abs(target - current) <= maxDelta) return target;
@@ -210,7 +216,7 @@ export const useContinuousAnalogMovement = ({
 
       hadControlRef.current = hasControl;
 
-      setPosition((prev) => (positionsEqual(prev, nextPosition) ? prev : nextPosition));
+      setPosition((prev) => (positionsNear(prev, nextPosition, POSITION_UPDATE_TOLERANCE) ? prev : nextPosition));
       setRoundedPosition((prev) => (positionsEqual(prev, roundedPositionRef.current) ? prev : roundedPositionRef.current));
       setHasDirectionalInput((prev) => (prev === hasInput ? prev : hasInput));
       setIsMoving((prev) => (prev === movingNow ? prev : movingNow));
