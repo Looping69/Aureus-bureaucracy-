@@ -10,6 +10,8 @@ const ACCELERATION = 28;
 const DECELERATION = 26;
 const STOP_THRESHOLD = 0.02;
 const MAX_FRAME_DELTA = 0.05;
+// Skip React state updates when position changed by less than this many world-units;
+// VoxelEngine's own 60 fps interpolation smooths the visual gap.
 const POSITION_UPDATE_TOLERANCE = 0.015;
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
