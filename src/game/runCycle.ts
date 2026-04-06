@@ -79,6 +79,12 @@ const getBestMine = (state: GameState) =>
   state.mines.find((mine) => mine.status === 'PROSPECTING' && mine.discovered) ??
   null;
 
+const getPhaseState = (activePriority: number, targetPriority: number): RunCyclePhase['state'] => {
+  if (activePriority === targetPriority) return 'ACTIVE';
+  if (activePriority > targetPriority) return 'READY';
+  return 'LOCKED';
+};
+
 export const getRunCycleSummary = (state: GameState): RunCycleSummary => {
   const permitNeed = getImmediatePermitNeed(state);
   const pendingPermit = hasPendingPermit(state);
@@ -136,11 +142,11 @@ export const getRunCycleSummary = (state: GameState): RunCycleSummary => {
   };
 
   const steps: RunCyclePhase[] = [
-    { id: 'SECURE', label: 'Secure', state: phasePriority[phase] === 0 ? 'ACTIVE' : phasePriority[phase] > 0 ? 'READY' : 'LOCKED' },
-    { id: 'PREPARE', label: 'Prepare', state: phasePriority[phase] === 1 ? 'ACTIVE' : phasePriority[phase] > 1 ? 'READY' : 'LOCKED' },
-    { id: 'EXECUTE', label: 'Execute', state: phasePriority[phase] === 2 ? 'ACTIVE' : phasePriority[phase] > 2 ? 'READY' : 'LOCKED' },
-    { id: 'RESOLVE', label: 'Resolve', state: phasePriority[phase] === 3 ? 'ACTIVE' : phasePriority[phase] > 3 ? 'READY' : 'LOCKED' },
-    { id: 'POLITICAL', label: 'Route', state: phasePriority[phase] === 4 ? 'ACTIVE' : 'LOCKED' }
+    { id: 'SECURE', label: 'Secure', state: getPhaseState(phasePriority[phase], 0) },
+    { id: 'PREPARE', label: 'Prepare', state: getPhaseState(phasePriority[phase], 1) },
+    { id: 'EXECUTE', label: 'Execute', state: getPhaseState(phasePriority[phase], 2) },
+    { id: 'RESOLVE', label: 'Resolve', state: getPhaseState(phasePriority[phase], 3) },
+    { id: 'POLITICAL', label: 'Route', state: getPhaseState(phasePriority[phase], 4) }
   ];
 
   return {
@@ -164,7 +170,7 @@ export const getOperationActions = (state: GameState): OperationActionDefinition
       label: 'Pressure Clerks',
       detail: 'Spend cash to make the bureaucracy care about your file again.',
       costLabel: '$140',
-      effectLabel: 'Bureau Pull 12h, Influence +2',
+      effectLabel: 'Bureau Pull 12 h, Influence +2',
       disabledReason:
         pressureCooldown > 0
           ? `Ready again in ${pressureCooldown}h`

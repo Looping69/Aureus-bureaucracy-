@@ -21,6 +21,10 @@ export interface ExportOptionPreview {
 const BASE_EXPORT_PRICE = 120;
 const LICENSED_EXPORT_BONUS = 40;
 const INFLUENCE_PRICE_FACTOR = 0.002;
+// Strategy modifiers intentionally trade immediate cash against heat and follow-up tempo.
+const QUIET_SALE_PAYOUT_MULTIPLIER = 0.82;
+const REINVEST_SALE_PAYOUT_MULTIPLIER = 0.9;
+const EXPOSE_SALE_PAYOUT_MULTIPLIER = 1.02;
 
 export const hasExportLicense = (state: GameState) =>
   state.permits['export-license']?.status === 'APPROVED';
@@ -48,7 +52,7 @@ const getExportOptionPreview = (
       strategy,
       label: 'Quiet Sale',
       detail: 'Move the ore carefully for less cash but far less heat.',
-      payout: Math.round(oreAmount * unitPrice * 0.82),
+      payout: Math.round(oreAmount * unitPrice * QUIET_SALE_PAYOUT_MULTIPLIER),
       exposureChange: Math.max(0, baseExposure - (hasExportLicense(state) ? 3 : 6)),
       influenceChange: 0,
       effectLabel: 'Low heat payout'
@@ -60,7 +64,7 @@ const getExportOptionPreview = (
       strategy,
       label: 'Reinvest The Haul',
       detail: 'Take a smaller payout and roll the rest into the next cycle.',
-      payout: Math.round(oreAmount * unitPrice * 0.9),
+      payout: Math.round(oreAmount * unitPrice * REINVEST_SALE_PAYOUT_MULTIPLIER),
       exposureChange: Math.max(1, baseExposure - 2),
       influenceChange: 1,
       effectLabel: 'Bureau Pull + 8h, Energy +12'
@@ -72,7 +76,7 @@ const getExportOptionPreview = (
       strategy,
       label: 'Expose The Shipment',
       detail: 'Turn the sale into a public story for influence at the cost of heat.',
-      payout: Math.round(oreAmount * unitPrice * 1.02),
+      payout: Math.round(oreAmount * unitPrice * EXPOSE_SALE_PAYOUT_MULTIPLIER),
       exposureChange: baseExposure + 6,
       influenceChange: 5,
       effectLabel: 'Media Heat + 12h'
