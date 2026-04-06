@@ -279,18 +279,19 @@ export const MineWorldScene = ({
 
       if (unloaded >= totalToUnload) {
         clearInterval(id);
-        // Reward: add to local inventory based on carry type
+        // Reward: add to local inventory and global ore for all types
         const ct = carryType;
         if (ct) {
           setInventory(prev => ({ ...prev, [ct]: prev[ct] + totalToUnload }));
         }
-        // Also deposit directly to global ore for refined metal / gems
+        // Reward global ore for every resource type
+        onCollectResource(totalToUnload);
         if (ct === 'gems') {
-          onCollectResource(totalToUnload);
           spawnParticle(`+${totalToUnload} gems stored`, '#9b59b6');
-        } else if (ct === 'rawOre' || ct === 'coal') {
-          // Raw resources go to local inventory for smelting later
-          spawnParticle(`+${totalToUnload} ${ct === 'rawOre' ? 'ore' : 'coal'} deposited`, '#f59e0b');
+        } else if (ct === 'rawOre') {
+          spawnParticle(`+${totalToUnload} ore stored`, '#f59e0b');
+        } else if (ct === 'coal') {
+          spawnParticle(`+${totalToUnload} coal stored`, '#374151');
         }
         setCarryType(null);
         setIsUnloading(false);
