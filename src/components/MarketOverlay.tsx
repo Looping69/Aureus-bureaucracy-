@@ -107,8 +107,16 @@ export const MarketOverlay: React.FC<MarketOverlayProps> = ({
                     <p className="mt-1 text-xs opacity-75">{option.detail}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-lg font-black text-emerald-700">${option.payout}</p>
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-700">
+                    <p
+                      className="text-lg font-black text-emerald-700"
+                      aria-label={`Sale price ${option.payout} dollars`}
+                    >
+                      ${option.payout}
+                    </p>
+                    <p
+                      className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-700"
+                      aria-label={`Increases exposure by ${option.exposureChange} points`}
+                    >
                       +{option.exposureChange} Heat
                     </p>
                   </div>

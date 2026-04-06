@@ -174,7 +174,7 @@ export const getOperationActions = (state: GameState): OperationActionDefinition
       label: 'Pressure Clerks',
       detail: 'Spend cash to make the bureaucracy care about your file again.',
       costLabel: '$140',
-      effectLabel: 'Bureau Pull 12 h, Influence +2',
+      effectLabel: 'Bureau Pull 12h, Influence +2',
       disabledReason:
         pressureCooldown > 0
           ? `Ready again in ${pressureCooldown}h`
