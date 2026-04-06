@@ -71,8 +71,12 @@ const getImmediatePermitNeed = (state: GameState) =>
     .map((id) => state.permits[id])
     .find((permit) => permit && (permit.status === 'AVAILABLE' || permit.status === 'REJECTED'));
 
-const hasPendingPermit = (state: GameState) =>
-  Object.values(state.permits).some((permit) => permit.status === 'PENDING');
+const hasPendingPermit = (state: GameState) => {
+  for (const permitId of Object.keys(state.permits)) {
+    if (state.permits[permitId]?.status === 'PENDING') return true;
+  }
+  return false;
+};
 
 const getBestMine = (state: GameState) =>
   state.mines.find((mine) => mine.status === 'OPERATIONAL' && mine.discovered) ??

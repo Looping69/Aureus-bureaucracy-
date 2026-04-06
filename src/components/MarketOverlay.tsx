@@ -115,7 +115,11 @@ export const MarketOverlay: React.FC<MarketOverlayProps> = ({
                 </div>
                 <div className="mt-2 flex items-center justify-between text-[10px] font-black uppercase tracking-[0.16em] opacity-60">
                   <span>{option.effectLabel ?? 'Immediate payout'}</span>
-                  <span>{option.influenceChange > 0 ? `+${option.influenceChange} Influence` : 'No influence shift'}</span>
+                  <span>
+                    {option.influenceChange === 0
+                      ? 'No influence shift'
+                      : `${option.influenceChange > 0 ? '+' : ''}${option.influenceChange} Influence`}
+                  </span>
                 </div>
               </button>
             ))}
