@@ -109,6 +109,7 @@ export const MineWorldScene = ({
   const [isWorking, setIsWorking]       = React.useState(false); // pickaxe animation
   const [isUnloading, setIsUnloading]   = React.useState(false); // unload sequence running
   const [unloadProgress, setUnloadProgress] = React.useState(0); // blocks unloaded so far
+  const [unloadTotal, setUnloadTotal]   = React.useState(0);     // total blocks in current unload batch
   /** What resource type the player is currently carrying */
   const [carryType, setCarryType]       = React.useState<'rawOre' | 'coal' | 'gems' | null>(null);
 
@@ -264,9 +265,10 @@ export const MineWorldScene = ({
     if (nearZone !== 'DELIVERY' || carried <= 0 || isUnloading) return;
 
     // Start unload sequence
+    const totalToUnload = carried;
     setIsUnloading(true);
     setUnloadProgress(0);
-    const totalToUnload = carried;
+    setUnloadTotal(totalToUnload);
     let unloaded = 0;
 
     const id = setInterval(() => {
@@ -598,7 +600,7 @@ export const MineWorldScene = ({
                 <span className="text-[9px] text-emerald-300 font-medium ml-1 flex items-center gap-1">
                   unloading…
                   <span className="w-8 h-1 rounded-full bg-white/20 overflow-hidden inline-block">
-                    <span className="block h-full rounded-full bg-emerald-400 transition-all" style={{ width: `${unloadProgress > 0 ? (unloadProgress / (unloadProgress + carried)) * 100 : 0}%` }} />
+                    <span className="block h-full rounded-full bg-emerald-400 transition-all" style={{ width: `${unloadTotal > 0 ? (unloadProgress / unloadTotal) * 100 : 0}%` }} />
                   </span>
                 </span>
               ) : carried > 0 ? (

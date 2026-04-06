@@ -358,7 +358,7 @@ export class VoxelCharacter {
   public setMoving(moving: boolean) {
     if (moving && this.currentState !== CharacterState.WALKING) {
       this.setState(CharacterState.WALKING);
-    } else if (!moving && this.currentState === CharacterState.WALKING) {
+    } else if (!moving && this.currentState !== CharacterState.IDLE && this.currentState !== CharacterState.JUMPING) {
       this.setState(CharacterState.IDLE);
     }
   }
@@ -423,7 +423,7 @@ export class VoxelCharacter {
     this.currentState = newState;
     this.animationTime = 0;
 
-    if (newState === CharacterState.IDLE || newState === CharacterState.WALKING) {
+    if (newState === CharacterState.IDLE) {
       this.leftLeg.rotation.x = 0;
       this.rightLeg.rotation.x = 0;
       this.leftArm.rotation.x = 0;
