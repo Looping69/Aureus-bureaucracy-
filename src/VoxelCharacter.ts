@@ -3,7 +3,8 @@ import * as THREE from 'three';
 export enum CharacterState {
   IDLE,
   WALKING,
-  JUMPING
+  JUMPING,
+  WORKING,
 }
 
 export class VoxelCharacter {
@@ -19,6 +20,16 @@ export class VoxelCharacter {
   private subVoxelSize = 0.1;
   private animationTime = 0;
   private currentState: CharacterState = CharacterState.IDLE;
+
+  /** Visual stack of carried ore blocks on the character's back */
+  private carryStack: THREE.Group;
+  private carriedBlocks: THREE.Mesh[] = [];
+  private _carriedCount = 0;
+
+  /** Maximum blocks this character can carry */
+  public static readonly MAX_CARRY = 6;
+  /** Vertical spacing between stacked blocks */
+  private static readonly CARRY_BLOCK_SPACING = 0.18;
 
   constructor(palette?: { shirt: number; pants: number; hair: number; skin: number; shoes: number; belt: number }) {
     const colors = palette ?? {
@@ -54,6 +65,11 @@ export class VoxelCharacter {
     this.setupPivot(this.rightArm, 0, 0.3, 0);
     this.setupPivot(this.leftLeg, 0, 0.3, 0);
     this.setupPivot(this.rightLeg, 0, 0.3, 0);
+
+    // ── Carry-stack container on the character's back ──────────────────
+    this.carryStack = new THREE.Group();
+    this.carryStack.position.set(0, 0.9, 0.25); // centered on back of torso
+    this.innerGroup.add(this.carryStack);
 
     this.innerGroup.add(this.body, this.head, this.leftArm, this.rightArm, this.leftLeg, this.rightLeg);
   }
@@ -342,9 +358,64 @@ export class VoxelCharacter {
   public setMoving(moving: boolean) {
     if (moving && this.currentState !== CharacterState.WALKING) {
       this.setState(CharacterState.WALKING);
-    } else if (!moving && this.currentState !== CharacterState.IDLE) {
+    } else if (!moving && this.currentState === CharacterState.WALKING) {
       this.setState(CharacterState.IDLE);
     }
+  }
+
+  /** Switch to the WORKING (mining) animation. Call setMoving(false) or setState(IDLE) to stop. */
+  public setWorking(working: boolean) {
+    if (working && this.currentState !== CharacterState.WORKING) {
+      this.setState(CharacterState.WORKING);
+    } else if (!working && this.currentState === CharacterState.WORKING) {
+      this.setState(CharacterState.IDLE);
+    }
+  }
+
+  // ── Carry-stack management ──────────────────────────────────────────────
+
+  /** Set the number of visible ore blocks on the character's back (0..MAX_CARRY). */
+  public setCarriedAmount(count: number) {
+    const n = Math.max(0, Math.min(VoxelCharacter.MAX_CARRY, Math.floor(count)));
+    if (n === this._carriedCount) return;
+
+    // Remove excess blocks
+    while (this.carriedBlocks.length > n) {
+      const block = this.carriedBlocks.pop()!;
+      this.carryStack.remove(block);
+      block.geometry.dispose();
+      (block.material as THREE.MeshStandardMaterial).dispose();
+    }
+
+    // Add missing blocks
+    const oreColors = [0xc87941, 0xe0a840, 0xb07030]; // amber/gold tones
+    while (this.carriedBlocks.length < n) {
+      const i = this.carriedBlocks.length;
+      const color = oreColors[i % oreColors.length];
+      const block = new THREE.Mesh(
+        new THREE.BoxGeometry(0.22, 0.15, 0.18),
+        new THREE.MeshStandardMaterial({ color, metalness: 0.3, roughness: 0.6 }),
+      );
+      block.position.y = i * VoxelCharacter.CARRY_BLOCK_SPACING;
+      block.rotation.y = (i * 0.4); // slight rotation for visual variety
+      block.castShadow = true;
+      this.carryStack.add(block);
+      this.carriedBlocks.push(block);
+    }
+
+    this._carriedCount = n;
+  }
+
+  /** Current number of carried blocks */
+  public getCarriedCount(): number {
+    return this._carriedCount;
+  }
+
+  /** Remove one block from the top of the stack. Returns true if a block was removed. */
+  public removeOneCarried(): boolean {
+    if (this._carriedCount <= 0) return false;
+    this.setCarriedAmount(this._carriedCount - 1);
+    return true;
   }
 
   public setState(newState: CharacterState) {
@@ -352,7 +423,7 @@ export class VoxelCharacter {
     this.currentState = newState;
     this.animationTime = 0;
 
-    if (newState === CharacterState.IDLE) {
+    if (newState === CharacterState.IDLE || newState === CharacterState.WALKING) {
       this.leftLeg.rotation.x = 0;
       this.rightLeg.rotation.x = 0;
       this.leftArm.rotation.x = 0;
@@ -398,6 +469,24 @@ export class VoxelCharacter {
         } else {
           this.setState(CharacterState.IDLE);
         }
+        break;
+      }
+
+      case CharacterState.WORKING: {
+        // Pickaxe-swing animation: right arm swings overhead repeatedly,
+        // left arm braces, slight forward lean, bobbing on strike.
+        const swingSpeed = 6;
+        const phase = this.animationTime * swingSpeed;
+        // Right arm: overhead swing  (range  -0.3 to -1.8 rad)
+        this.rightArm.rotation.x = -0.3 - Math.abs(Math.sin(phase)) * 1.5;
+        // Left arm braces forward slightly
+        this.leftArm.rotation.x = -0.4 + Math.sin(phase * 0.5) * 0.15;
+        // Legs planted, slight bend on strike
+        this.leftLeg.rotation.x = 0.08;
+        this.rightLeg.rotation.x = -0.08;
+        // Body bob on the down-stroke
+        const strike = Math.max(0, Math.sin(phase));
+        this.innerGroup.position.y = -strike * 0.04;
         break;
       }
     }

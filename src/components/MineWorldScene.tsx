@@ -1,16 +1,21 @@
 /**
  * MineWorldScene – a fully walkable 3-D mine environment.
  *
- * The player spawns near the mine entrance and can physically navigate to:
- *   • Extraction nodes (iron ore, coal, gems)  → auto-collect resources
- *   • Loading zone (truck bay)                 → brief loading indicator
- *   • Unloading zone (smelter / crusher)        → auto-smelt (needs ore+coal)
- *   • Delivery zone (storage warehouse)         → auto-deposit refined metal
+ * Gameplay loop:
+ *   1. Walk to an extraction node (ore / coal / gems) → enter WORK ZONE
+ *   2. Stand still in the work zone → character plays pickaxe-swing animation
+ *   3. Resources stack up visually on the character (up to MAX_CARRY)
+ *   4. Walk to the Storage Warehouse (delivery zone) → visual one-by-one unload
+ *   5. After unloading finishes, player is rewarded with that resource
+ *   6. Repeat
+ *
+ * The smelter (unloading zone) still auto-converts raw ore+coal → refined metal
+ * when the player deposits matching raw resources there.
  */
 
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowLeft, Hammer, Package, Flame, Boxes, Zap } from 'lucide-react';
+import { ArrowLeft, Hammer, Package, Flame, Boxes, Zap, Weight } from 'lucide-react';
 import { GameState, WorldHoverInfo, WorldPosition } from '../types';
 import { WORLD_CAMERA_AZIMUTH } from '../VoxelEngine';
 import { VoxelWorldContainer } from './VoxelWorldContainer';
@@ -19,6 +24,7 @@ import { buildWorldTerrainVoxels } from '../utils/worldSurface';
 import { WORLD_SIZE } from '../utils/voxelConstants';
 import { findPath } from '../utils/pathfinding';
 import { useContinuousAnalogMovement } from '../hooks/game/useContinuousAnalogMovement';
+import { VoxelCharacter } from '../VoxelCharacter';
 import {
   MINE_WORLD_BUILDINGS,
   MINE_WORLD_ENTRANCE_POS,
@@ -58,6 +64,13 @@ const SMELT_CHECK_INTERVAL_MS = 2500;
 /** How often (ms) the delivery zone checks for depositable resources */
 const DEPOSIT_CHECK_INTERVAL_MS = 1500;
 
+/** How often (ms) the player mines one unit while standing still in a work zone */
+const WORK_MINE_INTERVAL_MS = 1800;
+/** Maximum number of resource units the player can carry at once */
+const MAX_CARRY = VoxelCharacter.MAX_CARRY;
+/** How long (ms) each block takes to unload at the delivery zone */
+const UNLOAD_BLOCK_INTERVAL_MS = 400;
+
 // ─── helpers ──────────────────────────────────────────────────────────────────
 const isNear = (a: WorldPosition, b: WorldPosition, radius: number) =>
   Math.abs(a.x - b.x) <= radius && Math.abs(a.y - b.y) <= radius;
@@ -91,6 +104,14 @@ export const MineWorldScene = ({
   const [nearNode, setNearNode]         = React.useState<string | null>(null);
   const [nearZone, setNearZone]         = React.useState<'LOADING' | 'UNLOADING' | 'DELIVERY' | null>(null);
 
+  // ── carry state ──────────────────────────────────────────────────────────
+  const [carried, setCarried]           = React.useState(0);    // blocks on back
+  const [isWorking, setIsWorking]       = React.useState(false); // pickaxe animation
+  const [isUnloading, setIsUnloading]   = React.useState(false); // unload sequence running
+  const [unloadProgress, setUnloadProgress] = React.useState(0); // blocks unloaded so far
+  /** What resource type the player is currently carrying */
+  const [carryType, setCarryType]       = React.useState<'rawOre' | 'coal' | 'gems' | null>(null);
+
   const [analogInput, setAnalogInput]   = React.useState<AnalogStickVector>({ x: 0, y: 0, magnitude: 0, active: false });
   const [recenterTrigger, setRecenterTrigger] = React.useState(0);
   const [hoverInfo, setHoverInfo]       = React.useState<WorldHoverInfo | null>(null);
@@ -121,6 +142,7 @@ export const MineWorldScene = ({
   });
   const usingAnalogMovement = analogController.hasDirectionalInput || analogController.isMoving;
   const currentPlayerPos = usingAnalogMovement ? analogController.position : playerPos;
+  const playerIsMoving = usingAnalogMovement || path.length > 0;
 
   // ── spawn resource particle animation ──────────────────────────────────
   const spawnParticle = React.useCallback((label: string, color: string) => {
@@ -195,36 +217,90 @@ export const MineWorldScene = ({
     }
   }, [currentPlayerPos]);
 
-  // ── auto-harvest extraction nodes on proximity ─────────────────────────
+  // ── WORK-ZONE MINING: stand near node + not moving → mine one block at a time ─
   React.useEffect(() => {
-    if (!nearNode) return;
-    const tryHarvest = () => {
-      const ns = nodeStates[nearNode];
-      const ready = !ns || (Date.now() - ns.lastHarvested >= NODE_HARVEST_COOLDOWN_MS);
-      if (!ready) return;
-      const yieldAmt = MINE_NODE_YIELDS[nearNode] ?? 1;
-      // Add to local mine inventory based on node type
-      setInventory(prev => {
-        switch (nearNode) {
-          case 'ore_node':  return { ...prev, rawOre: prev.rawOre + yieldAmt };
-          case 'coal_node': return { ...prev, coal:   prev.coal   + yieldAmt };
-          case 'gem_node':  return { ...prev, gems:   prev.gems   + yieldAmt };
-          default:          return prev;
-        }
+    // Must be near a node, not moving, and have carry capacity left
+    if (!nearNode || playerIsMoving || carried >= MAX_CARRY) {
+      setIsWorking(false);
+      return;
+    }
+
+    // If already carrying a different resource type, can't mix
+    const nodeResourceType: 'rawOre' | 'coal' | 'gems' =
+      nearNode === 'ore_node' ? 'rawOre' : nearNode === 'coal_node' ? 'coal' : 'gems';
+    if (carryType && carryType !== nodeResourceType && carried > 0) {
+      setIsWorking(false);
+      return;
+    }
+
+    setIsWorking(true);
+
+    const tryMine = () => {
+      setCarried(prev => {
+        if (prev >= MAX_CARRY) return prev;
+        const info = nodeInfo(nearNode);
+        spawnParticle(`+1 ${info.label}`, info.hex);
+        setCarryType(nodeResourceType);
+        return prev + 1;
       });
-      setNodeStates(prev => ({ ...prev, [nearNode]: { lastHarvested: Date.now() } }));
-      // Spawn flying particle
-      const info = nodeInfo(nearNode);
-      spawnParticle(`+${yieldAmt} ${info.label}`, info.hex);
     };
-    // Harvest immediately, then repeat while standing near
-    tryHarvest();
-    const id = setInterval(tryHarvest, NODE_HARVEST_COOLDOWN_MS + HARVEST_CHECK_BUFFER_MS);
+
+    // Mine immediately, then repeat while standing
+    tryMine();
+    const id = setInterval(tryMine, WORK_MINE_INTERVAL_MS);
     return () => clearInterval(id);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nearNode, spawnParticle]);
+  }, [nearNode, playerIsMoving, carried, carryType, spawnParticle]);
 
-  // ── auto-smelt at unloading zone (requires rawOre + coal) ──────────────
+  // Stop working when player moves or leaves node
+  React.useEffect(() => {
+    if (playerIsMoving || !nearNode) {
+      setIsWorking(false);
+    }
+  }, [playerIsMoving, nearNode]);
+
+  // ── DELIVERY ZONE: visual one-by-one unload → reward ────────────────────
+  React.useEffect(() => {
+    if (nearZone !== 'DELIVERY' || carried <= 0 || isUnloading) return;
+
+    // Start unload sequence
+    setIsUnloading(true);
+    setUnloadProgress(0);
+    const totalToUnload = carried;
+    let unloaded = 0;
+
+    const id = setInterval(() => {
+      unloaded++;
+      setCarried(prev => Math.max(0, prev - 1));
+      setUnloadProgress(unloaded);
+      spawnParticle(`-1 unloaded`, '#10b981');
+
+      if (unloaded >= totalToUnload) {
+        clearInterval(id);
+        // Reward: add to local inventory based on carry type
+        const ct = carryType;
+        if (ct) {
+          setInventory(prev => ({ ...prev, [ct]: prev[ct] + totalToUnload }));
+        }
+        // Also deposit directly to global ore for refined metal / gems
+        if (ct === 'gems') {
+          onCollectResource(totalToUnload);
+          spawnParticle(`+${totalToUnload} gems stored`, '#9b59b6');
+        } else if (ct === 'rawOre' || ct === 'coal') {
+          // Raw resources go to local inventory for smelting later
+          spawnParticle(`+${totalToUnload} ${ct === 'rawOre' ? 'ore' : 'coal'} deposited`, '#f59e0b');
+        }
+        setCarryType(null);
+        setIsUnloading(false);
+        setUnloadProgress(0);
+      }
+    }, UNLOAD_BLOCK_INTERVAL_MS);
+
+    return () => clearInterval(id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nearZone, carried, isUnloading, carryType, spawnParticle, onCollectResource]);
+
+  // ── auto-smelt at unloading zone (requires rawOre + coal from inventory) ──
   React.useEffect(() => {
     if (nearZone !== 'UNLOADING') return;
     const trySmelt = () => {
@@ -246,26 +322,20 @@ export const MineWorldScene = ({
     return () => clearInterval(id);
   }, [nearZone, spawnParticle]);
 
-  // ── auto-deposit at delivery zone → global state ──────────────────────
+  // ── auto-deposit refined metal at delivery zone → global state ──────────
   React.useEffect(() => {
     if (nearZone !== 'DELIVERY') return;
     const tryDeposit = () => {
       setInventory(prev => {
         if (prev.refinedMetal > 0) {
           onCollectResource(prev.refinedMetal);
-          spawnParticle(`+${prev.refinedMetal} stored`, '#10b981');
+          spawnParticle(`+${prev.refinedMetal} metal stored`, '#10b981');
           return { ...prev, refinedMetal: 0 };
-        }
-        // Also deposit raw gems directly (no smelting needed)
-        if (prev.gems > 0) {
-          onCollectResource(prev.gems);
-          spawnParticle(`+${prev.gems} gems stored`, '#9b59b6');
-          return { ...prev, gems: 0 };
         }
         return prev;
       });
     };
-    tryDeposit();
+    // Give the unload sequence time to finish first
     const id = setInterval(tryDeposit, DEPOSIT_CHECK_INTERVAL_MS);
     return () => clearInterval(id);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -324,15 +394,6 @@ export const MineWorldScene = ({
     }
   };
 
-  // ── cooldown remaining helper ──────────────────────────────────────────
-  const cooldownPct = (nodeId: string) => {
-    const ns = nodeStates[nodeId];
-    if (!ns) return 0;
-    const elapsed = Date.now() - ns.lastHarvested;
-    if (elapsed >= NODE_HARVEST_COOLDOWN_MS) return 0;
-    return Math.round(100 - (elapsed / NODE_HARVEST_COOLDOWN_MS) * 100);
-  };
-
   // ── render ────────────────────────────────────────────────────────────────
   return (
     <div className={`flex-1 relative overflow-hidden transition-colors duration-1000 ${isNight ? 'bg-slate-950' : 'bg-stone-800'} cursor-crosshair`}>
@@ -344,7 +405,7 @@ export const MineWorldScene = ({
         npcs={state.npcs}
         time={state.time}
         playerPos={currentPlayerPos}
-        isMoving={usingAnalogMovement || path.length > 0}
+        isMoving={playerIsMoving}
         targetPos={usingAnalogMovement ? null : targetPos}
         path={usingAnalogMovement ? [] : path}
         recenterTrigger={recenterTrigger}
@@ -353,6 +414,8 @@ export const MineWorldScene = ({
         onHoverPosition={handleHoverPosition}
         onSelect={handleWorldSelect}
         showLoadingOverlay={false}
+        playerWorking={isWorking}
+        playerCarried={carried}
       />
 
       {/* ── Analog stick ────────────────────────────────────────────────── */}
@@ -378,32 +441,50 @@ export const MineWorldScene = ({
         Leave
       </button>
 
-      {/* ── Resource HUD (carried inventory) ─────────────────────────────── */}
-      <div className="absolute top-3 right-3 z-[200] flex items-center gap-1.5 rounded-full bg-black/70 px-2.5 py-1.5 text-[10px] font-bold text-white shadow-lg backdrop-blur-sm">
-        {inventory.rawOre > 0 && (
-          <span className="flex items-center gap-0.5 text-amber-300">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />{inventory.rawOre}
+      {/* ── Resource HUD (carried + depot inventory) ─────────────────────── */}
+      <div className="absolute top-3 right-3 z-[200] flex flex-col gap-1.5 items-end">
+        {/* Carry bar */}
+        <div className="flex items-center gap-1.5 rounded-full bg-black/70 px-2.5 py-1.5 text-[10px] font-bold text-white shadow-lg backdrop-blur-sm">
+          <Weight size={10} className="text-amber-300" />
+          <span className="text-amber-200">{carried}/{MAX_CARRY}</span>
+          {/* Small capacity bar */}
+          <div className="w-12 h-1.5 rounded-full bg-white/20 overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-300 ${carried >= MAX_CARRY ? 'bg-red-400' : 'bg-amber-400'}`}
+              style={{ width: `${(carried / MAX_CARRY) * 100}%` }}
+            />
+          </div>
+          {carryType && (
+            <span className="text-white/60 text-[9px] uppercase">{carryType === 'rawOre' ? 'ore' : carryType}</span>
+          )}
+        </div>
+        {/* Depot inventory */}
+        <div className="flex items-center gap-1.5 rounded-full bg-black/70 px-2.5 py-1.5 text-[10px] font-bold text-white shadow-lg backdrop-blur-sm">
+          {inventory.rawOre > 0 && (
+            <span className="flex items-center gap-0.5 text-amber-300">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />{inventory.rawOre}
+            </span>
+          )}
+          {inventory.coal > 0 && (
+            <span className="flex items-center gap-0.5 text-gray-300">
+              <span className="w-1.5 h-1.5 rounded-full bg-gray-500 inline-block" />{inventory.coal}
+            </span>
+          )}
+          {inventory.gems > 0 && (
+            <span className="flex items-center gap-0.5 text-purple-300">
+              <span className="w-1.5 h-1.5 rounded-full bg-purple-400 inline-block" />{inventory.gems}
+            </span>
+          )}
+          {inventory.refinedMetal > 0 && (
+            <span className="flex items-center gap-0.5 text-yellow-200">
+              <Zap size={10} />{inventory.refinedMetal}
+            </span>
+          )}
+          <span className="text-white/40">|</span>
+          <span className="flex items-center gap-0.5 text-emerald-300">
+            <Boxes size={10} />{state.ore}
           </span>
-        )}
-        {inventory.coal > 0 && (
-          <span className="flex items-center gap-0.5 text-gray-300">
-            <span className="w-1.5 h-1.5 rounded-full bg-gray-500 inline-block" />{inventory.coal}
-          </span>
-        )}
-        {inventory.gems > 0 && (
-          <span className="flex items-center gap-0.5 text-purple-300">
-            <span className="w-1.5 h-1.5 rounded-full bg-purple-400 inline-block" />{inventory.gems}
-          </span>
-        )}
-        {inventory.refinedMetal > 0 && (
-          <span className="flex items-center gap-0.5 text-yellow-200">
-            <Zap size={10} />{inventory.refinedMetal}
-          </span>
-        )}
-        <span className="text-white/40">|</span>
-        <span className="flex items-center gap-0.5 text-emerald-300">
-          <Boxes size={10} />{state.ore}
-        </span>
+        </div>
       </div>
 
       {/* ── Flying resource particles ────────────────────────────────────── */}
@@ -430,7 +511,7 @@ export const MineWorldScene = ({
 
       {/* ── Compact floating labels (near buildings) ─────────────────────── */}
       <AnimatePresence>
-        {/* Extraction node: compact tag */}
+        {/* Extraction node: working status */}
         {nearNode && (
           <motion.div
             key="node-tag"
@@ -441,15 +522,20 @@ export const MineWorldScene = ({
           >
             {(() => {
               const info = nodeInfo(nearNode);
-              const cd = cooldownPct(nearNode);
               return (
                 <div className="flex items-center gap-1.5 rounded-full bg-black/80 pl-1.5 pr-2.5 py-1 shadow-lg backdrop-blur-sm">
                   <div className={`rounded-full ${info.color} p-1 text-white`}>{info.icon}</div>
                   <span className="text-[10px] font-bold text-white">{MINE_WORLD_BUILDINGS[nearNode]?.name ?? info.label}</span>
-                  {cd > 0 ? (
-                    <span className="text-[9px] text-amber-300 font-medium ml-1">⏳ {cd}%</span>
+                  {isWorking ? (
+                    <span className="text-[9px] text-emerald-300 font-medium ml-1">⛏ mining…</span>
+                  ) : carried >= MAX_CARRY ? (
+                    <span className="text-[9px] text-red-300 font-medium ml-1">full – go unload!</span>
+                  ) : playerIsMoving ? (
+                    <span className="text-[9px] text-amber-300 font-medium ml-1">stop to mine</span>
+                  ) : carryType && carryType !== (nearNode === 'ore_node' ? 'rawOre' : nearNode === 'coal_node' ? 'coal' : 'gems') ? (
+                    <span className="text-[9px] text-red-300 font-medium ml-1">unload first</span>
                   ) : (
-                    <span className="text-[9px] text-emerald-300 font-medium ml-1">✓ ready</span>
+                    <span className="text-[9px] text-amber-300 font-medium ml-1">stand still…</span>
                   )}
                 </div>
               );
@@ -496,7 +582,7 @@ export const MineWorldScene = ({
           </motion.div>
         )}
 
-        {/* Delivery: compact tag */}
+        {/* Delivery: unload status */}
         {nearZone === 'DELIVERY' && (
           <motion.div
             key="deliver-tag"
@@ -508,8 +594,17 @@ export const MineWorldScene = ({
             <div className="flex items-center gap-1.5 rounded-full bg-black/80 pl-1.5 pr-2.5 py-1 shadow-lg backdrop-blur-sm">
               <div className="rounded-full bg-emerald-600 p-1 text-white"><Boxes size={10} /></div>
               <span className="text-[10px] font-bold text-white">Warehouse</span>
-              {inventory.refinedMetal > 0 || inventory.gems > 0 ? (
-                <span className="text-[9px] text-emerald-300 font-medium ml-1">✓ storing</span>
+              {isUnloading ? (
+                <span className="text-[9px] text-emerald-300 font-medium ml-1 flex items-center gap-1">
+                  unloading…
+                  <span className="w-8 h-1 rounded-full bg-white/20 overflow-hidden inline-block">
+                    <span className="block h-full rounded-full bg-emerald-400 transition-all" style={{ width: `${unloadProgress > 0 ? (unloadProgress / (unloadProgress + carried)) * 100 : 0}%` }} />
+                  </span>
+                </span>
+              ) : carried > 0 ? (
+                <span className="text-[9px] text-emerald-300 font-medium ml-1">✓ ready to unload</span>
+              ) : inventory.refinedMetal > 0 ? (
+                <span className="text-[9px] text-emerald-300 font-medium ml-1">✓ storing metal</span>
               ) : (
                 <span className="text-[9px] text-white/40 font-medium ml-1">nothing to deposit</span>
               )}

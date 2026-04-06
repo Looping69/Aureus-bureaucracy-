@@ -23,6 +23,10 @@ interface VoxelWorldProps {
   showLoadingOverlay?: boolean;
   onReady?: () => void;
   onProgress?: (progress: number, phase: string) => void;
+  /** When true the player character plays the WORKING (pickaxe-swing) animation */
+  playerWorking?: boolean;
+  /** Number of ore blocks visually stacked on the player's back (0..MAX_CARRY) */
+  playerCarried?: number;
 }
 
 export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({ 
@@ -41,7 +45,9 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
   onSelect,
   showLoadingOverlay = true,
   onReady,
-  onProgress
+  onProgress,
+  playerWorking,
+  playerCarried
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<VoxelEngine | null>(null);
@@ -222,6 +228,23 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
       );
     }
   }, [onStateChange, onCountChange, onHoverPosition, onSelect]);
+
+  // ── Drive player WORKING animation from prop ────────────────────────────
+  useEffect(() => {
+    if (!engineRef.current) return;
+    const player = engineRef.current.entities.player;
+    if (playerWorking) {
+      player.setWorking(true);
+    } else {
+      player.setWorking(false);
+    }
+  }, [playerWorking]);
+
+  // ── Drive visual carry-stack from prop ──────────────────────────────────
+  useEffect(() => {
+    if (!engineRef.current) return;
+    engineRef.current.entities.player.setCarriedAmount(playerCarried ?? 0);
+  }, [playerCarried]);
 
   return (
     <div ref={containerRef} className="w-full h-full relative">
