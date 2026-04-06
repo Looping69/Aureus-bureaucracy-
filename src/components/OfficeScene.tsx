@@ -4,6 +4,8 @@ import { ChevronRight, Stamp, MapPin, Building2 } from 'lucide-react';
 import { OfficeExploration } from './OfficeExploration';
 import { PoliticalPositionPanel } from './PoliticalPositionPanel';
 import { ProgressGuide } from './ProgressGuide';
+import { RunCyclePanel } from './RunCyclePanel';
+import { OperationActionId } from '../game/runCycle';
 
 export const OfficeScene = ({ 
   state, 
@@ -14,7 +16,8 @@ export const OfficeScene = ({
   onExplorationComplete,
   onStartExploration,
   onTravelTo,
-  onBackToDirectory
+  onBackToDirectory,
+  onOperationAction
 }: { 
   state: GameState, 
   onSelectNPC: (id: string) => void,
@@ -24,7 +27,8 @@ export const OfficeScene = ({
   onExplorationComplete: () => void,
   onStartExploration: () => void,
   onTravelTo: (buildingId: string) => void,
-  onBackToDirectory: () => void
+  onBackToDirectory: () => void,
+  onOperationAction: (actionId: OperationActionId) => void
 }) => {
   // If we are in a specific building, show that building's view
   if (state.activeBuildingId) {
@@ -44,10 +48,11 @@ export const OfficeScene = ({
     }
 
     // Otherwise show Building Dashboard (NPCs, Actions)
-    return (
-      <div className="flex-1 overflow-auto p-4 flex flex-col gap-6 bg-slate-50">
-        <ProgressGuide state={state} />
-        <PoliticalPositionPanel state={state} />
+      return (
+        <div className="flex-1 overflow-auto p-4 flex flex-col gap-6 bg-slate-50">
+          <ProgressGuide state={state} />
+          <RunCyclePanel state={state} onOperationAction={onOperationAction} />
+          <PoliticalPositionPanel state={state} />
 
         <div className="flex items-center justify-between mb-2">
           <button 
@@ -162,6 +167,7 @@ export const OfficeScene = ({
   return (
     <div className="flex-1 overflow-auto p-4 flex flex-col gap-6 bg-slate-100">
       <ProgressGuide state={state} />
+      <RunCyclePanel state={state} onOperationAction={onOperationAction} />
       <PoliticalPositionPanel state={state} />
 
       <div className="flex items-center justify-between">

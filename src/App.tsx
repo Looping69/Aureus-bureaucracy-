@@ -31,7 +31,7 @@ import { applyMineSceneAction, applyMineTileInteraction } from './game/actions/m
 import { applyMiniGameCompletion, applyPermitOverlayAction } from './game/actions/permitActions';
 import { applyFoundItem, applyTakePhoto } from './game/actions/evidenceActions';
 import { applyDialogueSocialConsequences, queueFeedback } from './game/actions/dialogueActions';
-import { applyDailyEconomyTick, applyOreExport, getExportExposureIncrease, getOreUnitPrice, hasExportLicense } from './game/economy';
+import { applyDailyEconomyTick, applyOreExport, getExportExposureIncrease, getExportOptions, getOreUnitPrice, hasExportLicense } from './game/economy';
 import { applyExhaustionCollapse } from './game/exhaustion';
 import { clearSavedGameState, hasSavedGameState, loadSavedGameState, saveGameState } from './game/save';
 import { useBuildingDiscovery } from './hooks/game/useBuildingDiscovery';
@@ -43,6 +43,7 @@ import { useTutorialProgression } from './hooks/game/useTutorialProgression';
 import { useCityEventLoop } from './hooks/game/useCityEventLoop';
 import { getUnlockedEnding } from './game/endings';
 import { EMPTY_WORLD_EFFECTS } from './game/dialogue/worldEffects';
+import { applyOperationAction } from './game/runCycle';
 // --- Main App ---
 
 const NOTIFICATION_AUTO_DISMISS_MS = 2800;
@@ -636,6 +637,15 @@ export default function App() {
     });
   };
 
+  const handleOperationAction = React.useCallback((actionId: Parameters<typeof applyOperationAction>[1]) => {
+    beginTrackedAction(`operation:${actionId}`);
+    setState((prev) => {
+      const result = applyOperationAction(prev, actionId);
+      setNotification(result.notification);
+      return result.nextState;
+    });
+  }, []);
+
   const handleTakePhoto = (itemId: string) => {
     beginTrackedAction(`take_photo:${itemId}`);
     setState(prev => {
@@ -670,7 +680,8 @@ export default function App() {
       unitPrice,
       exposureIncrease: getExportExposureIncrease(state),
       payout: state.ore * unitPrice,
-      licensed: hasExportLicense(state)
+      licensed: hasExportLicense(state),
+      options: getExportOptions(state, state.ore)
     };
   }, [state]);
 
@@ -818,6 +829,7 @@ export default function App() {
           beginTrackedAction('back_to_directory');
           setState(s => ({ ...s, activeBuildingId: null }));
         }}
+        onOperationAction={handleOperationAction}
         suppressInitialWorldFallback={!hasCompletedInitialWorldBoot}
         showInitialWorldLoadingOverlay={false}
         onInitialWorldReady={handleInitialWorldReady}
@@ -934,11 +946,12 @@ export default function App() {
             payout={marketSnapshot.payout}
             exposureIncrease={marketSnapshot.exposureIncrease}
             licensed={marketSnapshot.licensed}
+            options={marketSnapshot.options}
             onClose={() => setShowMarket(false)}
-            onSellAll={() => {
-              beginTrackedAction('export_ore');
+            onSellAll={(strategy) => {
+              beginTrackedAction(`export_ore:${strategy}`);
               setState(s => {
-                const exported = applyOreExport(s, s.ore);
+                const exported = applyOreExport(s, s.ore, strategy);
                 if (exported.notification) {
                   setNotification(exported.notification);
                 }

@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { Coins, ShieldAlert, TrendingUp, X } from 'lucide-react';
+import { ExportOptionPreview, ExportStrategy } from '../game/economy';
 
 interface MarketOverlayProps {
   ore: number;
@@ -8,8 +9,9 @@ interface MarketOverlayProps {
   payout: number;
   exposureIncrease: number;
   licensed: boolean;
+  options: ExportOptionPreview[];
   onClose: () => void;
-  onSellAll: () => void;
+  onSellAll: (strategy: ExportStrategy) => void;
 }
 
 export const MarketOverlay: React.FC<MarketOverlayProps> = ({
@@ -18,6 +20,7 @@ export const MarketOverlay: React.FC<MarketOverlayProps> = ({
   payout,
   exposureIncrease,
   licensed,
+  options,
   onClose,
   onSellAll
 }) => (
@@ -88,13 +91,35 @@ export const MarketOverlay: React.FC<MarketOverlayProps> = ({
             </p>
           </div>
         ) : (
-          <button
-            onClick={onSellAll}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-4 py-4 text-xs font-black uppercase tracking-[0.24em] text-white shadow-xl transition-all hover:bg-emerald-800 active:scale-95"
-          >
-            <TrendingUp size={18} />
-            Sell All Ore
-          </button>
+          <div className="flex flex-col gap-3">
+            {options.map((option) => (
+              <button
+                key={option.strategy}
+                onClick={() => onSellAll(option.strategy)}
+                className="rounded-2xl border border-black/10 bg-white p-4 text-left transition-all hover:border-black hover:bg-black hover:text-white active:scale-[0.98]"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <TrendingUp size={16} />
+                      <span className="text-xs font-black uppercase tracking-[0.22em]">{option.label}</span>
+                    </div>
+                    <p className="mt-1 text-xs opacity-75">{option.detail}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-lg font-black text-emerald-700">${option.payout}</p>
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-700">
+                      +{option.exposureChange} Heat
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-2 flex items-center justify-between text-[10px] font-black uppercase tracking-[0.16em] opacity-60">
+                  <span>{option.effectLabel ?? 'Immediate payout'}</span>
+                  <span>{option.influenceChange > 0 ? `+${option.influenceChange} Influence` : 'No influence shift'}</span>
+                </div>
+              </button>
+            ))}
+          </div>
         )}
       </div>
     </div>

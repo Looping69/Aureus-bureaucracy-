@@ -1,9 +1,21 @@
 import { GameState } from '../types';
-import { isWorldEffectActive } from './dialogue/worldEffects';
+import { extendWorldEffect, isWorldEffectActive } from './dialogue/worldEffects';
 
 export interface DailyEconomyResult {
   nextState: GameState;
   notification?: { title: string; msg: string };
+}
+
+export type ExportStrategy = 'STANDARD' | 'QUIET' | 'REINVEST' | 'EXPOSE';
+
+export interface ExportOptionPreview {
+  strategy: ExportStrategy;
+  label: string;
+  detail: string;
+  payout: number;
+  exposureChange: number;
+  influenceChange: number;
+  effectLabel?: string;
 }
 
 const BASE_EXPORT_PRICE = 120;
@@ -23,7 +35,72 @@ export const getOreUnitPrice = (state: GameState) => {
 export const getExportExposureIncrease = (state: GameState) =>
   Math.max(1, (hasExportLicense(state) ? 4 : 10) - (isWorldEffectActive(state, 'marketInsight') ? 2 : 0));
 
-export const applyOreExport = (state: GameState, oreAmount: number): DailyEconomyResult => {
+const getExportOptionPreview = (
+  state: GameState,
+  oreAmount: number,
+  strategy: ExportStrategy
+): ExportOptionPreview => {
+  const unitPrice = getOreUnitPrice(state);
+  const baseExposure = getExportExposureIncrease(state);
+
+  if (strategy === 'QUIET') {
+    return {
+      strategy,
+      label: 'Quiet Sale',
+      detail: 'Move the ore carefully for less cash but far less heat.',
+      payout: Math.round(oreAmount * unitPrice * 0.82),
+      exposureChange: Math.max(0, baseExposure - (hasExportLicense(state) ? 3 : 6)),
+      influenceChange: 0,
+      effectLabel: 'Low heat payout'
+    };
+  }
+
+  if (strategy === 'REINVEST') {
+    return {
+      strategy,
+      label: 'Reinvest The Haul',
+      detail: 'Take a smaller payout and roll the rest into the next cycle.',
+      payout: Math.round(oreAmount * unitPrice * 0.9),
+      exposureChange: Math.max(1, baseExposure - 2),
+      influenceChange: 1,
+      effectLabel: 'Bureau Pull + 8h, Energy +12'
+    };
+  }
+
+  if (strategy === 'EXPOSE') {
+    return {
+      strategy,
+      label: 'Expose The Shipment',
+      detail: 'Turn the sale into a public story for influence at the cost of heat.',
+      payout: Math.round(oreAmount * unitPrice * 1.02),
+      exposureChange: baseExposure + 6,
+      influenceChange: 5,
+      effectLabel: 'Media Heat + 12h'
+    };
+  }
+
+  return {
+    strategy,
+    label: 'Standard Sale',
+    detail: hasExportLicense(state)
+      ? 'Move ore through the legal channel for the clean default payout.'
+      : 'Take the direct off-book payout and accept the normal exposure hit.',
+    payout: oreAmount * unitPrice,
+    exposureChange: baseExposure,
+    influenceChange: 0
+  };
+};
+
+export const getExportOptions = (state: GameState, oreAmount: number): ExportOptionPreview[] =>
+  (['STANDARD', 'QUIET', 'REINVEST', 'EXPOSE'] as ExportStrategy[]).map((strategy) =>
+    getExportOptionPreview(state, oreAmount, strategy)
+  );
+
+export const applyOreExport = (
+  state: GameState,
+  oreAmount: number,
+  strategy: ExportStrategy = 'STANDARD'
+): DailyEconomyResult => {
   if (oreAmount <= 0) {
     return {
       nextState: state,
@@ -31,26 +108,49 @@ export const applyOreExport = (state: GameState, oreAmount: number): DailyEconom
     };
   }
 
-  const unitPrice = getOreUnitPrice(state);
-  const payout = oreAmount * unitPrice;
-  const exposureIncrease = getExportExposureIncrease(state);
+  const option = getExportOptionPreview(state, oreAmount, strategy);
   const licensed = hasExportLicense(state);
+  const worldEffects =
+    strategy === 'REINVEST'
+      ? extendWorldEffect(state, 'bureauPull', 8)
+      : strategy === 'EXPOSE'
+        ? extendWorldEffect(state, 'mediaHeat', 12)
+        : state.worldEffects;
 
   return {
     nextState: {
       ...state,
-      money: state.money + payout,
+      money: state.money + option.payout,
       ore: Math.max(0, state.ore - oreAmount),
+      energy: strategy === 'REINVEST' ? Math.min(state.maxEnergy, state.energy + 12) : state.energy,
+      worldEffects,
       meters: {
         ...state.meters,
-        exposure: Math.min(100, state.meters.exposure + exposureIncrease)
+        exposure: Math.min(100, state.meters.exposure + option.exposureChange),
+        influence: Math.min(100, state.meters.influence + option.influenceChange)
       }
     },
     notification: {
-      title: licensed ? 'Export Successful' : 'Black-Market Export',
-      msg: licensed
-        ? `Sold ${oreAmount} ore for $${payout} at $${unitPrice}/unit.`
-        : `Sold ${oreAmount} ore off-book for $${payout}. Exposure increased.`
+      title:
+        strategy === 'QUIET'
+          ? 'Quiet Cargo Moved'
+          : strategy === 'REINVEST'
+            ? 'Haul Reinvested'
+            : strategy === 'EXPOSE'
+              ? 'Shipment Exposed'
+              : licensed
+                ? 'Export Successful'
+                : 'Black-Market Export',
+      msg:
+        strategy === 'QUIET'
+          ? `Moved ${oreAmount} ore quietly for $${option.payout}. Lower heat, lower margin.`
+          : strategy === 'REINVEST'
+            ? `Sold ${oreAmount} ore for $${option.payout} and rolled the rest into faster follow-up operations.`
+            : strategy === 'EXPOSE'
+              ? `Sold ${oreAmount} ore for $${option.payout} and turned the shipment into a public pressure play.`
+              : licensed
+                ? `Sold ${oreAmount} ore for $${option.payout} through the legal channel.`
+                : `Sold ${oreAmount} ore off-book for $${option.payout}. Exposure increased.`
     }
   };
 };
