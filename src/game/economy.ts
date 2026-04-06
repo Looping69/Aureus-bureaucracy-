@@ -81,7 +81,7 @@ const getExportOptionPreview = (
 
   return {
     strategy,
-    label: 'Standard Sale',
+    label: 'Sell All Ore',
     detail: hasExportLicense(state)
       ? 'Move ore through the legal channel for the clean default payout.'
       : 'Take the direct off-book payout and accept the normal exposure hit.',
