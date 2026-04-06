@@ -75,6 +75,10 @@ const UNLOAD_BLOCK_INTERVAL_MS = 400;
 const isNear = (a: WorldPosition, b: WorldPosition, radius: number) =>
   Math.abs(a.x - b.x) <= radius && Math.abs(a.y - b.y) <= radius;
 
+/** Map a node id to its carry resource type */
+const nodeToResourceType = (nodeId: string): 'rawOre' | 'coal' | 'gems' =>
+  nodeId === 'ore_node' ? 'rawOre' : nodeId === 'coal_node' ? 'coal' : 'gems';
+
 // All buildings in the mine world (stable reference – never changes)
 const MINE_BUILDINGS_LIST = Object.values(MINE_WORLD_BUILDINGS);
 
@@ -227,8 +231,7 @@ export const MineWorldScene = ({
     }
 
     // If already carrying a different resource type, can't mix
-    const nodeResourceType: 'rawOre' | 'coal' | 'gems' =
-      nearNode === 'ore_node' ? 'rawOre' : nearNode === 'coal_node' ? 'coal' : 'gems';
+    const nodeResourceType = nodeToResourceType(nearNode);
     if (carryType && carryType !== nodeResourceType && carried > 0) {
       setIsWorking(false);
       return;
@@ -535,7 +538,7 @@ export const MineWorldScene = ({
                     <span className="text-[9px] text-red-300 font-medium ml-1">full – go unload!</span>
                   ) : playerIsMoving ? (
                     <span className="text-[9px] text-amber-300 font-medium ml-1">stop to mine</span>
-                  ) : carryType && carryType !== (nearNode === 'ore_node' ? 'rawOre' : nearNode === 'coal_node' ? 'coal' : 'gems') ? (
+                  ) : carryType && carryType !== nodeToResourceType(nearNode) ? (
                     <span className="text-[9px] text-red-300 font-medium ml-1">unload first</span>
                   ) : (
                     <span className="text-[9px] text-amber-300 font-medium ml-1">stand still…</span>
