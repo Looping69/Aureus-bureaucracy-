@@ -3,6 +3,7 @@ import { DollarSign, AlertTriangle, Megaphone, Database, Briefcase, Wrench } fro
 import { GameState } from '../types';
 import { Meter } from './Meter';
 import { getActiveWorldEffects } from '../game/dialogue/worldEffects';
+import { getRunCycleSummary } from '../game/runCycle';
 
 export const Header = ({ state, onOpenUtilities }: { state: GameState; onOpenUtilities: () => void }) => {
   const formatTime = (t: number) => {
@@ -13,6 +14,7 @@ export const Header = ({ state, onOpenUtilities }: { state: GameState; onOpenUti
 
   const isNight = state.time >= 20 || state.time < 6;
   const activeEffects = getActiveWorldEffects(state);
+  const cycle = getRunCycleSummary(state);
 
   return (
     <header className={`p-4 border-b border-black/10 backdrop-blur-md flex flex-col gap-3 transition-all duration-1000 hover:opacity-20 ${isNight ? 'bg-slate-900/40 text-white' : 'bg-white/20 text-black'}`}>
@@ -27,6 +29,8 @@ export const Header = ({ state, onOpenUtilities }: { state: GameState; onOpenUti
             <span className="w-1 h-1 bg-current rounded-full" />
             <span className={isNight ? "text-amber-400" : "text-blue-600"}>{formatTime(state.time)}</span>
             {isNight && <span className="ml-1 text-[8px] text-red-500 animate-pulse">Curfew Active</span>}
+            <span className="w-1 h-1 bg-current rounded-full" />
+            <span className="text-[9px] tracking-[0.18em]">{cycle.title}</span>
           </div>
         </div>
         <div className="flex gap-4 items-center">

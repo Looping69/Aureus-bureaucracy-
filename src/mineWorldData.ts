@@ -38,6 +38,15 @@ const DIRT_BROWN  = '#7c5c3c';
 const PATH_GRAVEL = '#b0a898';
 const SIGNAL_YLW  = '#f59e0b';
 
+// Beacon / indicator colours (vivid, eye-catching)
+const BEACON_ORE     = '#ff8c00';  // bright orange-amber
+const BEACON_COAL    = '#64748b';  // cool slate-grey
+const BEACON_GEM     = '#06b6d4';  // vivid cyan
+const BEACON_SMELTER = '#ef4444';  // hot red
+const BEACON_STORAGE = '#22c55e';  // bright green
+const BEACON_LOADING = '#3b82f6';  // bright blue
+const BEACON_WHITE   = '#fef9c3';  // warm glow cap
+
 // ─── extraction node: iron ore ────────────────────────────────────────────────
 const genOreNode = new BuildingGenerator();
 // Base rocky mound
@@ -51,6 +60,11 @@ genOreNode.addBox( 1, -2, 2,  2, -1, 2, ORE_GOLD);
 genOreNode.addBox(-1,  1, 3,  0,  1, 3, ORE_AMBER);
 // Ground patch
 genOreNode.addBox(-4, -4, 0, 4, 4, 0, DIRT_BROWN);
+// ── Beacon pillar: tall amber column with glowing cap ──
+genOreNode.addBox(4, -4, 1, 4, -4, 8, BEACON_ORE);
+genOreNode.addBox(4, -4, 9, 4, -4, 9, BEACON_WHITE);
+genOreNode.addBox(3, -4, 9, 3, -4, 9, BEACON_ORE);
+genOreNode.addBox(4, -3, 9, 4, -3, 9, BEACON_ORE);
 export const ORE_NODE_VOXELS = genOreNode.getVoxels();
 
 // ─── extraction node: coal ────────────────────────────────────────────────────
@@ -64,6 +78,11 @@ genCoalNode.addBox( 0,  0, 4, 0, 0, 4, METAL_GREY);  // glint
 genCoalNode.addBox(-2,  0, 2, -1,  1, 2, PALE_ROCK);
 genCoalNode.addBox( 1, -2, 1,  2, -1, 1, PALE_ROCK);
 genCoalNode.addBox(-4, -4, 0,  4,  4, 0, DARK_ROCK);
+// ── Beacon pillar: cool slate column with bright cap ──
+genCoalNode.addBox(4, -4, 1, 4, -4, 8, BEACON_COAL);
+genCoalNode.addBox(4, -4, 9, 4, -4, 9, BEACON_WHITE);
+genCoalNode.addBox(3, -4, 9, 3, -4, 9, BEACON_COAL);
+genCoalNode.addBox(4, -3, 9, 4, -3, 9, BEACON_COAL);
 export const COAL_NODE_VOXELS = genCoalNode.getVoxels();
 
 // ─── extraction node: gems ────────────────────────────────────────────────────
@@ -80,6 +99,12 @@ genGemNode.addVoxel( 0,  0, 4, GEM_CYAN);
 genGemNode.addVoxel( 0,  0, 5, GEM_TEAL);
 genGemNode.addVoxel( 1,  1, 4, GEM_PURPLE);
 genGemNode.addBox(-4, -4, 0, 4, 4, 0, DIRT_BROWN);
+// ── Beacon pillar: vivid cyan column with teal/purple accents ──
+genGemNode.addBox(4, -4, 1, 4, -4, 8, BEACON_GEM);
+genGemNode.addBox(4, -4, 9, 4, -4, 9, BEACON_WHITE);
+genGemNode.addVoxel(4, -4, 10, GEM_PURPLE);
+genGemNode.addBox(3, -4, 9, 3, -4, 9, BEACON_GEM);
+genGemNode.addBox(4, -3, 9, 4, -3, 9, BEACON_GEM);
 export const GEM_NODE_VOXELS = genGemNode.getVoxels();
 
 // ─── mine entrance arch ───────────────────────────────────────────────────────
@@ -124,6 +149,10 @@ genLoading.addBox(-6, 5, 1,  6, 5, 2, SIGNAL_YLW);
 // Warning stripes on floor
 genLoading.addBox(-6, 4, 1, -5, 5, 1, SIGNAL_YLW);
 genLoading.addBox( 5, 4, 1,  6, 5, 1, SIGNAL_YLW);
+// ── Beacon: tall blue mast with cross arm ──
+genLoading.addBox(-6, -5, 1, -6, -5, 10, BEACON_LOADING);
+genLoading.addBox(-6, -5, 11, -6, -5, 11, BEACON_WHITE);
+genLoading.addBox(-7, -5, 10, -5, -5, 10, BEACON_LOADING);
 export const LOADING_ZONE_VOXELS = genLoading.getVoxels();
 
 // ─── unloading zone (smelter / crusher) ───────────────────────────────────────
@@ -144,6 +173,13 @@ genUnloading.addBox(-4, 2, 1,  4, 3, 3, METAL_DARK);
 // Warning stripe
 genUnloading.addBox(-6, -5, 1, -5, -5, 2, SIGNAL_YLW);
 genUnloading.addBox( 5, -5, 1,  6, -5, 2, SIGNAL_YLW);
+// ── Beacon: bright red pillar next to chimneys ──
+genUnloading.addBox(-6, -5, 1, -6, -5, 10, BEACON_SMELTER);
+genUnloading.addBox(-6, -5, 11, -6, -5, 11, BEACON_WHITE);
+genUnloading.addBox(-7, -5, 10, -5, -5, 10, BEACON_SMELTER);
+// Furnace glow ring around opening
+genUnloading.addBox(-3,  5, 2,  3,  5, 4, FURNACE_ORG);
+genUnloading.addBox(-3,  5, 5,  3,  5, 5, BEACON_SMELTER);
 export const UNLOADING_ZONE_VOXELS = genUnloading.getVoxels();
 
 // ─── delivery / storage warehouse ─────────────────────────────────────────────
@@ -164,6 +200,11 @@ genDelivery.addBox( 2,  2, 1,  4,  4, 2, COAL_DARK);
 // Signage
 genDelivery.addBox(-3, -7, 3,  3, -7, 4, SIGNAL_YLW);
 genDelivery.addBox(-2, -7, 3,  2, -7, 4, WAREHOUSE);
+// ── Beacon: tall green pillar with flag arm ──
+genDelivery.addBox(-7, -6, 1, -7, -6, 10, BEACON_STORAGE);
+genDelivery.addBox(-7, -6, 11, -7, -6, 11, BEACON_WHITE);
+genDelivery.addBox(-8, -6, 9, -7, -6, 10, BEACON_STORAGE);
+genDelivery.addBox(-8, -6, 10, -8, -6, 11, BEACON_STORAGE);
 export const DELIVERY_ZONE_VOXELS = genDelivery.getVoxels();
 
 // ─── gravel path tile (small square) ─────────────────────────────────────────

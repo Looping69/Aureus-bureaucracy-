@@ -4,6 +4,7 @@ import { GameState, WorldPosition } from '../types';
 import { MinePickerModal } from './MinePickerModal';
 import { MineSceneFallback } from './MineSceneFallback';
 import { LightLoadingOverlay } from './LightLoadingOverlay';
+import { OperationActionId } from '../game/runCycle';
 
 const WorldScene = React.lazy(() =>
   import('./WorldScene').then((module) => ({ default: module.WorldScene }))
@@ -53,6 +54,7 @@ interface GameSceneRouterProps {
   onStartExploration: () => void;
   onTravelTo: (buildingId: string) => void;
   onBackToDirectory: () => void;
+  onOperationAction: (actionId: OperationActionId) => void;
   suppressInitialWorldFallback?: boolean;
   showInitialWorldLoadingOverlay?: boolean;
   onInitialWorldReady?: () => void;
@@ -108,6 +110,7 @@ export const GameSceneRouter: React.FC<GameSceneRouterProps> = ({
   onStartExploration,
   onTravelTo,
   onBackToDirectory,
+  onOperationAction,
   suppressInitialWorldFallback = false,
   showInitialWorldLoadingOverlay = true,
   onInitialWorldReady,
@@ -233,6 +236,7 @@ export const GameSceneRouter: React.FC<GameSceneRouterProps> = ({
                 onStartExploration={onStartExploration}
                 onTravelTo={onTravelTo}
                 onBackToDirectory={onBackToDirectory}
+                onOperationAction={onOperationAction}
               />
             </React.Suspense>
           </motion.div>
