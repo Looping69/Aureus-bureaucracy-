@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import { Pickaxe, Database, Users, ArrowLeft, Search, Lock, ShieldCheck, Radar } from 'lucide-react';
 import { GameState } from '../types';
 import { ProgressGuide } from './ProgressGuide';
+import { RunCyclePanel } from './RunCyclePanel';
 
 export const MineScene = ({ 
   state, 
@@ -33,6 +34,9 @@ export const MineScene = ({
   return (
     <div className="flex-1 overflow-auto p-4 grid-pattern flex flex-col">
       <ProgressGuide state={state} />
+      <div className="mt-3">
+        <RunCyclePanel state={state} />
+      </div>
 
       <div className="mb-6 flex justify-between items-start">
         <button 
