@@ -295,7 +295,11 @@ export const TestingWorldScene = ({
       }
     }, TESTING_UNLOAD_INTERVAL_MS);
 
-    return () => clearInterval(id);
+    return () => {
+      clearInterval(id);
+      // Always reset so a future approach to the depot can trigger a new unload
+      setIsUnloading(false);
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nearDepot, carried, isUnloading, spawnParticle]);
 

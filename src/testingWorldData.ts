@@ -284,5 +284,5 @@ export const LOG_PILE_BUILDINGS: Record<string, Building> = {
   },
 };
 
-/** Deposited-log thresholds to switch between pile stages (1→stage1, 15→stage2, 35→stage3) */
+/** Deposited-log thresholds to switch between pile stages (≥1→stage1, ≥15→stage2, ≥35→stage3) */
 export const LOG_PILE_THRESHOLDS = [1, 15, 35] as const;

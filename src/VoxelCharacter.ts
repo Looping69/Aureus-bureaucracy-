@@ -407,12 +407,14 @@ export class VoxelCharacter {
     const oreColors  = [0xc87941, 0xe0a840, 0xb07030];
     const woodColors = [0x8B4513, 0xA0522D, 0x6B3A2A];
     const colors = this._carriedType === 'wood' ? woodColors : oreColors;
+    const metalness = this._carriedType === 'wood' ? 0.0 : 0.3;
+    const roughness = this._carriedType === 'wood' ? 0.9 : 0.6;
     while (this.carriedBlocks.length < n) {
       const i = this.carriedBlocks.length;
       const color = colors[i % colors.length];
       const block = new THREE.Mesh(
         new THREE.BoxGeometry(0.22, 0.15, 0.18),
-        new THREE.MeshStandardMaterial({ color, metalness: this._carriedType === 'wood' ? 0.0 : 0.3, roughness: this._carriedType === 'wood' ? 0.9 : 0.6 }),
+        new THREE.MeshStandardMaterial({ color, metalness, roughness }),
       );
       block.position.y = i * VoxelCharacter.CARRY_BLOCK_SPACING;
       block.rotation.y = (i * 0.4); // slight rotation for visual variety
