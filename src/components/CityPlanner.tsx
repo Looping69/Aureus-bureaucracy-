@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { GameState, Building, WorldPosition } from '../types';
-import { 
+import {
   LICENSING_OFFICE_VOXELS, 
   UNION_HALL_VOXELS, 
   INSPECTOR_HQ_VOXELS, 
@@ -14,6 +14,13 @@ import {
   SIDEWALK_VOXELS,
   ROAD_VOXELS
 } from '../buildings';
+import {
+  ASSET_BUILDING_A_VOXELS,
+  ASSET_BUILDING_B_VOXELS,
+  ASSET_BUILDING_C_VOXELS,
+  ASSET_BUILDING_D_VOXELS,
+  ASSET_BUILDING_E_VOXELS,
+} from '../assetBuildings';
 import { X, Save, MapPin, Building2, Home, Factory, TreePine, Landmark, Square, MousePointer2 } from 'lucide-react';
 import { Canvas, useThree } from '@react-three/fiber';
 import { OrthographicCamera, MapControls } from '@react-three/drei';
@@ -41,6 +48,12 @@ const BUILDING_TEMPLATES: Partial<Building>[] = [
   { type: 'LANDMARK', name: 'Street Light', voxels: STREET_LIGHT_VOXELS },
   { type: 'LANDMARK', name: 'Sidewalk', voxels: SIDEWALK_VOXELS },
   { type: 'ROAD', name: 'Road', voxels: ROAD_VOXELS },
+  // Imported voxel model buildings
+  { type: 'LANDMARK', name: 'Aureus Tower', voxels: ASSET_BUILDING_A_VOXELS },
+  { type: 'OFFICE', name: 'Commerce Block', voxels: ASSET_BUILDING_B_VOXELS },
+  { type: 'LANDMARK', name: 'Borough Hall', voxels: ASSET_BUILDING_C_VOXELS },
+  { type: 'INDUSTRIAL', name: 'Supply Depot', voxels: ASSET_BUILDING_D_VOXELS },
+  { type: 'HOME', name: 'Staff Quarters', voxels: ASSET_BUILDING_E_VOXELS },
 ];
 
 const WORLD_SCALE = 10;

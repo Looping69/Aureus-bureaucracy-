@@ -2,6 +2,13 @@ import { NPC, Permit, Tile, Building, Mine, DialogueNode, OfficeItem, WorldPosit
 import { extendWorldEffect } from './game/dialogue/worldEffects';
 import { addStoryFlag, addStoryFlags, hasStoryFlag } from './game/dialogue/storyFlags';
 import { PLAYER_HOUSE_VOXELS } from './voxelData';
+import {
+  ASSET_BUILDING_A_VOXELS,
+  ASSET_BUILDING_B_VOXELS,
+  ASSET_BUILDING_C_VOXELS,
+  ASSET_BUILDING_D_VOXELS,
+  ASSET_BUILDING_E_VOXELS,
+} from './assetBuildings';
 import { WORLD_SIZE as SHARED_WORLD_SIZE } from './utils/voxelConstants';
 import { 
   LICENSING_OFFICE_VOXELS, 
@@ -1926,6 +1933,68 @@ const baseBuildings: Record<string, Building> = {
   ),
 
   ...cityStreets,
+
+  // ── Imported voxel model buildings ─────────────────────────────────
+  asset_tower_a: createPlacedBuilding(
+    { x: 0, y: 2 },
+    {
+      id: 'asset_tower_a',
+      npcId: 'none',
+      name: 'Aureus Tower',
+      type: 'LANDMARK',
+      isDiscovered: true,
+      voxels: ASSET_BUILDING_A_VOXELS,
+    },
+    occupiedCityCells
+  ),
+  asset_block_b: createPlacedBuilding(
+    { x: 2, y: 6 },
+    {
+      id: 'asset_block_b',
+      npcId: 'none',
+      name: 'Commerce Block',
+      type: 'OFFICE',
+      isDiscovered: true,
+      voxels: ASSET_BUILDING_B_VOXELS,
+    },
+    occupiedCityCells
+  ),
+  asset_hall_c: createPlacedBuilding(
+    { x: 8, y: 4 },
+    {
+      id: 'asset_hall_c',
+      npcId: 'none',
+      name: 'Borough Hall',
+      type: 'LANDMARK',
+      isDiscovered: true,
+      voxels: ASSET_BUILDING_C_VOXELS,
+    },
+    occupiedCityCells
+  ),
+  asset_depot_d: createPlacedBuilding(
+    { x: 10, y: 4 },
+    {
+      id: 'asset_depot_d',
+      npcId: 'none',
+      name: 'Supply Depot',
+      type: 'INDUSTRIAL',
+      isDiscovered: true,
+      voxels: ASSET_BUILDING_D_VOXELS,
+    },
+    occupiedCityCells
+  ),
+  asset_quarters_e: createPlacedBuilding(
+    { x: 6, y: 3 },
+    {
+      id: 'asset_quarters_e',
+      npcId: 'none',
+      name: 'Staff Quarters',
+      type: 'HOME',
+      isDiscovered: true,
+      voxels: ASSET_BUILDING_E_VOXELS,
+    },
+    occupiedCityCells
+  ),
 };
 
 export const BUILDINGS = normalizeWorldLayout(baseBuildings);
