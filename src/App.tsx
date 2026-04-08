@@ -742,6 +742,14 @@ export default function App() {
     }));
   };
 
+  const handleOpenTesting = () => {
+    beginTrackedAction('enter_testing');
+    setState(s => ({
+      ...s,
+      currentScene: 'TESTING' as const
+    }));
+  };
+
   const handleWorldInteract = (npcId: string, bId: string) => {
     if (npcId !== 'none') {
       beginTrackedAction(`world_interact_npc:${npcId}`);
@@ -810,6 +818,7 @@ export default function App() {
         onUpdateBuildings={(newBuildings) => setState(s => ({ ...s, buildings: newBuildings, currentScene: 'WORLD' }))}
         onClosePlanner={() => setState(s => ({ ...s, currentScene: 'WORLD' }))}
         onReturnMineToWorld={() => setState(s => ({ ...s, currentScene: 'WORLD' }))}
+        onReturnTestingToWorld={() => setState(s => ({ ...s, currentScene: 'WORLD' }))}
         onCollectMineResource={(amount) => {
           beginTrackedAction('mine_world_collect');
           setState(s => ({ ...s, ore: s.ore + amount }));
@@ -863,6 +872,7 @@ export default function App() {
         onToggle={() => setShowNavigationPanel(v => !v)}
         onOpenMine={openMineScene}
         onOpenMineWorld={handleOpenMineWorld}
+        onOpenTesting={handleOpenTesting}
         onOpenWorld={handleOpenWorldScene}
         onOpenOffice={() => {
           beginTrackedAction('open_office');

@@ -176,7 +176,7 @@ export interface GameState {
   objectives: Objective[];
   mines: Mine[];
   activeMineId: string | null;
-  currentScene: 'MINE' | 'MINE_WORLD' | 'OFFICE' | 'WORLD' | 'MENU' | 'CITY_PLANNER';
+  currentScene: 'MINE' | 'MINE_WORLD' | 'OFFICE' | 'WORLD' | 'MENU' | 'CITY_PLANNER' | 'TESTING';
   activeNPCId: string | null;
   activePermitId: string | null;
   activeBuildingId: string | null;
