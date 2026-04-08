@@ -1,5 +1,15 @@
+/**
+ * @module VoxelCharacter
+ * Builds and animates a voxel-art humanoid character using Three.js geometry.
+ *
+ * The character has four animation states (IDLE, WALKING, JUMPING, WORKING) and
+ * supports a visual carry-stack of up to {@link VoxelCharacter.MAX_CARRY} resource
+ * blocks on its back.  Block colours switch between ore (amber/gold) and wood
+ * (brown/sienna) via {@link VoxelCharacter.setCarriedType}.
+ */
 import * as THREE from 'three';
 
+/** Animation states for a {@link VoxelCharacter}. */
 export enum CharacterState {
   IDLE,
   WALKING,
@@ -7,6 +17,12 @@ export enum CharacterState {
   WORKING,
 }
 
+/**
+ * Voxel humanoid character composed of Three.js `BoxGeometry` meshes.
+ *
+ * Create one instance per character (player or NPC), add `group` to the scene,
+ * and call `update(deltaTime)` every animation frame.
+ */
 export class VoxelCharacter {
   public group: THREE.Group;
   private innerGroup: THREE.Group;
@@ -349,6 +365,10 @@ export class VoxelCharacter {
     return group;
   }
 
+  /**
+   * Shifts all children of `group` downward by `y` so that the group origin
+   * acts as a shoulder/hip pivot rather than the geometric centre.
+   */
   private setupPivot(group: THREE.Group, x: number, y: number, z: number) {
     group.children.forEach(child => {
       child.position.y -= y;
@@ -356,6 +376,11 @@ export class VoxelCharacter {
     group.position.y += y;
   }
 
+  /**
+   * Transition to the WALKING state when `moving` is true, or return to IDLE
+   * when `moving` is false (unless already mid-air).
+   * @param moving - Whether the character is currently moving.
+   */
   public setMoving(moving: boolean) {
     if (moving && this.currentState !== CharacterState.WALKING) {
       this.setState(CharacterState.WALKING);
@@ -438,6 +463,11 @@ export class VoxelCharacter {
     return true;
   }
 
+  /**
+   * Immediately transition to a new animation state, resetting `animationTime`
+   * and snapping limb rotations to their resting pose when entering IDLE.
+   * @param newState - The target {@link CharacterState}.
+   */
   public setState(newState: CharacterState) {
     if (this.currentState === newState) return;
     this.currentState = newState;
@@ -452,6 +482,18 @@ export class VoxelCharacter {
     }
   }
 
+  /**
+   * Advance the per-frame animation state machine.
+   *
+   * @param deltaTime - Seconds elapsed since the last frame.
+   *
+   * @remarks
+   * Each {@link CharacterState} drives a different procedural animation:
+   * - **IDLE** – subtle breathing bob and arm sway.
+   * - **WALKING** – sinusoidal leg/arm swing with a vertical bounce.
+   * - **JUMPING** – parabolic rise over 0.5 s, then auto-returns to IDLE.
+   * - **WORKING** – pickaxe-swing: right arm overhead, left arm braced, body dips on strike.
+   */
   public update(deltaTime: number) {
     this.animationTime += deltaTime;
 

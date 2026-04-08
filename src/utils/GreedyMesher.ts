@@ -1,7 +1,24 @@
+/**
+ * @module GreedyMesher
+ * Greedy meshing algorithm that merges coplanar, same-colour voxel faces into
+ * larger quads, dramatically reducing vertex and draw-call counts compared with
+ * naive per-face geometry.
+ *
+ * The algorithm sweeps each of the three axes (X, Y, Z) in both directions,
+ * builds a 2-D mask of exposed face colours for each slice, then greedily
+ * extends each non-zero mask cell into the largest possible rectangle before
+ * emitting a quad and clearing the covered cells.
+ *
+ * Reference: Mikola Lysenko, "Meshing in a Minecraft Game" (2012).
+ */
 import { VoxelData } from '../types';
 import * as THREE from 'three';
 import { CONFIG } from '../utils/voxelConstants';
 
+/**
+ * Raw geometry buffers produced by {@link GreedyMesher.mesh}.
+ * Feed directly into a `THREE.BufferGeometry` with `setAttribute`.
+ */
 interface GreedyMesh {
   positions: number[];
   normals: number[];
@@ -10,6 +27,18 @@ interface GreedyMesh {
 }
 
 export class GreedyMesher {
+  /**
+   * Convert an unordered array of coloured voxels into merged quad geometry.
+   *
+   * @param voxels - Voxel data with integer grid coordinates and packed colour values.
+   * @returns Interleaved float arrays suitable for `THREE.BufferGeometry`.
+   *
+   * @remarks
+   * The algorithm performs **two passes per axis per slice**:
+   * 1. **Mask pass** – detect exposed faces between adjacent voxels.
+   * 2. **Merge pass** – greedily extend each mask cell into the largest
+   *    same-colour rectangle, emit one quad, and zero out the covered cells.
+   */
   public static mesh(voxels: VoxelData[]): GreedyMesh {
     const positions: number[] = [];
     const normals: number[] = [];
@@ -49,6 +78,7 @@ export class GreedyMesher {
     const dims = [width, height, depth];
     
     // For each axis
+    // Sweep all three axes: d=0 → X faces, d=1 → Y faces, d=2 → Z faces
     for (let d = 0; d < 3; d++) {
       let i, j, k, l, w, h;
       let u = (d + 1) % 3;
@@ -61,10 +91,11 @@ export class GreedyMesher {
       q[d] = 1;
 
       // Iterate through the dimension
+      // Two passes per axis: +direction (front) and −direction (back)
       for (let backFace = 0; backFace < 2; ++backFace) {
         for (x[d] = -1; x[d] < dims[d]; ) {
           
-          // Compute mask
+          // --- Mask Pass: find exposed faces for this slice ---
           let n = 0;
           for (x[v] = 0; x[v] < dims[v]; ++x[v]) {
             for (x[u] = 0; x[u] < dims[u]; ++x[u]) {
@@ -100,17 +131,17 @@ export class GreedyMesher {
           
           ++x[d];
           
-          // Generate mesh from mask
+          // --- Merge Pass: extend mask cells into greedy rectangles ---
           n = 0;
           for (j = 0; j < dims[v]; ++j) {
             for (i = 0; i < dims[u]; ) {
               
               const c = mask[n];
               if (c !== 0) {
-                // Compute width
+                // Extend rectangle horizontally (u axis)
                 for (w = 1; c === mask[n + w] && i + w < dims[u]; ++w) {}
                 
-                // Compute height
+                // Extend rectangle vertically (v axis)
                 let done = false;
                 for (h = 1; j + h < dims[v]; ++h) {
                   for (k = 0; k < w; ++k) {
@@ -122,7 +153,7 @@ export class GreedyMesher {
                   if (done) break;
                 }
                 
-                // Add Quad
+                // Emit one quad covering the merged rectangle
                 const min_u = d === 0 ? minY : (d === 1 ? minZ : minX);
                 const min_v = d === 0 ? minZ : (d === 1 ? minX : minY);
                 
@@ -165,7 +196,7 @@ export class GreedyMesher {
                    indices.push(startIdx, startIdx + 2, startIdx + 3);
                 }
   
-                // Zero out mask
+                // Clear merged cells so they aren't processed again
                 for (l = 0; l < h; ++l) {
                   for (k = 0; k < w; ++k) {
                     mask[n + k + l * dims[u]] = 0;
