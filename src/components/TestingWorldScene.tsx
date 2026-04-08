@@ -4,17 +4,19 @@
  *
  * Gathering loop:
  *   1. Walk near a tree node → auto-lock into gathering
- *   2. Every 100 ms → +1 Wood added to inventory, node remaining decremented
+ *   2. Every 100 ms → +1 Wood added to carry stack (up to TESTING_CARRY_MAX)
  *   3. Floating "+1 Wood" feedback per tick
  *   4. Node depletes at 0 remaining and visually disappears
  *   5. Moving or leaving range cancels gathering instantly
+ *   6. Walk to the Log Depot → logs unload one-by-one onto the pile
+ *   7. Log pile stages grow visually as more logs are deposited
  *
  * Uses the same VoxelWorldContainer / VoxelEngine as all other world scenes.
  */
 
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowLeft, MapPin, TreePine, Package } from 'lucide-react';
+import { ArrowLeft, MapPin, TreePine, Package, Weight } from 'lucide-react';
 import { GameState, WorldHoverInfo, WorldPosition } from '../types';
 import { WORLD_CAMERA_AZIMUTH } from '../VoxelEngine';
 import { VoxelWorldContainer } from './VoxelWorldContainer';
@@ -31,6 +33,11 @@ import {
   TESTING_GATHER_INTERVAL_MS,
   TESTING_YIELD_PER_TICK,
   TREE_INITIAL_AMOUNT,
+  LOG_DEPOT_ID,
+  LOG_PILE_BUILDINGS,
+  LOG_PILE_THRESHOLDS,
+  TESTING_CARRY_MAX,
+  TESTING_UNLOAD_INTERVAL_MS,
 } from '../testingWorldData';
 
 // ─── types ────────────────────────────────────────────────────────────────────
@@ -51,8 +58,19 @@ const isNear = (a: WorldPosition, b: WorldPosition, radius: number) =>
 
 let _pid = 0;
 
-// All buildings as a stable list for the voxel renderer
-const ALL_BUILDINGS = Object.values(TESTING_WORLD_BUILDINGS);
+/** Return which log pile stage to show (0 = none, 1/2/3 = small/medium/large) */
+const getLogPileStage = (deposited: number): 0 | 1 | 2 | 3 => {
+  if (deposited < LOG_PILE_THRESHOLDS[0]) return 0;
+  if (deposited < LOG_PILE_THRESHOLDS[1]) return 1;
+  if (deposited < LOG_PILE_THRESHOLDS[2]) return 2;
+  return 3;
+};
+
+// All buildings combined for the voxel renderer (stable reference)
+const ALL_BUILDINGS_BASE = [
+  ...Object.values(TESTING_WORLD_BUILDINGS),
+  ...Object.values(LOG_PILE_BUILDINGS),
+];
 
 // ─── component ────────────────────────────────────────────────────────────────
 export const TestingWorldScene = ({
@@ -67,8 +85,14 @@ export const TestingWorldScene = ({
   const [path, setPath]             = React.useState<WorldPosition[]>([]);
   const [targetPos, setTargetPos]   = React.useState<WorldPosition | null>(null);
 
+  // ── carry / deposit state ─────────────────────────────────────────────
+  /** Logs currently on the player's back (0..TESTING_CARRY_MAX) */
+  const [carried, setCarried]       = React.useState(0);
+  /** Total logs deposited at the depot (persistent – grows each trip) */
+  const [deposited, setDeposited]   = React.useState(0);
+  const [isUnloading, setIsUnloading] = React.useState(false);
+
   // ── gather state ──────────────────────────────────────────────────────
-  const [wood, setWood] = React.useState(0);
   const [nodeStates, setNodeStates] = React.useState<Record<string, ResourceNodeState>>(() => {
     const init: Record<string, ResourceNodeState> = {};
     for (const id of TESTING_TREE_NODES) {
@@ -78,6 +102,7 @@ export const TestingWorldScene = ({
   });
   const [isGathering, setIsGathering]         = React.useState(false);
   const [currentNodeId, setCurrentNodeId]     = React.useState<string | null>(null);
+  const [nearDepot, setNearDepot]             = React.useState(false);
   const [particles, setParticles]             = React.useState<FloatingParticle[]>([]);
 
   // ── analog stick ──────────────────────────────────────────────────────
@@ -87,21 +112,31 @@ export const TestingWorldScene = ({
   const hoverRafRef = React.useRef<number | null>(null);
   const pendingHoverRef = React.useRef<WorldHoverInfo | null>(null);
 
-  // ── build terrain (stable – buildings never change) ───────────────────
-  // Dynamically compute which buildings to show (hide depleted tree nodes)
-  const visibleBuildings = React.useMemo(() => {
-    return ALL_BUILDINGS.filter(b => {
-      const ns = nodeStates[b.id];
-      if (ns && ns.isDepleted) return false;
-      return true;
-    });
-  }, [nodeStates]);
+  // Ref to avoid stale closure in gatherTick – always reflects current carried
+  const carriedRef = React.useRef(carried);
+  React.useEffect(() => { carriedRef.current = carried; }, [carried]);
 
+  // ── build terrain (stable – buildings never change) ───────────────────
   const terrainData = React.useMemo(
     () => buildWorldTerrainVoxels(TESTING_WORLD_BUILDINGS, WORLD_SIZE),
     []
   );
   const allVoxels = terrainData.voxels;
+
+  // ── visible buildings: hide depleted trees + show correct pile stage ──
+  const visibleBuildings = React.useMemo(() => {
+    const pileStage = getLogPileStage(deposited);
+    return ALL_BUILDINGS_BASE.filter(b => {
+      // Hide depleted tree nodes
+      const ns = nodeStates[b.id];
+      if (ns && ns.isDepleted) return false;
+      // Show only the matching log pile stage (0 = none shown)
+      if (b.id === 'log_pile_stage1') return pileStage === 1;
+      if (b.id === 'log_pile_stage2') return pileStage === 2;
+      if (b.id === 'log_pile_stage3') return pileStage === 3;
+      return true;
+    });
+  }, [nodeStates, deposited]);
 
   // ── analog movement ───────────────────────────────────────────────────
   const analogController = useContinuousAnalogMovement({
@@ -162,7 +197,7 @@ export const TestingWorldScene = ({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playerPos, state.movementSpeed, usingAnalogMovement]);
 
-  // ── proximity: detect nearest gatherable node ──────────────────────────
+  // ── proximity: detect nearest gatherable node + depot ─────────────────
   React.useEffect(() => {
     let found: string | null = null;
     for (const nodeId of TESTING_TREE_NODES) {
@@ -175,12 +210,16 @@ export const TestingWorldScene = ({
       }
     }
     setCurrentNodeId(found);
+
+    // Depot proximity
+    const depotB = TESTING_WORLD_BUILDINGS[LOG_DEPOT_ID];
+    setNearDepot(!!(depotB && isNear(currentPlayerPos, depotB.pos, TESTING_GATHER_RANGE)));
   }, [currentPlayerPos, nodeStates]);
 
   // ── GATHER LOOP: the heartbeat ─────────────────────────────────────────
   React.useEffect(() => {
-    // Gate checks: must be near a node, not moving, node not depleted
-    if (!currentNodeId || playerIsMoving) {
+    // Gate: must be near a node, not moving, node not depleted, and carry not full
+    if (!currentNodeId || playerIsMoving || carried >= TESTING_CARRY_MAX) {
       setIsGathering(false);
       return;
     }
@@ -191,10 +230,12 @@ export const TestingWorldScene = ({
       return;
     }
 
-    // Enter gathering state
     setIsGathering(true);
 
     const gatherTick = () => {
+      // Guard via ref to prevent any stale closure over-increment
+      if (carriedRef.current >= TESTING_CARRY_MAX) return;
+
       setNodeStates(prev => {
         const node = prev[currentNodeId];
         if (!node || node.isDepleted || node.remaining <= 0) return prev;
@@ -203,8 +244,8 @@ export const TestingWorldScene = ({
         const newRemaining = node.remaining - amount;
         const depleted = newRemaining <= 0;
 
-        // Add to inventory
-        setWood(w => w + amount);
+        // Stack on player
+        setCarried(c => Math.min(c + amount, TESTING_CARRY_MAX));
 
         // Feedback
         spawnParticle(`+${amount} Wood`, '#5c3a1e');
@@ -224,7 +265,7 @@ export const TestingWorldScene = ({
     const id = setInterval(gatherTick, TESTING_GATHER_INTERVAL_MS);
     return () => clearInterval(id);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentNodeId, playerIsMoving, spawnParticle]);
+  }, [currentNodeId, playerIsMoving, carried, spawnParticle]);
 
   // ── Stop gathering instantly when moving ───────────────────────────────
   React.useEffect(() => {
@@ -232,6 +273,31 @@ export const TestingWorldScene = ({
       setIsGathering(false);
     }
   }, [playerIsMoving]);
+
+  // ── UNLOAD at depot: one-by-one visual unload, logs stack at depot ─────
+  React.useEffect(() => {
+    if (!nearDepot || carried <= 0 || isUnloading) return;
+
+    const totalToUnload = carried;
+    setIsUnloading(true);
+    let unloaded = 0;
+
+    const id = setInterval(() => {
+      unloaded++;
+      setCarried(prev => Math.max(0, prev - 1));
+      setDeposited(prev => prev + 1);
+      spawnParticle('+1 log', '#22c55e');
+
+      if (unloaded >= totalToUnload) {
+        clearInterval(id);
+        setIsUnloading(false);
+        spawnParticle(`${totalToUnload} logs stored! 🪵`, '#22c55e');
+      }
+    }, TESTING_UNLOAD_INTERVAL_MS);
+
+    return () => clearInterval(id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nearDepot, carried, isUnloading, spawnParticle]);
 
   // ── world click / select ──────────────────────────────────────────────
   const handleWorldSelect = React.useCallback((target: WorldHoverInfo) => {
@@ -273,6 +339,7 @@ export const TestingWorldScene = ({
   }, []);
 
   const isNight = state.time >= 20 || state.time < 6;
+  const totalWood = deposited; // total logs deposited at the depot
 
   // ── render ────────────────────────────────────────────────────────────
   return (
@@ -295,6 +362,8 @@ export const TestingWorldScene = ({
         onSelect={handleWorldSelect}
         showLoadingOverlay={false}
         playerWorking={isGathering}
+        playerCarried={carried}
+        playerCarriedType="wood"
       />
 
       {/* ── Analog stick ──────────────────────────────────────────────── */}
@@ -322,55 +391,94 @@ export const TestingWorldScene = ({
 
       {/* ── Wood inventory HUD ───────────────────────────────────────── */}
       <div className="absolute top-3 right-3 z-[200] flex flex-col gap-1.5 items-end">
+        {/* Carry bar */}
         <div className="flex items-center gap-1.5 rounded-full bg-black/70 px-2.5 py-1.5 text-[10px] font-bold text-white shadow-lg backdrop-blur-sm">
-          <TreePine size={12} className="text-amber-400" />
-          <span className="text-amber-200">{wood} Wood</span>
+          <Weight size={10} className="text-amber-300" />
+          <span className="text-amber-200">{carried}/{TESTING_CARRY_MAX}</span>
+          <div className="w-12 h-1.5 rounded-full bg-white/20 overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-300 ${carried >= TESTING_CARRY_MAX ? 'bg-red-400' : 'bg-amber-400'}`}
+              style={{ width: `${(carried / TESTING_CARRY_MAX) * 100}%` }}
+            />
+          </div>
         </div>
 
-        {/* Gather status */}
-        {currentNodeId && (
+        {/* Depot stock */}
+        <div className="flex items-center gap-1.5 rounded-full bg-black/70 px-2.5 py-1.5 text-[10px] font-bold text-white shadow-lg backdrop-blur-sm">
+          <TreePine size={12} className="text-amber-400" />
+          <span className="text-amber-200">{totalWood} stored</span>
+        </div>
+
+        {/* Contextual status */}
+        {(currentNodeId || nearDepot) && (
           <div className="flex items-center gap-1.5 rounded-full bg-black/70 px-2.5 py-1.5 text-[10px] font-bold text-white shadow-lg backdrop-blur-sm">
-            {isGathering ? (
-              <>
-                <span className="text-emerald-300">⛏ Gathering…</span>
-                <span className="text-white/50">
-                  {nodeStates[currentNodeId]?.remaining ?? 0} left
-                </span>
-              </>
-            ) : playerIsMoving ? (
-              <span className="text-amber-300">Stop to gather</span>
-            ) : (
-              <span className="text-amber-300">Stand still…</span>
-            )}
+            {nearDepot && carried > 0 ? (
+              isUnloading ? (
+                <span className="text-emerald-300">📦 Unloading…</span>
+              ) : (
+                <span className="text-emerald-300">📦 Walk here to deposit</span>
+              )
+            ) : currentNodeId ? (
+              isGathering ? (
+                <>
+                  <span className="text-emerald-300">⛏ Gathering…</span>
+                  <span className="text-white/50">
+                    {nodeStates[currentNodeId]?.remaining ?? 0} left
+                  </span>
+                </>
+              ) : carried >= TESTING_CARRY_MAX ? (
+                <span className="text-red-300">Full! Unload at depot</span>
+              ) : playerIsMoving ? (
+                <span className="text-amber-300">Stop to gather</span>
+              ) : (
+                <span className="text-amber-300">Stand still…</span>
+              )
+            ) : null}
           </div>
         )}
       </div>
 
       {/* ── Floating node label ──────────────────────────────────────── */}
       <AnimatePresence>
-        {currentNodeId && (
+        {(currentNodeId || nearDepot) && (
           <motion.div
-            key="node-tag"
+            key={nearDepot ? 'depot-tag' : 'node-tag'}
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 8 }}
             className="absolute left-1/2 -translate-x-1/2 bottom-36 z-[110] pointer-events-none"
           >
-            <div className="flex items-center gap-1.5 rounded-full bg-black/80 pl-1.5 pr-2.5 py-1 shadow-lg backdrop-blur-sm">
-              <div className="rounded-full bg-amber-700 p-1 text-white">
-                <TreePine size={10} />
+            {nearDepot && carried > 0 ? (
+              <div className="flex items-center gap-1.5 rounded-full bg-black/80 pl-1.5 pr-2.5 py-1 shadow-lg backdrop-blur-sm">
+                <div className="rounded-full bg-green-700 p-1 text-white">
+                  <Package size={10} />
+                </div>
+                <span className="text-[10px] font-bold text-white">Log Depot</span>
+                {isUnloading ? (
+                  <span className="text-[9px] text-emerald-300 font-medium ml-1">📦 unloading…</span>
+                ) : (
+                  <span className="text-[9px] text-emerald-300 font-medium ml-1">deposit logs here</span>
+                )}
               </div>
-              <span className="text-[10px] font-bold text-white">
-                {TESTING_WORLD_BUILDINGS[currentNodeId]?.name ?? 'Tree'}
-              </span>
-              {isGathering ? (
-                <span className="text-[9px] text-emerald-300 font-medium ml-1">⛏ gathering…</span>
-              ) : playerIsMoving ? (
-                <span className="text-[9px] text-amber-300 font-medium ml-1">stop to gather</span>
-              ) : (
-                <span className="text-[9px] text-amber-300 font-medium ml-1">stand still…</span>
-              )}
-            </div>
+            ) : currentNodeId ? (
+              <div className="flex items-center gap-1.5 rounded-full bg-black/80 pl-1.5 pr-2.5 py-1 shadow-lg backdrop-blur-sm">
+                <div className="rounded-full bg-amber-700 p-1 text-white">
+                  <TreePine size={10} />
+                </div>
+                <span className="text-[10px] font-bold text-white">
+                  {TESTING_WORLD_BUILDINGS[currentNodeId]?.name ?? 'Tree'}
+                </span>
+                {isGathering ? (
+                  <span className="text-[9px] text-emerald-300 font-medium ml-1">⛏ gathering…</span>
+                ) : carried >= TESTING_CARRY_MAX ? (
+                  <span className="text-[9px] text-red-300 font-medium ml-1">full – go to depot!</span>
+                ) : playerIsMoving ? (
+                  <span className="text-[9px] text-amber-300 font-medium ml-1">stop to gather</span>
+                ) : (
+                  <span className="text-[9px] text-amber-300 font-medium ml-1">stand still…</span>
+                )}
+              </div>
+            ) : null}
           </motion.div>
         )}
       </AnimatePresence>
@@ -397,7 +505,7 @@ export const TestingWorldScene = ({
         ))}
       </AnimatePresence>
 
-      {/* ── Node depletion notice ─────────────────────────────────────── */}
+      {/* ── All-trees-depleted notice ─────────────────────────────────── */}
       <AnimatePresence>
         {TESTING_TREE_NODES.every(id => nodeStates[id]?.isDepleted) && (
           <motion.div
@@ -408,7 +516,7 @@ export const TestingWorldScene = ({
             className="absolute inset-x-4 bottom-40 z-[120] text-center pointer-events-none"
           >
             <div className="inline-block rounded-2xl bg-black/80 px-4 py-2 text-sm font-bold text-amber-200 shadow-xl backdrop-blur-sm">
-              🌲 All trees harvested! Total: {wood} Wood
+              🌲 All trees harvested! Stored: {totalWood} logs
             </div>
           </motion.div>
         )}
