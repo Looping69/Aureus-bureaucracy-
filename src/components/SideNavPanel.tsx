@@ -1,5 +1,5 @@
 import React from 'react';
-import { Briefcase, ChevronLeft, ChevronRight, Mountain, Pickaxe, Store, Users } from 'lucide-react';
+import { Briefcase, ChevronLeft, ChevronRight, FlaskConical, Mountain, Pickaxe, Store, Users } from 'lucide-react';
 import { motion } from 'motion/react';
 import { GameState } from '../types';
 
@@ -9,6 +9,7 @@ interface SideNavPanelProps {
   onToggle: () => void;
   onOpenMine: () => void;
   onOpenMineWorld: () => void;
+  onOpenTesting: () => void;
   onOpenWorld: () => void;
   onOpenOffice: () => void;
   onExport: () => void;
@@ -30,6 +31,7 @@ export const SideNavPanel: React.FC<SideNavPanelProps> = ({
   onToggle,
   onOpenMine,
   onOpenMineWorld,
+  onOpenTesting,
   onOpenWorld,
   onOpenOffice,
   onExport
@@ -49,6 +51,14 @@ export const SideNavPanel: React.FC<SideNavPanelProps> = ({
       icon: Mountain,
       onClick: onOpenMineWorld,
       title: 'Enter the 3-D mine shaft.'
+    },
+    {
+      key: 'testing',
+      label: 'Testing',
+      active: state.currentScene === 'TESTING',
+      icon: FlaskConical,
+      onClick: onOpenTesting,
+      title: 'Enter the testing world.'
     },
     {
       key: 'world',
