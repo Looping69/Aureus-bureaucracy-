@@ -13,6 +13,7 @@ export interface Permit {
   rejectionReason?: string;
   unlocksFeature?: string;
   accuracy?: number;
+  requiresPermits?: string[];
 }
 
 export type DirtType = 'PERMIT_VIOLATION' | 'BACKROOM_DEAL' | 'PERSONAL_SECRET';

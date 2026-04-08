@@ -1,5 +1,5 @@
 import React from 'react';
-import { Briefcase, ChevronLeft, ChevronRight, FlaskConical, Mountain, Pickaxe, Store, Users } from 'lucide-react';
+import { Briefcase, ChevronLeft, ChevronRight, FlaskConical, GitBranch, Mountain, Pickaxe, Store, Users } from 'lucide-react';
 import { motion } from 'motion/react';
 import { GameState } from '../types';
 
@@ -13,6 +13,7 @@ interface SideNavPanelProps {
   onOpenWorld: () => void;
   onOpenOffice: () => void;
   onExport: () => void;
+  onOpenProgression: () => void;
 }
 
 interface NavAction {
@@ -34,7 +35,8 @@ export const SideNavPanel: React.FC<SideNavPanelProps> = ({
   onOpenTesting,
   onOpenWorld,
   onOpenOffice,
-  onExport
+  onExport,
+  onOpenProgression
 }) => {
   const actions: NavAction[] = [
     {
@@ -76,6 +78,13 @@ export const SideNavPanel: React.FC<SideNavPanelProps> = ({
           onClick: onOpenOffice
         }]
       : []),
+    {
+      key: 'progression',
+      label: 'Permits',
+      icon: GitBranch,
+      onClick: onOpenProgression,
+      title: 'View the permit progression map.'
+    },
     {
       key: 'market',
       label: 'Market',

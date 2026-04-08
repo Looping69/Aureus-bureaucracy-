@@ -330,7 +330,8 @@ export const INITIAL_PERMITS: Record<string, Permit> = {
     description: 'Allows for surface-level sampling (up to 10 samples) to determine site viability. Do not extract ore.',
     cost: 150,
     status: 'LOCKED',
-    unlocksFeature: 'mine_access'
+    unlocksFeature: 'mine_access',
+    requiresPermits: ['extraction-intent']
   },
   'mining-permit-iron': {
     id: 'mining-permit-iron',
@@ -339,7 +340,8 @@ export const INITIAL_PERMITS: Record<string, Permit> = {
     description: 'Full operational rights for the Iron Vein Outpost. Compliance with safety regulations mandatory.',
     cost: 500,
     status: 'LOCKED',
-    unlocksFeature: 'iron_mine_full'
+    unlocksFeature: 'iron_mine_full',
+    requiresPermits: ['prospecting-license']
   },
   'prospecting-permit-deep': {
     id: 'prospecting-permit-deep',
@@ -347,7 +349,8 @@ export const INITIAL_PERMITS: Record<string, Permit> = {
     formNumber: 'DH-01',
     description: 'Permission to survey the Deep Hollow region. High danger pay required for inspectors.',
     cost: 300,
-    status: 'LOCKED'
+    status: 'LOCKED',
+    requiresPermits: ['mining-permit-iron']
   },
   'mining-permit-deep': {
     id: 'mining-permit-deep',
@@ -355,7 +358,8 @@ export const INITIAL_PERMITS: Record<string, Permit> = {
     formNumber: 'DH-02',
     description: 'Full mining rights for Deep Hollow. Waiver of liability for "shadow sickness" required.',
     cost: 1200,
-    status: 'LOCKED'
+    status: 'LOCKED',
+    requiresPermits: ['prospecting-permit-deep']
   },
   'prospecting-permit-abyss': {
     id: 'prospecting-permit-abyss',
@@ -363,7 +367,8 @@ export const INITIAL_PERMITS: Record<string, Permit> = {
     formNumber: 'AR-00',
     description: 'Authorization to send probes into the Abyssal Reach. Extreme caution advised.',
     cost: 1000,
-    status: 'LOCKED'
+    status: 'LOCKED',
+    requiresPermits: ['mining-permit-deep']
   },
   'wash-plant-permit': {
     id: 'wash-plant-permit',
@@ -398,7 +403,8 @@ export const INITIAL_PERMITS: Record<string, Permit> = {
     formNumber: 'AR-666',
     description: 'Unrestricted mining access to the Abyssal Reach. God help us all.',
     cost: 5000,
-    status: 'LOCKED'
+    status: 'LOCKED',
+    requiresPermits: ['prospecting-permit-abyss']
   }
 };
 

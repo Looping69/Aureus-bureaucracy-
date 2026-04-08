@@ -21,6 +21,7 @@ import { ActionLogEntry, ActionLogPanel } from './components/ActionLogPanel';
 import { DebugPanel } from './components/DebugPanel';
 import { EndingOverlay } from './components/EndingOverlay';
 import { MarketOverlay } from './components/MarketOverlay';
+import { ProgressionMapOverlay } from './components/ProgressionMapOverlay';
 import { UtilityDrawer } from './components/UtilityDrawer';
 import { SideNavPanel } from './components/SideNavPanel';
 import { getBuildingAccessPosition } from './utils/buildingAccess';
@@ -144,6 +145,7 @@ export default function App() {
   const [notification, setNotification] = useState<{title: string, msg: string} | null>(null);
   const [showMinePicker, setShowMinePicker] = useState(false);
   const [showMarket, setShowMarket] = useState(false);
+  const [showProgressionMap, setShowProgressionMap] = useState(false);
   const [actionLog, setActionLog] = useState<ActionLogEntry[]>([]);
   const [showActionLog, setShowActionLog] = useState(false);
   const [showDebugPanel, setShowDebugPanel] = useState(false);
@@ -881,6 +883,10 @@ export default function App() {
         onExport={() => {
           setShowMarket(true);
         }}
+        onOpenProgression={() => {
+          setShowProgressionMap(true);
+          setShowNavigationPanel(false);
+        }}
       />
 
       <ActionLogPanel
@@ -951,6 +957,16 @@ export default function App() {
           <EndingOverlay
             endingId={state.activeEndingId}
             onClose={() => setState(s => ({ ...s, activeEndingId: null }))}
+          />
+        )}
+        {showProgressionMap && (
+          <ProgressionMapOverlay
+            key="progression-map"
+            permits={state.permits}
+            onClose={() => setShowProgressionMap(false)}
+            onOpenPermit={(id) => {
+              setState(s => ({ ...s, activePermitId: id }));
+            }}
           />
         )}
         {showMarket && (
