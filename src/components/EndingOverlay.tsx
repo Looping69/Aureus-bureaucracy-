@@ -1,3 +1,8 @@
+/**
+ * @module EndingOverlay
+ * Full-screen ending reveal overlay shown when an ending is triggered.
+ * Displays the ending title, narrative text, and consequences.
+ */
 import React from 'react';
 import { motion } from 'motion/react';
 import { Crown, Flag, Skull } from 'lucide-react';

@@ -1,3 +1,9 @@
+/**
+ * @module MineScene
+ * 2-D grid-based mine UI (MINE scene).
+ * Renders the mine grid, lets the player click tiles to extract ore, and
+ * displays stability and yield information per tile.
+ */
 import React from 'react';
 import { motion } from 'motion/react';
 import { Pickaxe, Database, Users, ArrowLeft, Search, Lock, ShieldCheck, Radar } from 'lucide-react';

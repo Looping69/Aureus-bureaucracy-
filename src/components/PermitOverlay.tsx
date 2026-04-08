@@ -1,3 +1,9 @@
+/**
+ * @module PermitOverlay
+ * Permit management overlay.
+ * Lists all permits with their status (LOCKED, AVAILABLE, PENDING, APPROVED, REJECTED)
+ * and lets the player file, fast-track, or view rejection details for each.
+ */
 import React from 'react';
 import { motion } from 'motion/react';
 import { X, Stamp, FileText, Zap } from 'lucide-react';

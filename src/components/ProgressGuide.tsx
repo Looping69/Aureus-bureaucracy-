@@ -1,3 +1,8 @@
+/**
+ * @module ProgressGuide
+ * Contextual guidance panel driven by getProgressGuidance.
+ * Shows the player what to do next in plain language based on current game state.
+ */
 import React from 'react';
 import { AlertTriangle, CheckCircle2, Compass } from 'lucide-react';
 import { GameState } from '../types';

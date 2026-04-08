@@ -1,3 +1,10 @@
+/**
+ * @module MarketOverlay
+ * Ore export strategy picker overlay.
+ * Shows four export strategy options (STANDARD, QUIET, REINVEST, EXPOSE) with
+ * projected payout, exposure change, and influence change for each.
+ * Confirmed selection calls applyOreExport and closes the overlay.
+ */
 import React from 'react';
 import { motion } from 'motion/react';
 import { Coins, ShieldAlert, TrendingUp, X } from 'lucide-react';

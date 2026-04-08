@@ -1,3 +1,16 @@
+/**
+ * @module App
+ * Root application component and global game-state orchestrator.
+ *
+ * Responsibilities:
+ * - Holds the canonical {@link GameState} and dispatches all state updates
+ * - Wires all game-loop hooks (movement, time, permits, tutorial, city events)
+ * - Routes scene rendering through {@link GameSceneRouter}
+ * - Manages overlay visibility (dialogue, permit, market, tutorial, ending)
+ * - Provides callbacks to child scenes for player movement, NPC interaction,
+ *   building entry, and VoxelEngine events
+ * - Persists state to localStorage via the save/load system
+ */
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { 

@@ -1,3 +1,9 @@
+/**
+ * @module TutorialOverlay
+ * Collapsible tutorial overlay shown during the early game.
+ * Steps through guided instructions matched to tutorialStep in GameState.
+ * Can be minimised to a tab by the player.
+ */
 import React from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { ChevronDown, ChevronUp, X } from 'lucide-react';

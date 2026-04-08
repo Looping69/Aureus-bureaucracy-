@@ -1,3 +1,9 @@
+/**
+ * @module CityPlanner
+ * Voxel city editor scene (CITY_PLANNER).
+ * Allows the player to place, erase, and paint voxels using brush, eraser, and road tools
+ * with optional X or Z symmetry.  Changes are written back via onVoxelEdit.
+ */
 import React, { useState, useMemo, useRef } from 'react';
 import { GameState, Building, WorldPosition } from '../types';
 import {

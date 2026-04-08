@@ -1,3 +1,9 @@
+/**
+ * @module OfficeScene
+ * 2-D office exploration scene rendered as a CSS-positioned room layout.
+ * The player clicks on items (files, evidence, clues) to interact with them;
+ * found items are recorded in GameState.foundOfficeItemIds.
+ */
 import React from 'react';
 import { GameState } from '../types';
 import { ChevronRight, Stamp, MapPin, Building2 } from 'lucide-react';

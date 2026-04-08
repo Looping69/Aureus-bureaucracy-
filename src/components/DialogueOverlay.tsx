@@ -1,3 +1,10 @@
+/**
+ * @module DialogueOverlay
+ * Full-screen dialogue overlay rendered when an NPC conversation is active.
+ * Displays the NPC's avatar, name, current dialogue node text, and response options.
+ * Handles conditional option visibility (trust/leverage requirements) and applies
+ * state changes when an option is selected.
+ */
 import React, { useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, ShieldAlert, Heart, ChevronRight, FileText, Scale, Zap, MessageSquare, ArrowLeft, Clock, Smile, Frown } from 'lucide-react';

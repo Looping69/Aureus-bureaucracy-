@@ -1,3 +1,7 @@
+/**
+ * @module LoadingScreen
+ * Full-screen loading screen displayed while the 3-D world scene initialises.
+ */
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 

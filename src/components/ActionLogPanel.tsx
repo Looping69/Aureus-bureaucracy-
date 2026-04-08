@@ -1,3 +1,7 @@
+/**
+ * @module ActionLogPanel
+ * Scrollable log of recent player actions and game events, shown in the side panel.
+ */
 import React from 'react';
 import { Clock3, ScrollText } from 'lucide-react';
 
