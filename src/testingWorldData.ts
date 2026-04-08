@@ -234,8 +234,8 @@ export const TREE_INITIAL_AMOUNT = 28;
 /** Proximity radius (grid tiles) to trigger gathering */
 export const TESTING_GATHER_RANGE = 5;
 
-/** Gather interval in milliseconds (0.1s for fast feel) */
-export const TESTING_GATHER_INTERVAL_MS = 100;
+/** Gather interval in milliseconds – slow enough to see each log appear on the back */
+export const TESTING_GATHER_INTERVAL_MS = 1200;
 
 /** Wood gained per gather tick */
 export const TESTING_YIELD_PER_TICK = 1;
@@ -246,8 +246,8 @@ export const LOG_DEPOT_ID = 'log_depot';
 /** Maximum number of logs the player can carry at once (visual blocks on back) */
 export const TESTING_CARRY_MAX = 6;
 
-/** Milliseconds between each block unloaded at the depot */
-export const TESTING_UNLOAD_INTERVAL_MS = 400;
+/** Milliseconds between each block unloaded at the depot – slow enough to watch each log fly off */
+export const TESTING_UNLOAD_INTERVAL_MS = 1200;
 
 /**
  * Log pile stages placed at the depot position.

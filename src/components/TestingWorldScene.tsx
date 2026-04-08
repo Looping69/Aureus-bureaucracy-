@@ -116,6 +116,11 @@ export const TestingWorldScene = ({
   const carriedRef = React.useRef(carried);
   React.useEffect(() => { carriedRef.current = carried; }, [carried]);
 
+  // Ref that tracks whether an unload sequence is currently running.
+  // Using a ref (not state) means the unload effect is NOT re-triggered
+  // when unload progress changes — only when nearDepot itself changes.
+  const unloadingRef = React.useRef(false);
+
   // ── build terrain (stable – buildings never change) ───────────────────
   const terrainData = React.useMemo(
     () => buildWorldTerrainVoxels(TESTING_WORLD_BUILDINGS, WORLD_SIZE),
@@ -275,10 +280,23 @@ export const TestingWorldScene = ({
   }, [playerIsMoving]);
 
   // ── UNLOAD at depot: one-by-one visual unload, logs stack at depot ─────
+  //
+  // Key design: `carried` is intentionally NOT in the dependency array.
+  // Reading `carriedRef.current` at start-time avoids the bug where
+  // each `setCarried(prev - 1)` re-fires the effect, restarts the interval,
+  // and fights itself.  `unloadingRef` prevents double-starts.
   React.useEffect(() => {
-    if (!nearDepot || carried <= 0 || isUnloading) return;
+    if (!nearDepot) {
+      // Left the depot — let any running interval finish naturally;
+      // it already captured totalToUnload so it will self-terminate.
+      return;
+    }
 
-    const totalToUnload = carried;
+    // Already mid-unload, or nothing to unload
+    if (unloadingRef.current || carriedRef.current <= 0) return;
+
+    const totalToUnload = carriedRef.current;
+    unloadingRef.current = true;
     setIsUnloading(true);
     let unloaded = 0;
 
@@ -286,22 +304,23 @@ export const TestingWorldScene = ({
       unloaded++;
       setCarried(prev => Math.max(0, prev - 1));
       setDeposited(prev => prev + 1);
-      spawnParticle('+1 log', '#22c55e');
+      spawnParticle('+1 log 🪵', '#22c55e');
 
       if (unloaded >= totalToUnload) {
         clearInterval(id);
+        unloadingRef.current = false;
         setIsUnloading(false);
-        spawnParticle(`${totalToUnload} logs stored! 🪵`, '#22c55e');
+        spawnParticle(`${totalToUnload} log${totalToUnload !== 1 ? 's' : ''} stored!`, '#22c55e');
       }
     }, TESTING_UNLOAD_INTERVAL_MS);
 
     return () => {
       clearInterval(id);
-      // Always reset so a future approach to the depot can trigger a new unload
+      unloadingRef.current = false;
       setIsUnloading(false);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nearDepot, carried, isUnloading, spawnParticle]);
+  }, [nearDepot, spawnParticle]);
 
   // ── world click / select ──────────────────────────────────────────────
   const handleWorldSelect = React.useCallback((target: WorldHoverInfo) => {
