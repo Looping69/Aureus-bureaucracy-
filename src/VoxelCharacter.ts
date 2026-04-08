@@ -25,6 +25,7 @@ export class VoxelCharacter {
   private carryStack: THREE.Group;
   private carriedBlocks: THREE.Mesh[] = [];
   private _carriedCount = 0;
+  private _carriedType: 'ore' | 'wood' = 'ore';
 
   /** Maximum blocks this character can carry */
   public static readonly MAX_CARRY = 6;
@@ -374,6 +375,21 @@ export class VoxelCharacter {
 
   // ── Carry-stack management ──────────────────────────────────────────────
 
+  /**
+   * Set whether carried blocks look like ore (amber/gold) or wood (brown logs).
+   * Re-colours any already-stacked blocks immediately.
+   */
+  public setCarriedType(type: 'ore' | 'wood') {
+    if (this._carriedType === type) return;
+    this._carriedType = type;
+    const colors = type === 'wood'
+      ? [0x8B4513, 0xA0522D, 0x6B3A2A]   // brown / sienna / dark-wood
+      : [0xc87941, 0xe0a840, 0xb07030];  // amber / gold tones
+    this.carriedBlocks.forEach((block, i) => {
+      (block.material as THREE.MeshStandardMaterial).color.setHex(colors[i % colors.length]);
+    });
+  }
+
   /** Set the number of visible ore blocks on the character's back (0..MAX_CARRY). */
   public setCarriedAmount(count: number) {
     const n = Math.max(0, Math.min(VoxelCharacter.MAX_CARRY, Math.floor(count)));
@@ -388,13 +404,17 @@ export class VoxelCharacter {
     }
 
     // Add missing blocks
-    const oreColors = [0xc87941, 0xe0a840, 0xb07030]; // amber/gold tones
+    const oreColors  = [0xc87941, 0xe0a840, 0xb07030];
+    const woodColors = [0x8B4513, 0xA0522D, 0x6B3A2A];
+    const colors = this._carriedType === 'wood' ? woodColors : oreColors;
+    const metalness = this._carriedType === 'wood' ? 0.0 : 0.3;
+    const roughness = this._carriedType === 'wood' ? 0.9 : 0.6;
     while (this.carriedBlocks.length < n) {
       const i = this.carriedBlocks.length;
-      const color = oreColors[i % oreColors.length];
+      const color = colors[i % colors.length];
       const block = new THREE.Mesh(
         new THREE.BoxGeometry(0.22, 0.15, 0.18),
-        new THREE.MeshStandardMaterial({ color, metalness: 0.3, roughness: 0.6 }),
+        new THREE.MeshStandardMaterial({ color, metalness, roughness }),
       );
       block.position.y = i * VoxelCharacter.CARRY_BLOCK_SPACING;
       block.rotation.y = (i * 0.4); // slight rotation for visual variety

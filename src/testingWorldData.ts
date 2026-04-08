@@ -19,6 +19,10 @@ const DIRT_BROWN   = '#7c5c3c';
 const PATH_GRAVEL  = '#b0a898';
 const BEACON_WOOD  = '#a0522d'; // sienna beacon colour
 const BEACON_WHITE = '#fef9c3';
+// log-pile specific colours
+const LOG_BROWN_A  = '#8B4513'; // saddle brown
+const LOG_BROWN_B  = '#A0522D'; // sienna
+const LOG_DARK     = '#5C3317'; // dark end-grain
 
 // ─── tree resource node (clump of harvestable trees) ─────────────────────────
 const genTree = new BuildingGenerator();
@@ -45,6 +49,84 @@ genTree.addBox(3, -4, 9, 3, -4, 9, BEACON_WOOD);
 genTree.addBox(4, -3, 9, 4, -3, 9, BEACON_WOOD);
 export const TREE_NODE_VOXELS = genTree.getVoxels();
 
+// ─── log depot (open drop-off frame + gravel pad) ────────────────────────────
+const genLogDepot = new BuildingGenerator();
+// Gravel floor pad
+genLogDepot.addBox(-5, -4, 0, 5, 4, 0, PATH_GRAVEL);
+// Two rear support posts
+genLogDepot.addBox(-5, 4, 1, -5, 4, 7, TRUNK_BROWN);
+genLogDepot.addBox( 5, 4, 1,  5, 4, 7, TRUNK_BROWN);
+// Top crossbeam between rear posts
+genLogDepot.addBox(-5, 4, 7, 5, 4, 8, TRUNK_DARK);
+// Low side rails (keep logs from rolling off)
+genLogDepot.addBox(-5, -4, 1, -5, 4, 2, TRUNK_DARK);
+genLogDepot.addBox( 5, -4, 1,  5, 4, 2, TRUNK_DARK);
+// Beacon pillar at front-left corner
+genLogDepot.addBox(-5, -4, 3, -5, -4, 10, BEACON_WOOD);
+genLogDepot.addBox(-5, -4, 11, -5, -4, 11, BEACON_WHITE);
+genLogDepot.addBox(-4, -4, 11, -4, -4, 11, BEACON_WOOD);
+genLogDepot.addBox(-5, -3, 11, -5, -3, 11, BEACON_WOOD);
+export const LOG_DEPOT_VOXELS = genLogDepot.getVoxels();
+
+// ─── log pile stage 1 (small – 1-14 logs deposited) ─────────────────────────
+const genLogPile1 = new BuildingGenerator();
+// Bottom row: two parallel logs along the X axis
+genLogPile1.addBox(-4, -3, 1, 4, -2, 2, LOG_BROWN_A);
+genLogPile1.addBox(-4,  0, 1, 4,  1, 2, LOG_BROWN_B);
+// End-grain faces (darker slice at each end)
+genLogPile1.addBox(-4, -3, 1, -4,  1, 2, LOG_DARK);
+genLogPile1.addBox( 4, -3, 1,  4,  1, 2, LOG_DARK);
+// Top single log balanced between the two bottom ones
+genLogPile1.addBox(-4, -1, 2, 4, 0, 3, LOG_BROWN_A);
+genLogPile1.addBox(-4, -1, 2, -4, 0, 3, LOG_DARK);
+genLogPile1.addBox( 4, -1, 2,  4, 0, 3, LOG_DARK);
+export const LOG_PILE_STAGE1_VOXELS = genLogPile1.getVoxels();
+
+// ─── log pile stage 2 (medium – 15-34 logs deposited) ───────────────────────
+const genLogPile2 = new BuildingGenerator();
+// Level 1 (same as stage 1 base)
+genLogPile2.addBox(-4, -3, 1, 4, -2, 2, LOG_BROWN_A);
+genLogPile2.addBox(-4,  0, 1, 4,  1, 2, LOG_BROWN_B);
+genLogPile2.addBox(-4, -3, 1, -4,  1, 2, LOG_DARK);
+genLogPile2.addBox( 4, -3, 1,  4,  1, 2, LOG_DARK);
+// Level 2: three logs
+genLogPile2.addBox(-4, -3, 2, 4, -2, 3, LOG_BROWN_B);
+genLogPile2.addBox(-4,  0, 2, 4,  1, 3, LOG_BROWN_A);
+genLogPile2.addBox(-4, -1, 2, 4,  0, 3, LOG_BROWN_A);
+genLogPile2.addBox(-4, -3, 2, -4,  1, 3, LOG_DARK);
+genLogPile2.addBox( 4, -3, 2,  4,  1, 3, LOG_DARK);
+// Level 3: top log
+genLogPile2.addBox(-4, -1, 3, 4, 0, 4, LOG_BROWN_B);
+genLogPile2.addBox(-4, -1, 3, -4, 0, 4, LOG_DARK);
+genLogPile2.addBox( 4, -1, 3,  4, 0, 4, LOG_DARK);
+export const LOG_PILE_STAGE2_VOXELS = genLogPile2.getVoxels();
+
+// ─── log pile stage 3 (large – 35+ logs deposited) ──────────────────────────
+const genLogPile3 = new BuildingGenerator();
+// Level 1
+genLogPile3.addBox(-4, -3, 1, 4, -2, 2, LOG_BROWN_A);
+genLogPile3.addBox(-4,  0, 1, 4,  1, 2, LOG_BROWN_B);
+genLogPile3.addBox(-4, -3, 1, -4,  1, 2, LOG_DARK);
+genLogPile3.addBox( 4, -3, 1,  4,  1, 2, LOG_DARK);
+// Level 2
+genLogPile3.addBox(-4, -3, 2, 4, -2, 3, LOG_BROWN_B);
+genLogPile3.addBox(-4,  0, 2, 4,  1, 3, LOG_BROWN_A);
+genLogPile3.addBox(-4, -1, 2, 4,  0, 3, LOG_BROWN_A);
+genLogPile3.addBox(-4, -3, 2, -4,  1, 3, LOG_DARK);
+genLogPile3.addBox( 4, -3, 2,  4,  1, 3, LOG_DARK);
+// Level 3
+genLogPile3.addBox(-4, -3, 3, 4, -2, 4, LOG_BROWN_A);
+genLogPile3.addBox(-4,  0, 3, 4,  1, 4, LOG_BROWN_B);
+genLogPile3.addBox(-4, -1, 3, 4,  0, 4, LOG_BROWN_B);
+genLogPile3.addBox(-4, -3, 3, -4,  1, 4, LOG_DARK);
+genLogPile3.addBox( 4, -3, 3,  4,  1, 4, LOG_DARK);
+// Level 4 (tapered)
+genLogPile3.addBox(-4, -2, 4, 4, -1, 5, LOG_BROWN_A);
+genLogPile3.addBox(-4,  0, 4, 4,  0, 5, LOG_BROWN_B);
+genLogPile3.addBox(-4, -2, 4, -4,  0, 5, LOG_DARK);
+genLogPile3.addBox( 4, -2, 4,  4,  0, 5, LOG_DARK);
+export const LOG_PILE_STAGE3_VOXELS = genLogPile3.getVoxels();
+
 // ─── simple grass decoration ─────────────────────────────────────────────────
 const genGrass = new BuildingGenerator();
 genGrass.addBox(-7, -7, 0, 7, 7, 0, GRASS_LIGHT);
@@ -65,6 +147,8 @@ const CY = 120;
 const pos = (dx: number, dy: number) => ({ x: CX + dx, y: CY + dy });
 
 export const TESTING_WORLD_ENTRANCE_POS = pos(0, -30);
+/** Position of the log depot drop-off zone */
+const LOG_DEPOT_POS = pos(0, -18);
 
 export const TESTING_WORLD_BUILDINGS: Record<string, Building> = {
   // ── spawn shelter ──────────────────────────────────────────────────────
@@ -76,6 +160,18 @@ export const TESTING_WORLD_BUILDINGS: Record<string, Building> = {
     type: 'LANDMARK',
     isDiscovered: true,
     voxels: SHELTER_VOXELS,
+  },
+
+  // ── log drop-off depot ─────────────────────────────────────────────────
+  log_depot: {
+    id: 'log_depot',
+    npcId: 'none',
+    name: 'Log Depot',
+    pos: LOG_DEPOT_POS,
+    type: 'LANDMARK',
+    isDiscovered: true,
+    description: 'Bring harvested logs here to deposit them.',
+    voxels: LOG_DEPOT_VOXELS,
   },
 
   // ── tree resource nodes ────────────────────────────────────────────────
@@ -138,8 +234,55 @@ export const TREE_INITIAL_AMOUNT = 28;
 /** Proximity radius (grid tiles) to trigger gathering */
 export const TESTING_GATHER_RANGE = 5;
 
-/** Gather interval in milliseconds (0.1s for fast feel) */
-export const TESTING_GATHER_INTERVAL_MS = 100;
+/** Gather interval in milliseconds – slow enough to see each log appear on the back */
+export const TESTING_GATHER_INTERVAL_MS = 1200;
 
 /** Wood gained per gather tick */
 export const TESTING_YIELD_PER_TICK = 1;
+
+/** ID of the log depot building */
+export const LOG_DEPOT_ID = 'log_depot';
+
+/** Maximum number of logs the player can carry at once (visual blocks on back) */
+export const TESTING_CARRY_MAX = 6;
+
+/** Milliseconds between each block unloaded at the depot – slow enough to watch each log fly off */
+export const TESTING_UNLOAD_INTERVAL_MS = 1200;
+
+/**
+ * Log pile stages placed at the depot position.
+ * These are NOT in TESTING_WORLD_BUILDINGS so they don't affect pathfinding;
+ * they are merged into the buildings list for the voxel renderer only.
+ */
+export const LOG_PILE_BUILDINGS: Record<string, Building> = {
+  log_pile_stage1: {
+    id: 'log_pile_stage1',
+    npcId: 'none',
+    name: 'Log Pile',
+    pos: LOG_DEPOT_POS,
+    type: 'LANDMARK',
+    isDiscovered: true,
+    voxels: LOG_PILE_STAGE1_VOXELS,
+  },
+  log_pile_stage2: {
+    id: 'log_pile_stage2',
+    npcId: 'none',
+    name: 'Log Pile',
+    pos: LOG_DEPOT_POS,
+    type: 'LANDMARK',
+    isDiscovered: true,
+    voxels: LOG_PILE_STAGE2_VOXELS,
+  },
+  log_pile_stage3: {
+    id: 'log_pile_stage3',
+    npcId: 'none',
+    name: 'Log Pile',
+    pos: LOG_DEPOT_POS,
+    type: 'LANDMARK',
+    isDiscovered: true,
+    voxels: LOG_PILE_STAGE3_VOXELS,
+  },
+};
+
+/** Deposited-log thresholds to switch between pile stages (≥1→stage1, ≥15→stage2, ≥35→stage3) */
+export const LOG_PILE_THRESHOLDS = [1, 15, 35] as const;

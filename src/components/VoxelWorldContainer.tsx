@@ -27,6 +27,8 @@ interface VoxelWorldProps {
   playerWorking?: boolean;
   /** Number of ore blocks visually stacked on the player's back (0..MAX_CARRY) */
   playerCarried?: number;
+  /** Visual type for stacked carried blocks – 'ore' (default amber) or 'wood' (brown logs) */
+  playerCarriedType?: 'ore' | 'wood';
 }
 
 export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({ 
@@ -47,7 +49,8 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
   onReady,
   onProgress,
   playerWorking,
-  playerCarried
+  playerCarried,
+  playerCarriedType
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<VoxelEngine | null>(null);
@@ -243,8 +246,10 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
   // ── Drive visual carry-stack from prop ──────────────────────────────────
   useEffect(() => {
     if (!engineRef.current) return;
-    engineRef.current.entities.player.setCarriedAmount(playerCarried ?? 0);
-  }, [playerCarried]);
+    const player = engineRef.current.entities.player;
+    player.setCarriedType(playerCarriedType ?? 'ore');
+    player.setCarriedAmount(playerCarried ?? 0);
+  }, [playerCarried, playerCarriedType]);
 
   return (
     <div ref={containerRef} className="w-full h-full relative">
