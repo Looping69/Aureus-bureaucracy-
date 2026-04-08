@@ -56,16 +56,21 @@ type StartupLoadingState = {
   awaitingWorldBoot: boolean;
 };
 
-const buildHydratedBuildings = (savedBuildings?: GameState['buildings']): GameState['buildings'] =>
-  Object.fromEntries(
+const buildHydratedBuildings = (savedBuildings?: GameState['buildings']): GameState['buildings'] => {
+  if (savedBuildings && Object.keys(savedBuildings).length > 0) {
+    // Prioritize saved buildings for persistence of exact world layout, including deletions and additions.
+    return savedBuildings;
+  }
+  return Object.fromEntries(
     Object.entries(BUILDINGS).map(([id, building]) => [
       id,
       {
         ...building,
-        isDiscovered: savedBuildings?.[id]?.isDiscovered ?? building.isDiscovered
+        isDiscovered: building.isDiscovered
       }
     ])
   ) as GameState['buildings'];
+};
 
 const cloneSerializable = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
 const getWorldMapBuildings = (buildings: GameState['buildings']) => buildings;

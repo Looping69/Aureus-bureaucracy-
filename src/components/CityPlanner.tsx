@@ -12,7 +12,14 @@ import {
   GENERIC_HOUSE_B_VOXELS,
   GENERIC_OFFICE_VOXELS,
   SIDEWALK_VOXELS,
-  ROAD_VOXELS
+  ROAD_VOXELS,
+  TREE_A_VOXELS,
+  TREE_B_VOXELS,
+  BUSH_VOXELS,
+  GARDEN_VOXELS,
+  ROAD_CROSS_VOXELS,
+  FACTORY_VOXELS,
+  GENERIC_HOUSE_D_VOXELS
 } from '../buildings';
 import {
   ASSET_BUILDING_A_VOXELS,
@@ -54,6 +61,14 @@ const BUILDING_TEMPLATES: Partial<Building>[] = [
   { type: 'LANDMARK', name: 'Borough Hall', voxels: ASSET_BUILDING_C_VOXELS },
   { type: 'INDUSTRIAL', name: 'Supply Depot', voxels: ASSET_BUILDING_D_VOXELS },
   { type: 'HOME', name: 'Staff Quarters', voxels: ASSET_BUILDING_E_VOXELS },
+  // Utility & Props
+  { type: 'ROAD', name: 'Road Cross', voxels: ROAD_CROSS_VOXELS },
+  { type: 'INDUSTRIAL', name: 'Factory', voxels: FACTORY_VOXELS },
+  { type: 'HOME', name: 'Generic House D', voxels: GENERIC_HOUSE_D_VOXELS },
+  { type: 'PARK', name: 'Tree A', voxels: TREE_A_VOXELS },
+  { type: 'PARK', name: 'Tree B', voxels: TREE_B_VOXELS },
+  { type: 'PARK', name: 'Bush', voxels: BUSH_VOXELS },
+  { type: 'PARK', name: 'Garden', voxels: GARDEN_VOXELS },
 ];
 
 const WORLD_SCALE = 10;
