@@ -1,3 +1,12 @@
+/**
+ * @module EntityManager
+ * Manages all live scene entities: the player {@link VoxelCharacter}, NPC characters,
+ * {@link VoxelBuilding} meshes, a pooled street-light system, and the NPC commute AI.
+ *
+ * NPC commuting is driven by pre-computed A* paths ({@link findPath}) stored in
+ * {@link NpcMovementState}.  Call {@link EntityManager.initNpcMovement} after buildings
+ * are loaded, then call {@link EntityManager.update} every frame.
+ */
 import * as THREE from 'three';
 import { VoxelCharacter } from './VoxelCharacter';
 import { VoxelBuilding } from './VoxelBuilding';
@@ -25,6 +34,11 @@ const NPC_PALETTES: Record<string, { shirt: number; pants: number; hair: number;
   resident_d: { shirt: 0x558b2f, pants: 0x33691e, hair: 0x5d4037, skin: 0xf5cba7, shoes: 0x2c2c2c, belt: 0x5c3a1e },
 };
 
+/**
+ * Runtime commuting state for a single NPC.
+ * Paths are pre-computed once via {@link EntityManager.initNpcMovement} and
+ * replayed frame-by-frame in {@link EntityManager.updateNpcCommute}.
+ */
 interface NpcMovementState {
   npcId: string;
   homePos: WorldPosition;
@@ -33,11 +47,15 @@ interface NpcMovementState {
   workEnd: number;
   pathToWork: WorldPosition[];
   pathToHome: WorldPosition[];
+  /** Current commute phase – determines which path array is being followed. */
   phase: 'AT_HOME' | 'COMMUTING_TO_WORK' | 'AT_WORK' | 'COMMUTING_HOME';
+  /** Index of the next waypoint to visit in the active path array. */
   pathIndex: number;
+  /** Frame counter; NPC advances one waypoint every TICKS_PER_STEP frames. */
   moveTick: number;
 }
 
+/** Owns and animates all Three.js scene entities for a single game scene. */
 export class EntityManager {
   private scene: THREE.Scene;
   public player: VoxelCharacter;
@@ -49,6 +67,7 @@ export class EntityManager {
   private npcMovement: Map<string, NpcMovementState> = new Map();
   private buildingsData: Record<string, Building> = {};
 
+  // --- Initialization ---
   constructor(scene: THREE.Scene) {
     this.scene = scene;
     this.entityGroup = new THREE.Group();
@@ -67,6 +86,14 @@ export class EntityManager {
     }
   }
 
+  // --- Building Management ---
+
+  /**
+   * Instantiate a {@link VoxelBuilding} mesh for the given building data, position
+   * it in world space, and attach an invisible interaction collider used for
+   * raycasting.  Street Lights additionally register a pooled point-light position.
+   * @param buildingData - Serialised building descriptor from the world data.
+   */
   public addBuilding(buildingData: Building) {
     if (this.buildings.has(buildingData.id)) return;
     this.buildingsData[buildingData.id] = buildingData;
@@ -151,6 +178,14 @@ export class EntityManager {
     return collider;
   }
 
+  // --- NPC Management ---
+
+  /**
+   * Spawn a new NPC character at the given world-grid position and register it
+   * in the NPC map.  Each NPC receives a palette keyed by its `npcData.id`.
+   * @param npcData - NPC descriptor including id, work hours, and building refs.
+   * @param position - World-grid tile position (x, y) where the NPC should appear.
+   */
   public addNPC(npcData: NPC, position: { x: number, y: number }) {
     if (this.npcs.has(npcData.id)) return;
     
@@ -165,7 +200,13 @@ export class EntityManager {
     this.entityGroup.add(npc.group);
   }
 
-  /** Set up commuting routes for NPCs that have separate home / work buildings. */
+  // --- NPC Commute AI ---
+
+  /**
+   * Set up commuting routes for NPCs that have separate home / work buildings.
+   * @param allNpcs - Map of all NPC descriptors keyed by NPC id.
+   * @param buildings - Map of all building descriptors keyed by building id.
+   */
   public initNpcMovement(allNpcs: Record<string, NPC>, buildings: Record<string, Building>) {
     this.npcMovement.clear();
 
@@ -310,6 +351,13 @@ export class EntityManager {
     );
   }
 
+  // --- Per-Frame Update ---
+
+  /**
+   * Advance all entity animations, NPC commuting logic, and the street-light pool.
+   * @param deltaTime - Seconds elapsed since the last frame (for character animations).
+   * @param time - Current in-game hour (0–23) used to schedule NPC commute phases.
+   */
   public update(deltaTime: number, time: number) {
     this.player.update(deltaTime);
     this.npcs.forEach(npc => npc.update(deltaTime));
@@ -351,6 +399,10 @@ export class EntityManager {
     }
   }
 
+  /**
+   * Remove all entities from the scene and release light-pool resources.
+   * Call before destroying the scene or loading a new one.
+   */
   public cleanup() {
     this.entityGroup.clear();
     this.buildings.clear();

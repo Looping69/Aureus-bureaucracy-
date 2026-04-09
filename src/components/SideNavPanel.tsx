@@ -1,3 +1,9 @@
+/**
+ * @module SideNavPanel
+ * Collapsible side navigation panel providing access to game screens:
+ * permits, market, run cycle, progress guide, and debug panel.
+ * Replaces the old BottomNav on all screen sizes.
+ */
 import React from 'react';
 import { Briefcase, ChevronLeft, ChevronRight, FlaskConical, Mountain, Pickaxe, Store, Users } from 'lucide-react';
 import { motion } from 'motion/react';

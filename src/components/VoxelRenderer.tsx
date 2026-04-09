@@ -1,3 +1,8 @@
+/**
+ * @module VoxelRenderer
+ * Standalone React-Three-Fiber voxel renderer used outside the main engine
+ * (e.g. permit preview thumbnails or building cards).
+ */
 /// <reference types="@react-three/fiber" />
 import React, { useRef, useEffect } from 'react';
 import * as THREE from 'three';

@@ -1,3 +1,8 @@
+/**
+ * @module BuildingMesh
+ * React-Three-Fiber component that renders a single building's voxel mesh
+ * using GreedyMesher geometry within a Three.js scene graph.
+ */
 import React, { useMemo, useRef, useEffect } from 'react';
 import * as THREE from 'three';
 

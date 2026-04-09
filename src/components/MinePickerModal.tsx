@@ -1,3 +1,8 @@
+/**
+ * @module MinePickerModal
+ * Modal for selecting which mine to enter before transitioning to MINE_WORLD.
+ * Shows mine name, status, yield, and danger for each discovered site.
+ */
 import React from 'react';
 import { motion } from 'motion/react';
 import { Mine } from '../types';

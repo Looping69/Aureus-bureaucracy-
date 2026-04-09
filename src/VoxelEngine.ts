@@ -3,6 +3,20 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 
+/**
+ * @module VoxelEngine
+ * Core Three.js rendering engine for Aureus.  Owns the WebGL renderer, scene
+ * graph, physics world (cannon-es), RAF animation loop, entity manager, and all
+ * player/camera control logic.
+ *
+ * Key subsystems:
+ * - **World scene** – terrain voxels, buildings, sky dome, sun/moon, fog
+ * - **Player movement** – path-based click-to-move and analog-stick direct movement
+ * - **Camera** – locked isometric follow-cam (azimuth π/4, polar fixed)
+ * - **Voxel editing** – brush/eraser/road tools with optional symmetry
+ * - **Day/Night cycle** – light intensities and fog colour shift over a 0-24 float clock
+ */
+
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
@@ -13,20 +27,33 @@ import { GreedyMesher } from './utils/GreedyMesher';
 import { BuildingFootprint } from './utils/worldNavigation';
 import backgroundData from '../background.json';
 
+// Locked isometric camera azimuth (45°) — kept constant to give a consistent city view
 export const WORLD_CAMERA_AZIMUTH = Math.PI / 4;
+// Camera offset from target: x=20, y=30, z=20 gives the isometric angle
 const WORLD_CAMERA_OFFSET = new THREE.Vector3(20, 30, 20);
+// Pre-computed distance for the OrbitControls polar/distance constraints
 const WORLD_CAMERA_DISTANCE = WORLD_CAMERA_OFFSET.length();
+// Pre-computed polar angle derived from WORLD_CAMERA_OFFSET.y
 const WORLD_CAMERA_POLAR = Math.acos(WORLD_CAMERA_OFFSET.y / WORLD_CAMERA_DISTANCE);
 
+/**
+ * Singleton-style Three.js engine that owns the entire rendering pipeline for
+ * one game scene.  Instantiate with a DOM container and callback functions;
+ * call {@link VoxelEngine.buildWorldScene} to populate terrain and entities;
+ * the RAF loop starts automatically in the constructor.
+ *
+ * Dispose by calling {@link VoxelEngine.cleanup} before unmounting the container.
+ */
 export class VoxelEngine {
-  private static readonly FOG_NEAR_DAY = 120;
-  private static readonly FOG_FAR_DAY = 280;
-  private static readonly FOG_NEAR_NIGHT = 80;
+  private static readonly FOG_NEAR_DAY = 120;    // Fog start distance during daytime (world units)
+  private static readonly FOG_FAR_DAY = 280;     // Fog end distance during daytime
+  private static readonly FOG_NEAR_NIGHT = 80;   // Fog compresses at night for atmosphere
   private static readonly FOG_FAR_NIGHT = 220;
-  private static readonly ANALOG_MOVE_CONVERGE_THRESHOLD = 0.05;
+  private static readonly ANALOG_MOVE_CONVERGE_THRESHOLD = 0.05; // Stop walking when XZ delta < 0.05 units
   private static readonly PLAYER_MOVE_SPEED = 12; // world units per second (XZ only)
-  private static readonly CAMERA_FOLLOW_DAMPING_XZ = 22;
-  private static readonly CAMERA_FOLLOW_DAMPING_Y = 14;
+  private static readonly CAMERA_FOLLOW_DAMPING_XZ = 22; // THREE.MathUtils.damp coefficient for XZ follow
+  private static readonly CAMERA_FOLLOW_DAMPING_Y = 14;  // Slower Y damping prevents jarring vertical jumps
+  // --- Scene & Renderer ---
   private container: HTMLElement;
   private scene: THREE.Scene;
   private camera: THREE.PerspectiveCamera;
@@ -61,6 +88,7 @@ export class VoxelEngine {
   private rebuildTargets: RebuildTarget[] = [];
   private rebuildStartTime: number = 0;
   
+  // --- App State & Callbacks ---
   private state: AppState = AppState.STABLE;
   private onStateChange: (state: AppState) => void;
   private onCountChange: (count: number) => void;
@@ -89,6 +117,7 @@ export class VoxelEngine {
   private firstPositionSet: boolean = false;
   private requestedPlayerMoving: boolean = false;
 
+  // --- Constructor ---
   constructor(
     container: HTMLElement, 
     onStateChange: (state: AppState) => void,
@@ -288,6 +317,11 @@ export class VoxelEngine {
     this.animate();
   }
 
+  // --- Public API: Callbacks ---
+  /**
+   * Replace the callback functions registered at construction time.
+   * Useful when the parent React component re-renders and produces new closures.
+   */
   public setCallbacks(
     onStateChange: (state: AppState) => void,
     onCountChange: (count: number) => void,
@@ -300,6 +334,13 @@ export class VoxelEngine {
     this.onSelect = onSelect;
   }
 
+  // --- Public API: Camera ---
+  /**
+   * Translate both the camera position and its orbit target by the given XZ delta.
+   * The delta is applied in camera-relative space so WASD controls feel intuitive.
+   * @param dx - Strafing offset (camera-right axis).
+   * @param dz - Forward/backward offset (camera-forward axis).
+   */
   public moveCamera(dx: number, dz: number) {
     // Move camera relative to its current orientation for intuitive WASD controls
     const forward = new THREE.Vector3();
@@ -320,6 +361,10 @@ export class VoxelEngine {
     this.controls.update();
   }
 
+  /**
+   * Zoom the camera along its view direction, clamped to [minDistance, maxDistance].
+   * @param delta - Positive zooms in, negative zooms out.
+   */
   public zoomCamera(delta: number) {
     const zoomSpeed = 3;
     const direction = new THREE.Vector3();
@@ -340,6 +385,12 @@ export class VoxelEngine {
     this.controls.update();
   }
 
+  /**
+   * Drive the day/night cycle to the given hour.
+   * Updates sun/moon positions, directional-light intensity and colour, ambient
+   * light, fog near/far distances, sky dome colour, and street-light activation.
+   * @param time - Fractional hour in [0, 24).
+   */
   public updateTime(time: number) {
     this.time = time;
     const angle = ((time - 6) / 24) * Math.PI * 2;
@@ -396,6 +447,23 @@ export class VoxelEngine {
     }
   }
 
+  // --- Public API: Player ---
+  /**
+   * Set the player's target world position and movement state.
+   *
+   * For path-based movement (`isMoving=true`), a target indicator ring and path
+   * polyline are shown.  For analog-stick movement, the target is set directly and
+   * the character faces the movement direction.  The first call also snaps
+   * camera and character to avoid an interpolation glide from the origin.
+   *
+   * @param x        - Target X in Three.js world space.
+   * @param z        - Target Z in Three.js world space.
+   * @param surfaceY - Surface height (Y) at the target tile.
+   * @param isMoving - Whether the player is actively moving toward a path target.
+   * @param targetX  - End-of-path X (path-based movement only).
+   * @param targetZ  - End-of-path Z (path-based movement only).
+   * @param path     - World-grid waypoints for the path polyline.
+   */
   public setPlayerPosition(
     x: number,
     z: number,
@@ -462,6 +530,7 @@ export class VoxelEngine {
     }
   }
 
+  /** Snapshot the current voxel simulation state as plain {@link VoxelData} objects. */
   public getCurrentVoxelData(): VoxelData[] {
     return this.voxels.map(v => ({
       x: v.x,
@@ -471,6 +540,7 @@ export class VoxelEngine {
     }));
   }
 
+  /** Snap the camera follow target to the player's current position immediately. */
   public recenterOnPlayer() {
     this.targetCameraFocus.copy(this.currentPlayerPos);
     this.currentCameraFocus.copy(this.currentPlayerPos);
@@ -1581,6 +1651,7 @@ export class VoxelEngine {
     }
   }
 
+  // --- Render Loop ---
   private animate() {
     this.animationId = requestAnimationFrame(this.animate);
     

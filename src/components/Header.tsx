@@ -1,3 +1,9 @@
+/**
+ * @module Header
+ * Game HUD header bar.
+ * Displays the player's key resources (money, ore, energy, exposure) and the
+ * current in-game day and time.
+ */
 import React from 'react';
 import { DollarSign, AlertTriangle, Megaphone, Database, Briefcase, Wrench } from 'lucide-react';
 import { GameState } from '../types';

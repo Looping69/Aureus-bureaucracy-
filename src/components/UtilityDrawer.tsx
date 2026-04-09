@@ -1,3 +1,8 @@
+/**
+ * @module UtilityDrawer
+ * Slide-out utility drawer for secondary controls and settings.
+ * Contains zoom controls, grid toggle, and export options for the voxel editor.
+ */
 import React from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Bug, Map, ScrollText, Wrench, X } from 'lucide-react';

@@ -1,3 +1,14 @@
+/**
+ * @module pathfinding
+ * A* pathfinding on the 2-D world grid produced by {@link buildWorldSurfaceMap}.
+ *
+ * The algorithm uses an **octile-distance** heuristic to handle diagonal movement
+ * efficiently. Blocked tiles (building foundations) are collected into a `Set<string>`
+ * for O(1) lookup.  The open list is a plain array with a linear min-scan; sufficient
+ * for world sizes up to 240×240 tiles.
+ *
+ * Entry point: {@link findPath}.
+ */
 import { Building, WorldPosition } from '../types';
 import { WORLD_SIZE } from './voxelConstants';
 import {
@@ -7,6 +18,10 @@ import {
   type WorldSurfaceMap,
 } from './worldSurface';
 
+/**
+ * Single node in the A* search tree.
+ * `g` is the cost from start, `h` the heuristic to goal, `f = g + h`.
+ */
 export interface PathNode {
   x: number;
   y: number;
@@ -16,9 +31,9 @@ export interface PathNode {
   parent: PathNode | null;
 }
 
-const STRAIGHT_COST = 1;
-const DIAGONAL_COST = Math.SQRT2;
-const STEP_HEIGHT_LIMIT = 1;
+const STRAIGHT_COST = 1; // Cost for cardinal (N/S/E/W) movement
+const DIAGONAL_COST = Math.SQRT2; // √2 ≈ 1.414 — Euclidean cost for diagonal movement
+const STEP_HEIGHT_LIMIT = 1; // Maximum terrain-height delta the player can traverse in one step
 
 const DIRECTIONS = [
   { x: 1, y: 0, cost: STRAIGHT_COST },
@@ -46,12 +61,14 @@ const clampWorldPosition = (
   y: clampWorldCoordinate(pos.y, mapSize),
 });
 
+/** Admissible octile-distance heuristic for diagonal-movement grids. */
 const octileDistance = (a: WorldPosition, b: WorldPosition) => {
   const dx = Math.abs(a.x - b.x);
   const dy = Math.abs(a.y - b.y);
   return dx + dy + (DIAGONAL_COST - 2) * Math.min(dx, dy);
 };
 
+/** Collect all non-walkable tile keys into a Set for O(1) blocked-check. */
 const buildBlockedTiles = (surfaceMap: WorldSurfaceMap) => {
   const blocked = new Set<string>();
 
@@ -67,6 +84,7 @@ const buildBlockedTiles = (surfaceMap: WorldSurfaceMap) => {
 const isInBounds = (x: number, y: number, mapSize: number) =>
   x >= 0 && x < mapSize && y >= 0 && y < mapSize;
 
+/** Return true if the tile at (x, y) is in-bounds and walkable. */
 const canOccupyTile = (
   x: number,
   y: number,
@@ -82,6 +100,7 @@ const canOccupyTile = (
   return Boolean(tile?.walkable);
 };
 
+/** Walk parent pointers from the goal node back to start and return the path. */
 const reconstructPath = (node: PathNode) => {
   const path: WorldPosition[] = [];
   let current: PathNode | null = node;
@@ -94,6 +113,7 @@ const reconstructPath = (node: PathNode) => {
   return path.reverse();
 };
 
+/** Core A* loop operating on a pre-built surface map and blocked-tile set. */
 const findPathOnGrid = (
   start: WorldPosition,
   end: WorldPosition,
@@ -205,6 +225,16 @@ const findPathOnGrid = (
   return [];
 };
 
+/**
+ * Find a walkable path between two world-space positions using A*.
+ *
+ * @param start - World-grid start position (tile coordinates, 0..mapSize-1).
+ * @param end   - World-grid goal position.
+ * @param buildings - All buildings in the scene; used to build the surface map.
+ * @param mapSize - Side length of the square world grid (default: {@link WORLD_SIZE}).
+ * @returns Ordered array of world-position waypoints from start to end (exclusive).
+ *          Returns an empty array if no path exists or start === end.
+ */
 export const findPath = (
   start: WorldPosition,
   end: WorldPosition,

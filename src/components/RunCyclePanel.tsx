@@ -1,3 +1,9 @@
+/**
+ * @module RunCyclePanel
+ * Side-panel showing the current run-cycle phase and available operation actions
+ * (Pressure Clerks, Scout Buyers, Community Cover, Leak to Press).
+ * Driven by getRunCycleSummary and getOperationActions from the runCycle module.
+ */
 import React from 'react';
 import { BriefcaseBusiness, ChevronRight, Flame, Gavel, Package, Pickaxe } from 'lucide-react';
 import { GameState } from '../types';
