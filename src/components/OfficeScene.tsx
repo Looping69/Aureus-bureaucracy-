@@ -200,47 +200,6 @@ export const OfficeScene = ({
       </div>
 
       <div className="grid grid-cols-1 gap-3">
-        {/* Active Permits Section */}
-        <div className="bg-white p-4 rounded-2xl shadow-sm border border-emerald-100/50 mb-4">
-          <h3 className="text-xs font-black uppercase tracking-widest mb-3 flex items-center gap-2 text-emerald-900">
-            <Stamp size={14} className="text-emerald-600" /> Active Permits
-          </h3>
-          <div className="space-y-2">
-            {Object.values(state.permits)
-              .filter(p => p.status !== 'LOCKED' && p.status !== 'REJECTED')
-              .map(permit => (
-                <button
-                  key={permit.id}
-                  onClick={() => onSelectPermit(permit.id)}
-                  title={`Review ${permit.formNumber}. Current status: ${permit.status}.`}
-                  className="w-full flex items-center justify-between p-2 bg-slate-50 hover:bg-emerald-50 rounded-lg border border-transparent hover:border-emerald-200 transition-all group"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={`w-2 h-2 rounded-full ${
-                      permit.status === 'APPROVED' ? 'bg-emerald-500' : 
-                      permit.status === 'PENDING' ? 'bg-amber-500 animate-pulse' : 'bg-slate-300'
-                    }`} />
-                    <div className="text-left">
-                      <div className="text-xs font-bold text-slate-700 group-hover:text-emerald-800">{permit.name}</div>
-                      <div className="text-[10px] font-mono text-slate-400">{permit.formNumber}</div>
-                    </div>
-                  </div>
-                  <div className={`text-[10px] font-bold px-2 py-1 rounded-md ${
-                    permit.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-700' : 
-                    permit.status === 'PENDING' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'
-                  }`}>
-                    {permit.status}
-                  </div>
-                </button>
-              ))}
-              {Object.values(state.permits).filter(p => p.status !== 'LOCKED' && p.status !== 'REJECTED').length === 0 && (
-                <div className="text-center py-4 text-[10px] text-slate-400 italic">
-                  No active permits. Visit the Licensing Office.
-                </div>
-              )}
-          </div>
-        </div>
-
         {discoveredBuildings.map(building => (
           <div 
             key={building.id}

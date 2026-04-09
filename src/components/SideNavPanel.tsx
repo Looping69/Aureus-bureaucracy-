@@ -15,7 +15,6 @@ interface SideNavPanelProps {
   onToggle: () => void;
   onOpenMine: () => void;
   onOpenMineWorld: () => void;
-  onOpenTesting: () => void;
   onOpenWorld: () => void;
   onOpenOffice: () => void;
   onExport: () => void;
@@ -37,7 +36,6 @@ export const SideNavPanel: React.FC<SideNavPanelProps> = ({
   onToggle,
   onOpenMine,
   onOpenMineWorld,
-  onOpenTesting,
   onOpenWorld,
   onOpenOffice,
   onExport

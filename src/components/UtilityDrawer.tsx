@@ -5,7 +5,7 @@
  */
 import React from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { Bug, Map, ScrollText, Wrench, X } from 'lucide-react';
+import { Bug, FlaskConical, Map, ScrollText, Wrench, X } from 'lucide-react';
 
 interface UtilityDrawerProps {
   isOpen: boolean;
@@ -13,6 +13,7 @@ interface UtilityDrawerProps {
   onOpenActionLog: () => void;
   onOpenDebug: () => void;
   onOpenPlanner: () => void;
+  onOpenTesting: () => void;
 }
 
 export const UtilityDrawer: React.FC<UtilityDrawerProps> = ({
@@ -20,7 +21,8 @@ export const UtilityDrawer: React.FC<UtilityDrawerProps> = ({
   onClose,
   onOpenActionLog,
   onOpenDebug,
-  onOpenPlanner
+  onOpenPlanner,
+  onOpenTesting
 }) => {
   return (
     <AnimatePresence>
@@ -88,6 +90,17 @@ export const UtilityDrawer: React.FC<UtilityDrawerProps> = ({
                 <div>
                   <div className="text-sm font-black uppercase tracking-wider">City Builder</div>
                   <div className="text-[11px] opacity-65">Open the city planner without floating world buttons.</div>
+                </div>
+              </button>
+
+              <button
+                onClick={onOpenTesting}
+                className="flex items-center gap-3 rounded-2xl bg-white/5 hover:bg-white/10 px-4 py-3 text-left"
+              >
+                <FlaskConical size={16} className="text-violet-300" />
+                <div>
+                  <div className="text-sm font-black uppercase tracking-wider">Testing</div>
+                  <div className="text-[11px] opacity-65">Open the testing world scene.</div>
                 </div>
               </button>
             </div>
