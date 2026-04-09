@@ -885,7 +885,6 @@ export default function App() {
         onToggle={() => setShowNavigationPanel(v => !v)}
         onOpenMine={openMineScene}
         onOpenMineWorld={handleOpenMineWorld}
-        onOpenTesting={handleOpenTesting}
         onOpenWorld={handleOpenWorldScene}
         onOpenOffice={() => {
           beginTrackedAction('open_office');
@@ -928,6 +927,10 @@ export default function App() {
         }}
         onOpenPlanner={() => {
           setState(s => ({ ...s, currentScene: 'CITY_PLANNER' }));
+          setShowUtilityDrawer(false);
+        }}
+        onOpenTesting={() => {
+          handleOpenTesting();
           setShowUtilityDrawer(false);
         }}
       />
