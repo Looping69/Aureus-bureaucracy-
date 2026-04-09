@@ -110,7 +110,7 @@ const buildInitialGameState = (): GameState => {
     },
     permits: cloneSerializable(INITIAL_PERMITS),
     npcs: cloneSerializable(INITIAL_NPCS),
-    knownNpcIds: ['journalist'],
+    knownNpcIds: [],
     objectives: [
       { id: 'start', text: 'Find the Bureau of Extraction (East).', isCompleted: false, type: 'DISCOVER', targetId: 'licensing_office' }
     ],

@@ -165,9 +165,25 @@ export const OfficeScene = ({
   }
 
   // Directory View (Default when no active building)
+  // Only show buildings that are discovered AND have gameplay relevance:
+  // - Has an NPC to interact with
+  // - Has exploration items to find
+  // - Is the mine entrance
+  // - Is the player's home
+  // Filter out decorative buildings (generic houses, parks, landmarks, trees, roads, etc.)
+  const DIRECTORY_BUILDING_IDS = new Set([
+    'player_home',
+    'licensing_office',
+    'union_hall',
+    'inspector_hq',
+    'fixer_den',
+    'hotline_booth',
+    'chief_hut',
+    'mine_entrance',
+    'central_park'
+  ]);
   const discoveredBuildings = Object.values(state.buildings).filter(b => 
-    b.isDiscovered && 
-    (b.npcId !== 'none' || (b.explorationItems && b.explorationItems.length > 0) || b.type === 'MINE_ENTRANCE' || b.type === 'HOME' || b.id === 'central_park')
+    b.isDiscovered && DIRECTORY_BUILDING_IDS.has(b.id)
   );
 
   return (
