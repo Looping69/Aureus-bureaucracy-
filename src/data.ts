@@ -1668,7 +1668,7 @@ const baseBuildings: Record<string, Building> = {
       npcId: 'journalist',
       name: 'Hotline Booth',
       type: 'HOTLINE',
-      isDiscovered: true,
+      isDiscovered: false,
       voxels: HOTLINE_BOOTH_VOXELS,
     },
     occupiedCityCells
@@ -1680,7 +1680,7 @@ const baseBuildings: Record<string, Building> = {
       npcId: 'chief',
       name: 'Chief\'s Hut',
       type: 'HOME',
-      isDiscovered: true,
+      isDiscovered: false,
       voxels: CHIEF_HUT_VOXELS,
     },
     occupiedCityCells
@@ -1692,7 +1692,7 @@ const baseBuildings: Record<string, Building> = {
       npcId: 'none',
       name: 'Sector 4 Entrance',
       type: 'MINE_ENTRANCE',
-      isDiscovered: true,
+      isDiscovered: false,
     },
     occupiedCityCells
   ),
@@ -1792,7 +1792,7 @@ const baseBuildings: Record<string, Building> = {
       npcId: 'resident_a',
       name: 'Dunn Residence',
       type: 'HOME',
-      isDiscovered: true,
+      isDiscovered: false,
       voxels: GENERIC_HOUSE_C_VOXELS,
     },
     occupiedCityCells
@@ -1804,7 +1804,7 @@ const baseBuildings: Record<string, Building> = {
       npcId: 'resident_b',
       name: 'Holt Residence',
       type: 'HOME',
-      isDiscovered: true,
+      isDiscovered: false,
       voxels: GENERIC_HOUSE_D_VOXELS,
     },
     occupiedCityCells
@@ -1816,7 +1816,7 @@ const baseBuildings: Record<string, Building> = {
       npcId: 'resident_c',
       name: 'Sato Residence',
       type: 'HOME',
-      isDiscovered: true,
+      isDiscovered: false,
       voxels: GENERIC_HOUSE_C_VOXELS,
     },
     occupiedCityCells
@@ -1828,7 +1828,7 @@ const baseBuildings: Record<string, Building> = {
       npcId: 'resident_d',
       name: 'Bray Residence',
       type: 'HOME',
-      isDiscovered: true,
+      isDiscovered: false,
       voxels: GENERIC_HOUSE_D_VOXELS,
     },
     occupiedCityCells

@@ -5,7 +5,7 @@
  * Replaces the old BottomNav on all screen sizes.
  */
 import React from 'react';
-import { Briefcase, ChevronLeft, ChevronRight, FlaskConical, Mountain, Pickaxe, Store, Users } from 'lucide-react';
+import { Briefcase, ChevronLeft, ChevronRight, Mountain, Pickaxe, Store, Users } from 'lucide-react';
 import { motion } from 'motion/react';
 import { GameState } from '../types';
 
@@ -42,30 +42,27 @@ export const SideNavPanel: React.FC<SideNavPanelProps> = ({
   onOpenOffice,
   onExport
 }) => {
+  // Progression gates
+  const hasProspecting = state.permits['extraction-intent']?.status === 'APPROVED';
+  const hasMineDiscovered = state.buildings.mine_entrance?.isDiscovered === true;
+  const hasExportLicense = state.permits['export-license']?.status === 'APPROVED';
+
   const actions: NavAction[] = [
-    {
+    ...(hasProspecting ? [{
       key: 'mine',
       label: 'Mine',
       active: state.currentScene === 'MINE',
       icon: Pickaxe,
       onClick: onOpenMine
-    },
-    {
+    }] : []),
+    ...(hasMineDiscovered ? [{
       key: 'mine_world',
       label: 'Shaft',
       active: state.currentScene === 'MINE_WORLD',
       icon: Mountain,
       onClick: onOpenMineWorld,
       title: 'Enter the 3-D mine shaft.'
-    },
-    {
-      key: 'testing',
-      label: 'Testing',
-      active: state.currentScene === 'TESTING',
-      icon: FlaskConical,
-      onClick: onOpenTesting,
-      title: 'Enter the testing world.'
-    },
+    }] : []),
     {
       key: 'world',
       label: 'World',
@@ -82,14 +79,14 @@ export const SideNavPanel: React.FC<SideNavPanelProps> = ({
           onClick: onOpenOffice
         }]
       : []),
-    {
+    ...(hasExportLicense ? [{
       key: 'market',
       label: 'Market',
       icon: Store,
       accentClassName: state.ore > 0 ? 'text-emerald-700' : 'text-black/45',
       onClick: onExport,
       title: 'Open the market.'
-    }
+    }] : [])
   ];
 
   const handleAction = (action: NavAction) => {
