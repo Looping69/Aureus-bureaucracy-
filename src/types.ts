@@ -42,8 +42,28 @@ export interface DirtItem {
 export type MoodShiftType = 'GRUMPY' | 'HAPPY' | 'NEUTRAL';
 
 /**
+ * Lightweight relationship state per NPC.
+ * Derived from trust/leverage/story-flags; used to branch dialogue without
+ * exploding complexity.
+ */
+export type RelationshipStateVane = 'neutral' | 'aligned' | 'complicit' | 'opposed';
+export type RelationshipStateInspector = 'neutral' | 'watching' | 'targeting';
+export type RelationshipStateFixer = 'neutral' | 'friendly' | 'dependent';
+export type RelationshipStateVox = 'neutral' | 'interested' | 'invested';
+export type RelationshipStateCommunity = 'neutral' | 'supportive' | 'disillusioned';
+export type NpcRelationshipState =
+  | RelationshipStateVane
+  | RelationshipStateInspector
+  | RelationshipStateFixer
+  | RelationshipStateVox
+  | RelationshipStateCommunity;
+
+/**
  * A non-player character the player can interact with, build trust with, or
  * use leverage against to advance permit processing and story objectives.
+ *
+ * Each NPC also carries **force identity** fields that define their
+ * ideological pressure on the player (belief / tone / pressure).
  */
 export interface NPC {
   id: string;
@@ -51,6 +71,15 @@ export interface NPC {
   role: string;
   persona: string;
   motive: string;
+
+  // --- Force identity (Step 1) ---
+  /** Core ideological belief that drives this NPC's every line. */
+  belief: string;
+  /** Dialogue voice descriptor (e.g. "Calm, reasonable, quietly corrupt"). */
+  tone: string;
+  /** The kind of pressure this NPC exerts on the player. */
+  pressure: string;
+
   vulnerability: {
     id: string;
     description: string;
@@ -78,6 +107,8 @@ export interface NPC {
   workBuildingId?: string;
   /** How dialogue tone changes when leverage is applied. */
   moodShiftType: MoodShiftType;
+  /** Current relationship state — lightweight enum used for dialogue branching. */
+  relationshipState: NpcRelationshipState;
 }
 
 /** A single cell in a mine grid, representing a unit of underground terrain. */

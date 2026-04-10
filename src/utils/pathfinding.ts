@@ -113,13 +113,21 @@ const reconstructPath = (node: PathNode) => {
   return path.reverse();
 };
 
+/**
+ * Off-road penalty multiplier for NPC pathfinding.
+ * Applied to non-road/sidewalk surface costs so NPCs strongly prefer
+ * walking along roads rather than cutting across grass.
+ */
+const NPC_OFF_ROAD_PENALTY = 6;
+
 /** Core A* loop operating on a pre-built surface map and blocked-tile set. */
 const findPathOnGrid = (
   start: WorldPosition,
   end: WorldPosition,
   blocked: Set<string>,
   mapSize: number,
-  surfaceMap: WorldSurfaceMap
+  surfaceMap: WorldSurfaceMap,
+  preferRoads: boolean = false
 ): WorldPosition[] => {
   const openList: PathNode[] = [];
   const openMap = new Map<string, PathNode>();
@@ -199,7 +207,13 @@ const findPathOnGrid = (
         }
       }
 
-      const g = current.g + direction.cost + nextSurface.cost + heightDelta * 0.4;
+      // Apply off-road penalty for NPC pathfinding so they strongly prefer roads/sidewalks
+      let surfaceCost = nextSurface.cost;
+      if (preferRoads && nextSurface.kind !== 'ROAD' && nextSurface.kind !== 'SIDEWALK' && nextSurface.kind !== 'PLAZA') {
+        surfaceCost *= NPC_OFF_ROAD_PENALTY;
+      }
+
+      const g = current.g + direction.cost + surfaceCost + heightDelta * 0.4;
       const existing = openMap.get(nextKey);
 
       if (!existing) {
@@ -261,4 +275,37 @@ export const findPath = (
   blocked.delete(keyFor(startPos.x, startPos.y));
 
   return findPathOnGrid(startPos, endPos, blocked, mapSize, surfaceMap);
+};
+
+/**
+ * Find a path for NPCs that strongly prefers roads and sidewalks.
+ * NPCs will avoid cutting across grass and instead walk along roads
+ * to reach their destination at a natural pace.
+ */
+export const findNpcPath = (
+  start: WorldPosition,
+  end: WorldPosition,
+  buildings: Record<string, Building>,
+  mapSize: number = WORLD_SIZE
+): WorldPosition[] => {
+  const surfaceMap = buildWorldSurfaceMap(buildings, mapSize);
+  const blocked = buildBlockedTiles(surfaceMap);
+
+  const startTile = getNearestWalkableTile(clampWorldPosition(start, mapSize), surfaceMap);
+  const endTile = getNearestWalkableTile(clampWorldPosition(end, mapSize), surfaceMap);
+
+  if (!startTile || !endTile) {
+    return [];
+  }
+
+  const startPos = { x: startTile.x, y: startTile.y };
+  const endPos = { x: endTile.x, y: endTile.y };
+
+  if (startPos.x === endPos.x && startPos.y === endPos.y) {
+    return [];
+  }
+
+  blocked.delete(keyFor(startPos.x, startPos.y));
+
+  return findPathOnGrid(startPos, endPos, blocked, mapSize, surfaceMap, true);
 };

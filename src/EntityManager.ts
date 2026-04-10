@@ -18,7 +18,7 @@ import {
   getBuildingHeight,
   getStructureBaseHeight,
 } from './utils/worldNavigation';
-import { findPath } from './utils/pathfinding';
+import { findNpcPath } from './utils/pathfinding';
 
 // NPC colour palettes so each resident looks distinct
 const NPC_PALETTES: Record<string, { shirt: number; pants: number; hair: number; skin: number; shoes: number; belt: number }> = {
@@ -51,8 +51,8 @@ interface NpcMovementState {
   phase: 'AT_HOME' | 'COMMUTING_TO_WORK' | 'AT_WORK' | 'COMMUTING_HOME';
   /** Index of the next waypoint to visit in the active path array. */
   pathIndex: number;
-  /** Frame counter; NPC advances one waypoint every TICKS_PER_STEP frames. */
-  moveTick: number;
+  /** Fractional interpolation progress [0,1) between current waypoint and next. */
+  lerpProgress: number;
 }
 
 /** Owns and animates all Three.js scene entities for a single game scene. */
@@ -221,8 +221,9 @@ export class EntityManager {
       const homePos = getBuildingAccessPosition(homeBuilding);
       const workPos = getBuildingAccessPosition(workBuilding);
 
-      const pathToWork = findPath(homePos, workPos, buildings);
-      const pathToHome = findPath(workPos, homePos, buildings);
+      // Use NPC-specific pathfinding that strongly prefers roads
+      const pathToWork = findNpcPath(homePos, workPos, buildings);
+      const pathToHome = findNpcPath(workPos, homePos, buildings);
 
       if (pathToWork.length === 0 && pathToHome.length === 0) continue;
 
@@ -236,13 +237,13 @@ export class EntityManager {
         pathToHome,
         phase: 'AT_HOME',
         pathIndex: 0,
-        moveTick: 0,
+        lerpProgress: 0,
       });
     }
   }
 
   /** Advance NPC commuting based on current game time (called every frame). */
-  private updateNpcCommute(time: number) {
+  private updateNpcCommute(time: number, deltaTime: number) {
     this.npcMovement.forEach((state) => {
       const npcChar = this.npcs.get(state.npcId);
       if (!npcChar) return;
@@ -265,19 +266,19 @@ export class EntityManager {
       if (isCommuteToWork && state.phase === 'AT_HOME') {
         state.phase = 'COMMUTING_TO_WORK';
         state.pathIndex = 0;
-        state.moveTick = 0;
+        state.lerpProgress = 0;
       } else if (isWorkTime && (state.phase === 'COMMUTING_TO_WORK' || state.phase === 'AT_HOME')) {
         state.phase = 'AT_WORK';
         state.pathIndex = 0;
-        state.moveTick = 0;
+        state.lerpProgress = 0;
       } else if (isCommuteHome && state.phase === 'AT_WORK') {
         state.phase = 'COMMUTING_HOME';
         state.pathIndex = 0;
-        state.moveTick = 0;
+        state.lerpProgress = 0;
       } else if (!isWorkTime && !isCommuteToWork && !isCommuteHome && state.phase !== 'AT_HOME' && state.phase !== 'COMMUTING_HOME') {
         state.phase = 'AT_HOME';
         state.pathIndex = 0;
-        state.moveTick = 0;
+        state.lerpProgress = 0;
       }
 
       // If phase just changed, handle snap to destination
@@ -291,21 +292,25 @@ export class EntityManager {
         }
       }
 
-      // Animate commuting
+      // Animate commuting with smooth interpolation
       if (state.phase === 'COMMUTING_TO_WORK') {
-        this.advanceNpcAlongPath(npcChar, state, state.pathToWork, 'AT_WORK', state.workPos);
+        this.advanceNpcAlongPath(npcChar, state, state.pathToWork, 'AT_WORK', state.workPos, deltaTime);
       } else if (state.phase === 'COMMUTING_HOME') {
-        this.advanceNpcAlongPath(npcChar, state, state.pathToHome, 'AT_HOME', state.homePos);
+        this.advanceNpcAlongPath(npcChar, state, state.pathToHome, 'AT_HOME', state.homePos, deltaTime);
       }
     });
   }
+
+  /** NPC walking speed in tiles per second — a natural walking pace. */
+  private static readonly NPC_WALK_SPEED = 3.5;
 
   private advanceNpcAlongPath(
     npcChar: VoxelCharacter,
     state: NpcMovementState,
     path: WorldPosition[],
     endPhase: NpcMovementState['phase'],
-    endPos: WorldPosition
+    endPos: WorldPosition,
+    deltaTime: number
   ) {
     if (path.length === 0) {
       state.phase = endPhase;
@@ -314,32 +319,43 @@ export class EntityManager {
       return;
     }
 
-    // Move one step every few ticks (controlled by moveTick)
-    state.moveTick += 1;
-    const TICKS_PER_STEP = 4; // advance one path node every 4 update cycles
-    if (state.moveTick < TICKS_PER_STEP) return;
-    state.moveTick = 0;
+    // Advance lerp progress based on walk speed and delta time
+    state.lerpProgress += EntityManager.NPC_WALK_SPEED * deltaTime;
 
-    if (state.pathIndex < path.length) {
-      const target = path[state.pathIndex];
-      this.placeNpcAt(npcChar, target);
-      npcChar.setMoving(true);
-
-      // Face direction of movement
-      if (state.pathIndex > 0) {
-        const prev = path[state.pathIndex - 1];
-        const dx = target.x - prev.x;
-        const dy = target.y - prev.y;
-        if (dx !== 0 || dy !== 0) {
-          npcChar.group.rotation.y = Math.atan2(dx, -dy);
-        }
-      }
-
+    // Consume full waypoint segments as the NPC walks past them
+    while (state.lerpProgress >= 1 && state.pathIndex < path.length - 1) {
+      state.lerpProgress -= 1;
       state.pathIndex += 1;
-    } else {
+    }
+
+    if (state.pathIndex >= path.length - 1) {
+      // Reached end of path
       state.phase = endPhase;
       this.placeNpcAt(npcChar, endPos);
       npcChar.setMoving(false);
+      return;
+    }
+
+    // Interpolate between current waypoint and next
+    const from = path[state.pathIndex];
+    const to = path[state.pathIndex + 1];
+    const t = Math.min(state.lerpProgress, 1);
+
+    const interpX = from.x + (to.x - from.x) * t;
+    const interpY = from.y + (to.y - from.y) * t;
+
+    npcChar.group.position.set(
+      interpX - WORLD_HALF_SIZE,
+      CONFIG.FLOOR_Y + 0.5,
+      interpY - WORLD_HALF_SIZE
+    );
+    npcChar.setMoving(true);
+
+    // Face the direction of movement
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    if (dx !== 0 || dy !== 0) {
+      npcChar.group.rotation.y = Math.atan2(dx, -dy);
     }
   }
 
@@ -363,7 +379,7 @@ export class EntityManager {
     this.npcs.forEach(npc => npc.update(deltaTime));
 
     // Advance NPC commuting
-    this.updateNpcCommute(time);
+    this.updateNpcCommute(time, deltaTime);
 
     // Update light pool based on proximity to player
     const isNight = time >= 19 || time < 6;
