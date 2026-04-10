@@ -394,7 +394,7 @@ function GameUI({
         onMineAction={handleMineAction}
         onOpenMine={openMineScene}
         onRest={handleRest}
-        onRecenter={() => { /* handled by VoxelWorldContainer */ }}
+        onRecenter={() => { /* recenter is self-contained within WorldScene */ }}
         onTravel={handleTravel}
         onSelectMine={handleTravel}
         onCloseMinePicker={() => setShowMinePicker(false)}

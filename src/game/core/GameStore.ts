@@ -29,10 +29,7 @@ export const buildHydratedBuildings = (
     return savedBuildings;
   }
   return Object.fromEntries(
-    Object.entries(BUILDINGS).map(([id, building]) => [
-      id,
-      { ...building, isDiscovered: building.isDiscovered },
-    ]),
+    Object.entries(BUILDINGS).map(([id, building]) => [id, { ...building }]),
   ) as GameState['buildings'];
 };
 
