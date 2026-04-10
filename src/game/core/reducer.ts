@@ -20,6 +20,7 @@ import { getBuildingAccessPosition } from '../../utils/buildingAccess';
 import { findPath } from '../../utils/pathfinding';
 import { buildWorldSurfaceMap, getWorldSurfaceTile, WorldSurfaceMap } from '../../utils/worldSurface';
 import { WORLD_SIZE } from '../../utils/voxelConstants';
+import { refreshAllRelationshipStates } from '../dialogue/relationshipState';
 
 export const applyDirectMoveAction = (
   state: GameState,
@@ -48,9 +49,14 @@ export const applyDialogueChoiceAction = (
   const result = dialogueAction(state);
   const newState = { ...state, ...result } as GameState;
   const withConsequences = applyDialogueSocialConsequences(state, newState, feedbackQueue);
+  // Recompute all NPC relationship states after any dialogue change
+  const withRelationships = {
+    ...withConsequences,
+    npcs: refreshAllRelationshipStates(withConsequences),
+  };
   return feedbackQueue.length === 0
-    ? withConsequences
-    : { ...withConsequences, feedbacks: [...withConsequences.feedbacks, ...feedbackQueue] };
+    ? withRelationships
+    : { ...withRelationships, feedbacks: [...withRelationships.feedbacks, ...feedbackQueue] };
 };
 
 /**

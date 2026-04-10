@@ -194,14 +194,16 @@ export class VoxelEngine {
     this.dirLight.castShadow = true;
     this.dirLight.shadow.mapSize.width = 4096;
     this.dirLight.shadow.mapSize.height = 4096;
-    this.dirLight.shadow.camera.left = -100;
-    this.dirLight.shadow.camera.right = 100;
-    this.dirLight.shadow.camera.top = 100;
-    this.dirLight.shadow.camera.bottom = -100;
+    this.dirLight.shadow.camera.left = -60;
+    this.dirLight.shadow.camera.right = 60;
+    this.dirLight.shadow.camera.top = 60;
+    this.dirLight.shadow.camera.bottom = -60;
     this.dirLight.shadow.camera.near = 0.5;
-    this.dirLight.shadow.camera.far = 400;
+    this.dirLight.shadow.camera.far = 300;
     this.dirLight.shadow.bias = -0.0003;
     this.scene.add(this.dirLight);
+    // Add target to scene so it can be repositioned to follow the player
+    this.scene.add(this.dirLight.target);
 
     // Target Indicator
     const targetGeom = new THREE.RingGeometry(0.4, 0.5, 32);
@@ -387,6 +389,8 @@ export class VoxelEngine {
    * Drive the day/night cycle to the given hour.
    * Updates sun/moon positions, directional-light intensity and colour, ambient
    * light, fog near/far distances, sky dome colour, and street-light activation.
+   * The directional light position and shadow camera follow the player so shadows
+   * are always rendered near the player and move across the world as the sun moves.
    * @param time - Fractional hour in [0, 24).
    */
   public updateTime(time: number) {
@@ -406,17 +410,37 @@ export class VoxelEngine {
 
     this.ambientLight.intensity = 0.1 + dayFactor * 0.2;
     this.hemiLight.intensity = 0.2 + dayFactor * 0.3;
-    
+
+    // Compute sun/moon light direction (normalised)
+    const sunDir = this.sun.position.clone().normalize();
+    const moonDir = this.moon.position.clone().normalize();
+
+    // Position the directional light relative to the *player* so the shadow
+    // frustum always covers the area around the player.  The light offset
+    // encodes the current sun/moon angle so shadows move across the world.
+    const playerPos = this.currentPlayerPos;
+
     if (dayFactor > 0) {
       this.dirLight.intensity = dayFactor * 1.0;
-      this.dirLight.position.copy(this.sun.position).normalize().multiplyScalar(100);
+      this.dirLight.position.set(
+        playerPos.x + sunDir.x * 80,
+        playerPos.y + sunDir.y * 80,
+        playerPos.z + sunDir.z * 80
+      );
       this.dirLight.color.setHex(0xffffff);
     } else {
       const nightFactor = 1 - dayFactor;
       this.dirLight.intensity = nightFactor * 0.3;
-      this.dirLight.position.copy(this.moon.position).normalize().multiplyScalar(100);
+      this.dirLight.position.set(
+        playerPos.x + moonDir.x * 80,
+        playerPos.y + moonDir.y * 80,
+        playerPos.z + moonDir.z * 80
+      );
       this.dirLight.color.setHex(0xaaaaff);
     }
+
+    // Point the directional light at the player so shadow camera is centered there
+    this.dirLight.target.position.copy(playerPos);
 
     const isDay = time >= 6 && time < 18;
     const fogColor = isDay ? 0xe2e8f0 : 0x020617;
@@ -1744,6 +1768,18 @@ export class VoxelEngine {
     this.entities.player.group.rotation.y += diff * Math.min(rotationLerpFactor, 0.5);
 
     this.updateCameraFollow(deltaTime);
+
+    // Keep directional light shadow camera centered on the player each frame
+    // so shadows stay visible near the player as they move
+    this.dirLight.target.position.copy(this.currentPlayerPos);
+    const sunDir = this.sun.position.clone().normalize();
+    const moonDir = this.moon.position.clone().normalize();
+    const lightDir = this.time >= 5 && this.time < 19 ? sunDir : moonDir;
+    this.dirLight.position.set(
+      this.currentPlayerPos.x + lightDir.x * 80,
+      this.currentPlayerPos.y + lightDir.y * 80,
+      this.currentPlayerPos.z + lightDir.z * 80
+    );
     this.updateIntroAnimation();
     this.enforceCameraBounds();
     this.controls.update();
