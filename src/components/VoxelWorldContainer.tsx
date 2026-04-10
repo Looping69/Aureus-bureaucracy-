@@ -145,6 +145,8 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
           engineReadyRef.current = true;
           reportProgress(100, 'Access Granted');
           setLoading(false);
+          // Kick off the intro camera pull-back (close-up → normal isometric view)
+          engineRef.current?.playIntroAnimation();
           if (!readyReportedRef.current) {
             readyReportedRef.current = true;
             onReadyRef.current?.();
