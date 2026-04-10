@@ -16,10 +16,7 @@ export const WorldScene = ({
   onMove, 
   onDirectMove,
   onInteract,
-  onEnterHome,
-  onEnterMine,
   onRecenter,
-  onTravel,
   showDebug = false,
   showInitialLoadingOverlay = true,
   onInitialSceneReady,
@@ -29,16 +26,12 @@ export const WorldScene = ({
   onMove: (pos: WorldPosition, options?: { ignoreDrag?: boolean }) => void,
   onDirectMove: (pos: WorldPosition) => void,
   onInteract: (npcId: string, buildingId: string) => void,
-  onEnterHome: () => void,
-  onEnterMine: () => void,
   onRecenter: () => void,
-  onTravel: (mineId: string) => void,
   showDebug?: boolean,
   showInitialLoadingOverlay?: boolean,
   onInitialSceneReady?: () => void,
   onInitialLoadingProgress?: (progress: number, phase: string) => void
 }) => {
-  const [showTravelMenu, setShowTravelMenu] = React.useState(false);
   const [hoverInfo, setHoverInfo] = React.useState<WorldHoverInfo | null>(null);
   const [pendingSelection, setPendingSelection] = React.useState<WorldHoverInfo | null>(null);
   const [buildingPromptId, setBuildingPromptId] = React.useState<string | null>(null);
@@ -373,13 +366,7 @@ export const WorldScene = ({
         </button>
       </div>
       
-      {/* Travel Menu Overlay (simplified for now) */}
       <AnimatePresence>
-        {showTravelMenu && (
-          <div className="absolute inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-6" onClick={() => setShowTravelMenu(false)}>
-            <div className="bg-white p-4 rounded-2xl">Travel Menu</div>
-          </div>
-        )}
         {promptedBuilding && (
           <motion.div
             key="building-entry-prompt"

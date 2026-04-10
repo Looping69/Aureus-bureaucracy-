@@ -40,6 +40,7 @@ import { saveGameState } from '../save';
 import { buildWorldSurfaceMap, getWorldSurfaceTile } from '../../utils/worldSurface';
 import { WORLD_SIZE } from '../../utils/voxelConstants';
 import { getBuildingAccessPosition } from '../../utils/buildingAccess';
+import { detectRelationshipStateChanges, buildRelationshipChangeNotification } from '../dialogue/relationshipState';
 import { useBuildingDiscovery } from '../../hooks/game/useBuildingDiscovery';
 import { useFeedbackCleanup } from '../../hooks/game/useFeedbackCleanup';
 import { useMovementLoop } from '../../hooks/game/useMovementLoop';
@@ -144,7 +145,17 @@ export function GameProvider({ initialState, children }: GameProviderProps) {
     // ── DIALOGUE_CHOICE: capture both direct and social feedback queues ──
     if (action.type === 'DIALOGUE_CHOICE') {
       queuedFeedbackRef.current = [];
-      setGameState(prev => applyDialogueChoiceAction(prev, action.dialogueAction, queuedFeedbackRef.current));
+      setGameState(prev => {
+        const next = applyDialogueChoiceAction(prev, action.dialogueAction, queuedFeedbackRef.current);
+        // Detect relationship state changes and show a notification
+        const changes = detectRelationshipStateChanges(prev.npcs, next.npcs);
+        const notif = buildRelationshipChangeNotification(changes);
+        if (notif) {
+          // Schedule the notification outside the state updater
+          Promise.resolve().then(() => setNotification(notif));
+        }
+        return next;
+      });
       return;
     }
 
