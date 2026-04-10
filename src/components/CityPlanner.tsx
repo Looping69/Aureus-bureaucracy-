@@ -232,6 +232,7 @@ export const CityPlanner: React.FC<CityPlannerProps> = ({ state, onUpdateBuildin
   const [activeCategory, setActiveCategory] = useState<BuildingCategory>('ALL');
   const [showZoneOverlay, setShowZoneOverlay] = useState(false);
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
+  const buildingIdCounter = useRef(0);
 
   const { current: tempBuildings, push: pushHistory, undo, redo, canUndo, canRedo } = useHistory(state.buildings);
 
@@ -301,7 +302,7 @@ export const CityPlanner: React.FC<CityPlannerProps> = ({ state, onUpdateBuildin
   const placeBuilding = (pos: {x: number, y: number}) => {
     if (!selectedTemplate || !isValidPlacement(pos.x, pos.y)) return;
 
-    const newId = `custom_${Date.now()}_${Math.floor(Math.random() * 0xFFFFFF).toString(16)}`;
+    const newId = `custom_${Date.now()}_${buildingIdCounter.current++}`;
     const worldPos = {
       x: pos.x * WORLD_SCALE + 5,
       y: pos.y * WORLD_SCALE + 5

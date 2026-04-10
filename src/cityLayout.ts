@@ -119,6 +119,9 @@ export const generateCityLayout = (
   const occupied = new Set<string>();
   let idCounter = 0;
 
+  /** Maximum scatter-placement attempts before giving up on a category. */
+  const MAX_PLACEMENT_ATTEMPTS = 200;
+
   const nextId = (prefix: string) => `proc_${prefix}_${idCounter++}`;
 
   const tryPlace = (
@@ -254,7 +257,7 @@ export const generateCityLayout = (
   const houseNames = ['Townhouse', 'Bungalow', 'Worker Cabin'];
   let housesPlaced = 0;
   let attempts = 0;
-  while (housesPlaced < cfg.houseCount && attempts < 200) {
+  while (housesPlaced < cfg.houseCount && attempts < MAX_PLACEMENT_ATTEMPTS) {
     attempts++;
     const gx = Math.floor(rng() * (cfg.gridSize - 4)) + 2;
     const gy = Math.floor(rng() * (cfg.gridSize - 4)) + 2;
@@ -279,7 +282,7 @@ export const generateCityLayout = (
   // 4. Place offices near the center
   let officesPlaced = 0;
   attempts = 0;
-  while (officesPlaced < cfg.officeCount && attempts < 100) {
+  while (officesPlaced < cfg.officeCount && attempts < MAX_PLACEMENT_ATTEMPTS) {
     attempts++;
     const gx = centerG + Math.floor(rng() * 8) - 4;
     const gy = centerG + Math.floor(rng() * 8) - 4;
@@ -298,7 +301,7 @@ export const generateCityLayout = (
   ];
   let parksPlaced = 0;
   attempts = 0;
-  while (parksPlaced < cfg.parkCount && attempts < 200) {
+  while (parksPlaced < cfg.parkCount && attempts < MAX_PLACEMENT_ATTEMPTS) {
     attempts++;
     const gx = Math.floor(rng() * (cfg.gridSize - 2)) + 1;
     const gy = Math.floor(rng() * (cfg.gridSize - 2)) + 1;
