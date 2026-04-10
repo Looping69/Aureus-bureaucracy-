@@ -117,6 +117,12 @@ export class VoxelEngine {
   private firstPositionSet: boolean = false;
   private requestedPlayerMoving: boolean = false;
 
+  // --- Intro camera animation state ---
+  private static readonly INTRO_CLOSE_DISTANCE = 12;          // Start zoomed in close to character
+  private static readonly INTRO_DURATION_MS = 2200;            // Total pull-back duration
+  private introAnimationActive: boolean = false;
+  private introStartTime: number = 0;
+
   // --- Constructor ---
   constructor(
     container: HTMLElement, 
@@ -248,15 +254,7 @@ export class VoxelEngine {
       0x64748b
     );
     this.worldGrid.position.set(-0.5, CONFIG.FLOOR_Y + 0.02, -0.5);
-    const gridMaterial = this.worldGrid.material as THREE.Material | THREE.Material[];
-    const materials = Array.isArray(gridMaterial) ? gridMaterial : [gridMaterial];
-    materials.forEach((material) => {
-      if (material instanceof THREE.LineBasicMaterial) {
-        material.transparent = true;
-        material.opacity = 0;
-        material.depthWrite = false;
-      }
-    });
+    this.worldGrid.visible = false;
     this.scene.add(this.worldGrid);
 
     // Edge decorations – place motifs from background.json around the world
@@ -548,6 +546,60 @@ export class VoxelEngine {
     this.camera.position.copy(this.currentCameraFocus).add(WORLD_CAMERA_OFFSET);
     this.enforceCameraBounds();
     this.controls.update();
+  }
+
+  /**
+   * Kick off a smooth intro camera pull-back.  Starts with the camera
+   * zoomed tight on the player character and eases out to the normal
+   * isometric distance over {@link INTRO_DURATION_MS} milliseconds.
+   * Safe to call multiple times — subsequent calls are no-ops while
+   * an intro is already running.
+   */
+  public playIntroAnimation() {
+    if (this.introAnimationActive) return;
+    this.introAnimationActive = true;
+    this.introStartTime = performance.now();
+
+    // Snap focus on the player and position the camera at the close-up distance
+    this.targetCameraFocus.copy(this.currentPlayerPos);
+    this.currentCameraFocus.copy(this.currentPlayerPos);
+    this.controls.target.copy(this.currentCameraFocus);
+
+    const closeOffset = WORLD_CAMERA_OFFSET.clone()
+      .normalize()
+      .multiplyScalar(VoxelEngine.INTRO_CLOSE_DISTANCE);
+    this.camera.position.copy(this.currentCameraFocus).add(closeOffset);
+    this.enforceCameraBounds();
+    this.controls.update();
+  }
+
+  /** Advance the intro pull-back each frame.  Called from animate(). */
+  private updateIntroAnimation() {
+    if (!this.introAnimationActive) return;
+
+    const elapsed = performance.now() - this.introStartTime;
+    const t = Math.min(elapsed / VoxelEngine.INTRO_DURATION_MS, 1);
+
+    // Smooth ease-out (cubic)
+    const ease = 1 - Math.pow(1 - t, 3);
+
+    const distance = THREE.MathUtils.lerp(
+      VoxelEngine.INTRO_CLOSE_DISTANCE,
+      WORLD_CAMERA_DISTANCE,
+      ease,
+    );
+
+    const direction = WORLD_CAMERA_OFFSET.clone().normalize();
+    this.camera.position
+      .copy(this.controls.target)
+      .addScaledVector(direction, distance);
+
+    this.enforceCameraBounds();
+    this.controls.update();
+
+    if (t >= 1) {
+      this.introAnimationActive = false;
+    }
   }
 
   private updateCameraFollow(deltaTime: number) {
@@ -1692,6 +1744,7 @@ export class VoxelEngine {
     this.entities.player.group.rotation.y += diff * Math.min(rotationLerpFactor, 0.5);
 
     this.updateCameraFollow(deltaTime);
+    this.updateIntroAnimation();
     this.enforceCameraBounds();
     this.controls.update();
     this.physicsWorld.step(1 / 60, deltaTime, 3);
