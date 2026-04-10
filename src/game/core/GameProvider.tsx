@@ -31,11 +31,10 @@ import React, {
 } from 'react';
 import { GameState, RelationshipFeedback } from '../../types';
 import { GameAction } from './actions';
-import { gameReducer } from './reducer';
+import { applyDialogueChoiceAction, applyDirectMoveAction, gameReducer } from './reducer';
 import { getNotificationForAction } from './effects';
 import { buildInitialGameState } from './GameStore';
 import { queueFeedback } from '../actions/dialogueActions';
-import { applyDialogueSocialConsequences } from '../actions/dialogueActions';
 import { getUnlockedEnding } from '../endings';
 import { saveGameState } from '../save';
 import { buildWorldSurfaceMap, getWorldSurfaceTile } from '../../utils/worldSurface';
@@ -145,20 +144,7 @@ export function GameProvider({ initialState, children }: GameProviderProps) {
     // ── DIALOGUE_CHOICE: capture both direct and social feedback queues ──
     if (action.type === 'DIALOGUE_CHOICE') {
       queuedFeedbackRef.current = [];
-      setGameState(prev => {
-        const result = action.dialogueAction(prev);
-        const newState = { ...prev, ...result } as GameState;
-        const withConsequences = applyDialogueSocialConsequences(
-          prev,
-          newState,
-          queuedFeedbackRef.current,
-        );
-        if (queuedFeedbackRef.current.length === 0) return withConsequences;
-        return {
-          ...withConsequences,
-          feedbacks: [...withConsequences.feedbacks, ...queuedFeedbackRef.current],
-        };
-      });
+      setGameState(prev => applyDialogueChoiceAction(prev, action.dialogueAction, queuedFeedbackRef.current));
       return;
     }
 
@@ -178,20 +164,7 @@ export function GameProvider({ initialState, children }: GameProviderProps) {
         if (!cached || cached.buildings !== prev.buildings) {
           cachedSurfaceMapRef.current = { buildings: prev.buildings, map: surfaceMap };
         }
-
-        const tile = getWorldSurfaceTile(surfaceMap, action.pos.x, action.pos.y);
-        if (!tile || !tile.walkable) {
-          return shouldClearPath ? { ...prev, path: [], targetPos: null } : prev;
-        }
-        const energyCost = sameTile ? 0 : 0.35;
-        if (energyCost > 0 && prev.energy <= energyCost) return prev;
-        return {
-          ...prev,
-          playerPos: action.pos,
-          path: [],
-          targetPos: null,
-          energy: prev.energy - energyCost,
-        };
+        return applyDirectMoveAction(prev, action.pos, { surfaceMap });
       });
       return;
     }
