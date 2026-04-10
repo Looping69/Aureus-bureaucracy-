@@ -4,8 +4,11 @@
  *
  * The algorithm uses an **octile-distance** heuristic to handle diagonal movement
  * efficiently. Blocked tiles (building foundations) are collected into a `Set<string>`
- * for O(1) lookup.  The open list is a plain array with a linear min-scan; sufficient
- * for world sizes up to 240×240 tiles.
+ * for O(1) lookup.  The open list is a **binary min-heap** for O(log n) extract-min,
+ * replacing the original O(n) linear scan.
+ *
+ * Surface maps are **cached** by buildings reference to avoid rebuilding the
+ * 240×240-tile grid on every pathfind call.
  *
  * Entry point: {@link findPath}.
  */
@@ -17,6 +20,7 @@ import {
   getWorldSurfaceTile,
   type WorldSurfaceMap,
 } from './worldSurface';
+import { MinHeap } from './MinHeap';
 
 /**
  * Single node in the A* search tree.
@@ -120,7 +124,10 @@ const reconstructPath = (node: PathNode) => {
  */
 const NPC_OFF_ROAD_PENALTY = 6;
 
-/** Core A* loop operating on a pre-built surface map and blocked-tile set. */
+/**
+ * Core A* loop operating on a pre-built surface map and blocked-tile set.
+ * Uses a binary min-heap for O(log n) extract-min instead of O(n) linear scan.
+ */
 const findPathOnGrid = (
   start: WorldPosition,
   end: WorldPosition,
@@ -129,7 +136,7 @@ const findPathOnGrid = (
   surfaceMap: WorldSurfaceMap,
   preferRoads: boolean = false
 ): WorldPosition[] => {
-  const openList: PathNode[] = [];
+  const openHeap = new MinHeap<PathNode>();
   const openMap = new Map<string, PathNode>();
   const closed = new Set<string>();
 
@@ -150,21 +157,14 @@ const findPathOnGrid = (
   };
   startNode.f = startNode.g + startNode.h;
 
-  openList.push(startNode);
+  openHeap.push(startNode);
   openMap.set(keyFor(start.x, start.y), startNode);
 
-  while (openList.length > 0) {
-    let currentIndex = 0;
-    for (let i = 1; i < openList.length; i++) {
-      if (openList[i].f < openList[currentIndex].f) {
-        currentIndex = i;
-      }
-    }
-
-    const current = openList[currentIndex];
-    openList.splice(currentIndex, 1);
-    openMap.delete(keyFor(current.x, current.y));
-    closed.add(keyFor(current.x, current.y));
+  while (!openHeap.isEmpty()) {
+    const current = openHeap.pop()!;
+    const currentKey = keyFor(current.x, current.y);
+    openMap.delete(currentKey);
+    closed.add(currentKey);
 
     if (current.x === end.x && current.y === end.y) {
       return reconstructPath(current);
@@ -226,17 +226,60 @@ const findPathOnGrid = (
           parent: current,
         };
         node.f = node.g + node.h;
-        openList.push(node);
+        openHeap.push(node);
         openMap.set(nextKey, node);
       } else if (g < existing.g) {
         existing.g = g;
         existing.f = existing.g + existing.h;
         existing.parent = current;
+        openHeap.decreaseKey(existing);
       }
     }
   }
 
   return [];
+};
+
+// ── Surface-map cache ───────────────────────────────────────────────────────
+// Cache the surface map and blocked-tile set by buildings reference so that
+// consecutive pathfind calls on the same frame/buildings don't rebuild the
+// full 240×240-tile grid.
+
+let _cachedBuildings: Record<string, Building> | null = null;
+let _cachedMapSize: number = 0;
+let _cachedSurfaceMap: WorldSurfaceMap | null = null;
+let _cachedBlocked: Set<string> | null = null;
+
+const getCachedSurfaceData = (
+  buildings: Record<string, Building>,
+  mapSize: number
+) => {
+  if (
+    _cachedSurfaceMap &&
+    _cachedBlocked &&
+    _cachedBuildings === buildings &&
+    _cachedMapSize === mapSize
+  ) {
+    return { surfaceMap: _cachedSurfaceMap, blocked: _cachedBlocked };
+  }
+
+  const surfaceMap = buildWorldSurfaceMap(buildings, mapSize);
+  const blocked = buildBlockedTiles(surfaceMap);
+
+  _cachedBuildings = buildings;
+  _cachedMapSize = mapSize;
+  _cachedSurfaceMap = surfaceMap;
+  _cachedBlocked = blocked;
+
+  return { surfaceMap, blocked };
+};
+
+/** Explicitly invalidate the surface-map cache (call after building changes). */
+export const invalidatePathfindingCache = () => {
+  _cachedBuildings = null;
+  _cachedMapSize = 0;
+  _cachedSurfaceMap = null;
+  _cachedBlocked = null;
 };
 
 /**
@@ -255,8 +298,9 @@ export const findPath = (
   buildings: Record<string, Building>,
   mapSize: number = WORLD_SIZE
 ): WorldPosition[] => {
-  const surfaceMap = buildWorldSurfaceMap(buildings, mapSize);
-  const blocked = buildBlockedTiles(surfaceMap);
+  const { surfaceMap, blocked: cachedBlocked } = getCachedSurfaceData(buildings, mapSize);
+  // Clone the blocked set so per-call tweaks (deleting start tile) don't persist
+  const blocked = new Set(cachedBlocked);
 
   const startTile = getNearestWalkableTile(clampWorldPosition(start, mapSize), surfaceMap);
   const endTile = getNearestWalkableTile(clampWorldPosition(end, mapSize), surfaceMap);
@@ -288,8 +332,8 @@ export const findNpcPath = (
   buildings: Record<string, Building>,
   mapSize: number = WORLD_SIZE
 ): WorldPosition[] => {
-  const surfaceMap = buildWorldSurfaceMap(buildings, mapSize);
-  const blocked = buildBlockedTiles(surfaceMap);
+  const { surfaceMap, blocked: cachedBlocked } = getCachedSurfaceData(buildings, mapSize);
+  const blocked = new Set(cachedBlocked);
 
   const startTile = getNearestWalkableTile(clampWorldPosition(start, mapSize), surfaceMap);
   const endTile = getNearestWalkableTile(clampWorldPosition(end, mapSize), surfaceMap);

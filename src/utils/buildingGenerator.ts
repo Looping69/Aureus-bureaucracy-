@@ -6,6 +6,50 @@ export interface Voxel {
   c: string;
 }
 
+/**
+ * Rotation preset for building voxels.
+ * 0 = no rotation (original), 1 = 90° CW, 2 = 180°, 3 = 270° CW.
+ */
+export type RotationStep = 0 | 1 | 2 | 3;
+
+/**
+ * Rotate a voxel array by the given step around the Y axis (vertical).
+ * Each step is 90° clockwise when viewed from above.
+ *
+ * @param voxels - Source voxel array.
+ * @param step   - Rotation step (0–3).
+ * @returns New voxel array with rotated coordinates and fresh IDs.
+ */
+export const rotateVoxels = (voxels: Voxel[], step: RotationStep): Voxel[] => {
+  if (step === 0) return voxels;
+
+  return voxels.map((v, idx) => {
+    let { x, y } = v;
+    const { z, c } = v;
+
+    for (let i = 0; i < step; i++) {
+      const temp = x;
+      x = -y;
+      y = temp;
+    }
+
+    return { id: idx, x, y, z, c };
+  });
+};
+
+/**
+ * Mirror a voxel array along the X axis.
+ * Useful for creating building variants from one definition.
+ */
+export const mirrorVoxelsX = (voxels: Voxel[]): Voxel[] =>
+  voxels.map((v, idx) => ({ ...v, id: idx, x: -v.x }));
+
+/**
+ * Mirror a voxel array along the Y axis.
+ */
+export const mirrorVoxelsY = (voxels: Voxel[]): Voxel[] =>
+  voxels.map((v, idx) => ({ ...v, id: idx, y: -v.y }));
+
 export class BuildingGenerator {
   private voxelsMap: Map<string, Voxel> = new Map();
   private nextId = 0;
@@ -63,6 +107,13 @@ export class BuildingGenerator {
           }
         }
       }
+    }
+  }
+
+  /** Merge voxels from another generator (for composing buildings from sub-parts). */
+  merge(other: BuildingGenerator, offsetX = 0, offsetY = 0, offsetZ = 0) {
+    for (const v of other.getVoxels()) {
+      this.addVoxel(v.x + offsetX, v.y + offsetY, v.z + offsetZ, v.c);
     }
   }
 

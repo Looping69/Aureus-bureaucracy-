@@ -1,11 +1,14 @@
 import { Building, VoxelData } from '../types';
 import { COLORS, CONFIG, WORLD_HALF_SIZE, WORLD_SIZE } from './voxelConstants';
 import {
-  getBuildingFootprint,
   getStructureBaseHeight,
   isSolidBuilding,
 } from './worldNavigation';
 import type { BuildingFootprint } from './worldNavigation';
+import {
+  deriveFootprint,
+  isInsideFootprint as isInsideFootprintShared,
+} from './buildingFootprint';
 
 export type SurfaceKind =
   | 'GROUND'
@@ -88,48 +91,6 @@ const terrainHeightAt = (x: number, y: number, mapSize: number = WORLD_SIZE) => 
   return quantizeHeight(tier + wobble);
 };
 
-const isInsideFootprint = (
-  x: number,
-  y: number,
-  footprint: BuildingFootprint,
-  padding: number = 0
-) =>
-  x >= footprint.minX - padding &&
-  x <= footprint.maxX + padding &&
-  y >= footprint.minY - padding &&
-  y <= footprint.maxY + padding;
-
-const deriveFootprint = (building: Building): BuildingFootprint => {
-  if (building.voxels && building.voxels.length > 0) {
-    return building.voxels.reduce(
-      (bounds, voxel) => ({
-        minX: Math.min(bounds.minX, building.pos.x + voxel.x),
-        maxX: Math.max(bounds.maxX, building.pos.x + voxel.x),
-        minY: Math.min(bounds.minY, building.pos.y + voxel.y),
-        maxY: Math.max(bounds.maxY, building.pos.y + voxel.y),
-      }),
-      {
-        minX: Number.POSITIVE_INFINITY,
-        maxX: Number.NEGATIVE_INFINITY,
-        minY: Number.POSITIVE_INFINITY,
-        maxY: Number.NEGATIVE_INFINITY,
-      }
-    );
-  }
-
-  const solidFootprint = getBuildingFootprint(building);
-  if (solidFootprint) {
-    return solidFootprint;
-  }
-
-  return {
-    minX: building.pos.x - 1,
-    maxX: building.pos.x + 1,
-    minY: building.pos.y - 1,
-    maxY: building.pos.y + 1,
-  };
-};
-
 const applyBaseTerrain = (tile: SurfaceTile, mapSize: number = WORLD_SIZE) => {
   let height = terrainHeightAt(tile.x, tile.y, mapSize);
 
@@ -194,7 +155,7 @@ export const buildWorldSurfaceMap = (
       applyBaseTerrain(tile, mapSize);
 
       for (const { building, footprint } of footprintEntries) {
-        if (!isInsideFootprint(x, y, footprint, 1)) {
+        if (!isInsideFootprintShared(x, y, footprint, 1)) {
           continue;
         }
 
@@ -212,7 +173,7 @@ export const buildWorldSurfaceMap = (
           continue;
         }
 
-        if (isInsideFootprint(x, y, footprint, 0)) {
+        if (isInsideFootprintShared(x, y, footprint, 0)) {
           applyBlockedSurface(tile, building.id, foundationHeight);
           continue;
         }
