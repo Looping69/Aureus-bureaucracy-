@@ -18,8 +18,40 @@ import { applyDailyEconomyTick, applyOreExport } from '../economy';
 import { applyOperationAction } from '../runCycle';
 import { getBuildingAccessPosition } from '../../utils/buildingAccess';
 import { findPath } from '../../utils/pathfinding';
-import { buildWorldSurfaceMap, getWorldSurfaceTile } from '../../utils/worldSurface';
+import { buildWorldSurfaceMap, getWorldSurfaceTile, WorldSurfaceMap } from '../../utils/worldSurface';
 import { WORLD_SIZE } from '../../utils/voxelConstants';
+
+export const applyDirectMoveAction = (
+  state: GameState,
+  pos: { x: number; y: number },
+  options?: { surfaceMap?: WorldSurfaceMap },
+): GameState => {
+  const sameTile = state.playerPos.x === pos.x && state.playerPos.y === pos.y;
+  const shouldClearPath = state.path.length > 0 || state.targetPos !== null;
+  if (sameTile && !shouldClearPath) return state;
+
+  const surfaceMap = options?.surfaceMap ?? buildWorldSurfaceMap(state.buildings, WORLD_SIZE);
+  const tile = getWorldSurfaceTile(surfaceMap, pos.x, pos.y);
+  if (!tile || !tile.walkable) {
+    return shouldClearPath ? { ...state, path: [], targetPos: null } : state;
+  }
+  const energyCost = sameTile ? 0 : 0.35;
+  if (energyCost > 0 && state.energy <= energyCost) return state;
+  return { ...state, playerPos: pos, path: [], targetPos: null, energy: state.energy - energyCost };
+};
+
+export const applyDialogueChoiceAction = (
+  state: GameState,
+  dialogueAction: (s: GameState) => Partial<GameState>,
+  feedbackQueue: RelationshipFeedback[] = [],
+): GameState => {
+  const result = dialogueAction(state);
+  const newState = { ...state, ...result } as GameState;
+  const withConsequences = applyDialogueSocialConsequences(state, newState, feedbackQueue);
+  return feedbackQueue.length === 0
+    ? withConsequences
+    : { ...withConsequences, feedbacks: [...withConsequences.feedbacks, ...feedbackQueue] };
+};
 
 /**
  * Central pure reducer.
@@ -122,19 +154,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
      * directly from tests the map is rebuilt inline (no cache).
      */
     case 'DIRECT_MOVE': {
-      const { pos } = action;
-      const sameTile = state.playerPos.x === pos.x && state.playerPos.y === pos.y;
-      const shouldClearPath = state.path.length > 0 || state.targetPos !== null;
-      if (sameTile && !shouldClearPath) return state;
-
-      const surfaceMap = buildWorldSurfaceMap(state.buildings, WORLD_SIZE);
-      const tile = getWorldSurfaceTile(surfaceMap, pos.x, pos.y);
-      if (!tile || !tile.walkable) {
-        return shouldClearPath ? { ...state, path: [], targetPos: null } : state;
-      }
-      const energyCost = sameTile ? 0 : 0.35;
-      if (energyCost > 0 && state.energy <= energyCost) return state;
-      return { ...state, playerPos: pos, path: [], targetPos: null, energy: state.energy - energyCost };
+      return applyDirectMoveAction(state, action.pos);
     }
 
     case 'REST': {
@@ -210,13 +230,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
      * to capture both queues; this case handles the pure state portion only.
      */
     case 'DIALOGUE_CHOICE': {
-      const queue: RelationshipFeedback[] = [];
-      const result = action.dialogueAction(state);
-      const newState = { ...state, ...result } as GameState;
-      const withConsequences = applyDialogueSocialConsequences(state, newState, queue);
-      return queue.length === 0
-        ? withConsequences
-        : { ...withConsequences, feedbacks: [...withConsequences.feedbacks, ...queue] };
+      return applyDialogueChoiceAction(state, action.dialogueAction);
     }
 
     case 'SELECT_NPC':
