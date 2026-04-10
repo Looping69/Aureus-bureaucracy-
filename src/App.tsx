@@ -395,7 +395,6 @@ function GameUI({
         onOpenMine={openMineScene}
         onRest={handleRest}
         onRecenter={() => { /* recenter is self-contained within WorldScene */ }}
-        onTravel={handleTravel}
         onSelectMine={handleTravel}
         onCloseMinePicker={() => setShowMinePicker(false)}
         onWorldInteract={handleWorldInteract}
