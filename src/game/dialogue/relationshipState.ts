@@ -90,6 +90,14 @@ const RELATIONSHIP_STATE_LABELS: Record<NpcRelationshipState, string> = {
   disillusioned: 'Disillusioned',
 };
 
+/** A single NPC relationship state transition. */
+export interface RelationshipStateChange {
+  npcId: string;
+  npcName: string;
+  from: NpcRelationshipState;
+  to: NpcRelationshipState;
+}
+
 /**
  * Compare old and new NPC records and return descriptions of any
  * relationship-state transitions.  Pure; no side-effects.
@@ -97,8 +105,8 @@ const RELATIONSHIP_STATE_LABELS: Record<NpcRelationshipState, string> = {
 export const detectRelationshipStateChanges = (
   oldNpcs: Record<string, NPC>,
   newNpcs: Record<string, NPC>,
-): Array<{ npcId: string; npcName: string; from: NpcRelationshipState; to: NpcRelationshipState }> => {
-  const changes: Array<{ npcId: string; npcName: string; from: NpcRelationshipState; to: NpcRelationshipState }> = [];
+): RelationshipStateChange[] => {
+  const changes: RelationshipStateChange[] = [];
   for (const [id, newNpc] of Object.entries(newNpcs)) {
     const oldNpc = oldNpcs[id];
     if (!oldNpc) continue;
@@ -119,7 +127,7 @@ export const detectRelationshipStateChanges = (
  * or `null` if no transitions occurred.
  */
 export const buildRelationshipChangeNotification = (
-  changes: Array<{ npcId: string; npcName: string; from: NpcRelationshipState; to: NpcRelationshipState }>,
+  changes: RelationshipStateChange[],
 ): { title: string; msg: string } | null => {
   if (changes.length === 0) return null;
   if (changes.length === 1) {

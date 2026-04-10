@@ -145,11 +145,10 @@ export function GameProvider({ initialState, children }: GameProviderProps) {
     // ── DIALOGUE_CHOICE: capture both direct and social feedback queues ──
     if (action.type === 'DIALOGUE_CHOICE') {
       queuedFeedbackRef.current = [];
-      const prevNpcs = stateRef.current.npcs;
       setGameState(prev => {
         const next = applyDialogueChoiceAction(prev, action.dialogueAction, queuedFeedbackRef.current);
         // Detect relationship state changes and show a notification
-        const changes = detectRelationshipStateChanges(prevNpcs, next.npcs);
+        const changes = detectRelationshipStateChanges(prev.npcs, next.npcs);
         const notif = buildRelationshipChangeNotification(changes);
         if (notif) {
           // Schedule the notification outside the state updater
