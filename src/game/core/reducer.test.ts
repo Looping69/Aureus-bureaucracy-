@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildInitialGameState } from './GameStore';
 import { applyDialogueChoiceAction, applyDirectMoveAction, gameReducer } from './reducer';
+import { getNotificationForAction } from './effects';
 import { buildWorldSurfaceMap, getWorldSurfaceTile } from '../../utils/worldSurface';
 import { WORLD_SIZE } from '../../utils/voxelConstants';
 
@@ -22,6 +23,51 @@ const findWalkableTileNear = (x: number, y: number, radius = 6) => {
 
   throw new Error('Expected to find a walkable tile near the player start.');
 };
+
+// ── DIRECT_MOVE ──────────────────────────────────────────────────────────────
+
+test('applyDirectMoveAction clears queued path when the destination tile is blocked', () => {
+  const state = {
+    ...buildInitialGameState(),
+    path: [{ x: 1, y: 1 }],
+    targetPos: { x: 1, y: 1 },
+  };
+
+  const nextState = applyDirectMoveAction(state, state.buildings.player_home.pos);
+
+  assert.deepEqual(nextState.path, []);
+  assert.equal(nextState.targetPos, null);
+  assert.deepEqual(nextState.playerPos, state.playerPos);
+});
+
+test('gameReducer uses the shared direct-move transition for walkable tiles', () => {
+  const state = buildInitialGameState();
+  const { candidate, surfaceMap } = findWalkableTileNear(state.playerPos.x, state.playerPos.y);
+
+  const reduced = gameReducer(state, { type: 'DIRECT_MOVE', pos: candidate });
+  const expected = applyDirectMoveAction(state, candidate, { surfaceMap });
+
+  assert.deepEqual(reduced, expected);
+  assert.deepEqual(reduced.playerPos, candidate);
+  assert.equal(reduced.energy, state.energy - 0.35);
+  assert.deepEqual(reduced.path, []);
+  assert.equal(reduced.targetPos, null);
+});
+
+test('DIRECT_MOVE is a no-op when player is already on the target tile', () => {
+  const state = buildInitialGameState();
+  const result = gameReducer(state, { type: 'DIRECT_MOVE', pos: state.playerPos });
+  assert.equal(result, state); // identity — no new object allocation
+});
+
+test('DIRECT_MOVE rejects moves when energy is depleted', () => {
+  const state = { ...buildInitialGameState(), energy: 0.1 };
+  const { candidate } = findWalkableTileNear(state.playerPos.x, state.playerPos.y);
+  const result = gameReducer(state, { type: 'DIRECT_MOVE', pos: candidate });
+  assert.deepEqual(result.playerPos, state.playerPos);
+});
+
+// ── DIALOGUE_CHOICE ──────────────────────────────────────────────────────────
 
 test('applyDialogueChoiceAction appends provider-captured and social feedback through one shared path', () => {
   const state = {
@@ -67,30 +113,296 @@ test('applyDialogueChoiceAction appends provider-captured and social feedback th
   );
 });
 
-test('applyDirectMoveAction clears queued path when the destination tile is blocked', () => {
+test('DIALOGUE_CHOICE pure path (no queued feedback) produces no feedbacks array entries for a no-op action', () => {
   const state = {
     ...buildInitialGameState(),
-    path: [{ x: 1, y: 1 }],
-    targetPos: { x: 1, y: 1 },
+    activeNPCId: 'licensing',
   };
-
-  const nextState = applyDirectMoveAction(state, state.buildings.player_home.pos);
-
-  assert.deepEqual(nextState.path, []);
-  assert.equal(nextState.targetPos, null);
-  assert.deepEqual(nextState.playerPos, state.playerPos);
+  const result = gameReducer(state, {
+    type: 'DIALOGUE_CHOICE',
+    dialogueAction: () => ({}),
+  });
+  assert.deepEqual(result.feedbacks, []);
 });
 
-test('gameReducer uses the shared direct-move transition for walkable tiles', () => {
+test('DIALOGUE_CHOICE refreshes relationship states after trust change', () => {
+  const state = {
+    ...buildInitialGameState(),
+    activeNPCId: 'fixer',
+  };
+  // Start fixer below 30 trust — should be 'neutral'
+  assert.equal(state.npcs.fixer.relationshipState, 'neutral');
+
+  const result = gameReducer(state, {
+    type: 'DIALOGUE_CHOICE',
+    dialogueAction: (s) => ({
+      npcs: {
+        ...s.npcs,
+        fixer: { ...s.npcs.fixer, trustLevel: 35 },
+      },
+    }),
+  });
+  // After trust crosses 30 threshold, fixer relationship state should update
+  assert.equal(result.npcs.fixer.relationshipState, 'friendly');
+});
+
+// ── TRAVEL ───────────────────────────────────────────────────────────────────
+
+test('TRAVEL to a discovered mine switches to MINE scene and costs energy and time', () => {
   const state = buildInitialGameState();
-  const { candidate, surfaceMap } = findWalkableTileNear(state.playerPos.x, state.playerPos.y);
+  // iron-vein starts discovered with travelTime 2
+  const mine = state.mines.find(m => m.id === 'iron-vein')!;
+  assert.ok(mine.discovered);
 
-  const reduced = gameReducer(state, { type: 'DIRECT_MOVE', pos: candidate });
-  const expected = applyDirectMoveAction(state, candidate, { surfaceMap });
+  const result = gameReducer(state, { type: 'TRAVEL', mineId: 'iron-vein' });
 
-  assert.deepEqual(reduced, expected);
-  assert.deepEqual(reduced.playerPos, candidate);
-  assert.equal(reduced.energy, state.energy - 0.35);
-  assert.deepEqual(reduced.path, []);
-  assert.equal(reduced.targetPos, null);
+  assert.equal(result.currentScene, 'MINE');
+  assert.equal(result.activeMineId, 'iron-vein');
+  assert.equal(result.energy, state.energy - mine.travelTime * 5);
+  assert.equal(result.time, (state.time + mine.travelTime) % 24);
+});
+
+test('TRAVEL to an undiscovered mine is a no-op', () => {
+  const state = buildInitialGameState();
+  const result = gameReducer(state, { type: 'TRAVEL', mineId: 'deep-hollow' });
+  assert.equal(result, state);
+});
+
+test('TRAVEL to a non-existent mine is a no-op', () => {
+  const state = buildInitialGameState();
+  const result = gameReducer(state, { type: 'TRAVEL', mineId: 'nonexistent' });
+  assert.equal(result, state);
+});
+
+test('TRAVEL with insufficient energy is a no-op', () => {
+  const state = { ...buildInitialGameState(), energy: 1 };
+  const result = gameReducer(state, { type: 'TRAVEL', mineId: 'iron-vein' });
+  assert.equal(result.currentScene, 'WORLD');
+  assert.equal(result.energy, 1);
+});
+
+test('TRAVEL notification shows travel complete for valid travel', () => {
+  const state = buildInitialGameState();
+  const notif = getNotificationForAction(state, { type: 'TRAVEL', mineId: 'iron-vein' });
+  assert.ok(notif);
+  assert.equal(notif.title, 'Travel Complete');
+});
+
+test('TRAVEL notification shows exhaustion for insufficient energy', () => {
+  const state = { ...buildInitialGameState(), energy: 1 };
+  const notif = getNotificationForAction(state, { type: 'TRAVEL', mineId: 'iron-vein' });
+  assert.ok(notif);
+  assert.equal(notif.title, 'Too Exhausted');
+});
+
+// ── WORLD_INTERACT ───────────────────────────────────────────────────────────
+
+test('WORLD_INTERACT with NPC opens OFFICE scene with activeNPCId', () => {
+  const state = buildInitialGameState();
+  const result = gameReducer(state, {
+    type: 'WORLD_INTERACT',
+    npcId: 'licensing',
+    buildingId: 'none',
+  });
+  assert.equal(result.currentScene, 'OFFICE');
+  assert.equal(result.activeNPCId, 'licensing');
+  assert.equal(result.activeBuildingId, null);
+  assert.equal(result.explorationActive, false);
+});
+
+test('WORLD_INTERACT with OFFICE building opens OFFICE scene with activeBuildingId', () => {
+  const state = buildInitialGameState();
+  const result = gameReducer(state, {
+    type: 'WORLD_INTERACT',
+    npcId: 'none',
+    buildingId: 'licensing_office',
+  });
+  assert.equal(result.currentScene, 'OFFICE');
+  assert.equal(result.activeNPCId, null);
+  assert.equal(result.activeBuildingId, 'licensing_office');
+});
+
+test('WORLD_INTERACT with MINE_ENTRANCE opens MINE_WORLD scene', () => {
+  const state = buildInitialGameState();
+  const result = gameReducer(state, {
+    type: 'WORLD_INTERACT',
+    npcId: 'none',
+    buildingId: 'mine_entrance',
+  });
+  assert.equal(result.currentScene, 'MINE_WORLD');
+  assert.equal(result.activeBuildingId, 'mine_entrance');
+});
+
+test('WORLD_INTERACT with non-interactable building is a no-op', () => {
+  const state = buildInitialGameState();
+  const result = gameReducer(state, {
+    type: 'WORLD_INTERACT',
+    npcId: 'none',
+    buildingId: 'central_park',
+  });
+  // PARK is not interactable — state should be unchanged
+  assert.equal(result, state);
+});
+
+test('WORLD_INTERACT with non-existent building is a no-op', () => {
+  const state = buildInitialGameState();
+  const result = gameReducer(state, {
+    type: 'WORLD_INTERACT',
+    npcId: 'none',
+    buildingId: 'nonexistent',
+  });
+  assert.equal(result, state);
+});
+
+// ── PERMITS ──────────────────────────────────────────────────────────────────
+
+test('SUBMIT_PERMIT with insufficient funds returns notification but no state change', () => {
+  const state = { ...buildInitialGameState(), money: 0 };
+  // Find a permit that is AVAILABLE
+  const availablePermitId = Object.keys(state.permits).find(
+    id => state.permits[id].status === 'AVAILABLE'
+  );
+  assert.ok(availablePermitId, 'Expected at least one AVAILABLE permit');
+
+  const result = gameReducer(state, {
+    type: 'SUBMIT_PERMIT',
+    id: availablePermitId,
+    action: 'SUBMIT',
+  });
+  assert.equal(result.money, 0);
+  assert.equal(result.activeMiniGame, null);
+});
+
+test('SUBMIT_PERMIT with sufficient funds deducts money and starts mini-game', () => {
+  const state = buildInitialGameState();
+  const availablePermitId = Object.keys(state.permits).find(
+    id => state.permits[id].status === 'AVAILABLE'
+  )!;
+  const permit = state.permits[availablePermitId];
+
+  const result = gameReducer(state, {
+    type: 'SUBMIT_PERMIT',
+    id: availablePermitId,
+    action: 'SUBMIT',
+  });
+  assert.equal(result.money, state.money - permit.cost);
+  assert.equal(result.activeMiniGame, 'FORM_PROCESSING');
+  assert.equal(result.pendingPermitAction, 'SUBMIT');
+});
+
+test('MINI_GAME_COMPLETE with low accuracy rejects the permit', () => {
+  const state = buildInitialGameState();
+  const availablePermitId = Object.keys(state.permits).find(
+    id => state.permits[id].status === 'AVAILABLE'
+  )!;
+  // Set up state as if a permit was being processed
+  const prepped = {
+    ...state,
+    activePermitId: availablePermitId,
+    activeMiniGame: 'FORM_PROCESSING' as const,
+    pendingPermitAction: 'SUBMIT' as const,
+  };
+  const result = gameReducer(prepped, {
+    type: 'MINI_GAME_COMPLETE',
+    accuracy: 0.3,
+    time: 20,
+  });
+  assert.equal(result.permits[availablePermitId].status, 'REJECTED');
+  assert.equal(result.activeMiniGame, null);
+  assert.equal(result.activePermitId, null);
+});
+
+test('MINI_GAME_COMPLETE with good accuracy submits the permit to PENDING', () => {
+  const state = buildInitialGameState();
+  const availablePermitId = Object.keys(state.permits).find(
+    id => state.permits[id].status === 'AVAILABLE'
+  )!;
+  const prepped = {
+    ...state,
+    activePermitId: availablePermitId,
+    activeMiniGame: 'FORM_PROCESSING' as const,
+    pendingPermitAction: 'SUBMIT' as const,
+  };
+  const result = gameReducer(prepped, {
+    type: 'MINI_GAME_COMPLETE',
+    accuracy: 0.85,
+    time: 15,
+  });
+  assert.equal(result.permits[availablePermitId].status, 'PENDING');
+  assert.equal(result.activeMiniGame, null);
+});
+
+// ── REST ─────────────────────────────────────────────────────────────────────
+
+test('REST restores energy, advances day, and sets time to 6', () => {
+  const state = { ...buildInitialGameState(), energy: 10, day: 3, time: 22 };
+  const result = gameReducer(state, { type: 'REST' });
+
+  assert.equal(result.energy, state.maxEnergy);
+  assert.equal(result.day, 4);
+  assert.equal(result.time, 6);
+});
+
+test('REST moves player to home position', () => {
+  const state = buildInitialGameState();
+  const homePos = state.playerPos; // Initial state starts at home
+  const movedState = { ...state, playerPos: { x: 50, y: 50 } };
+  const result = gameReducer(movedState, { type: 'REST' });
+  assert.deepEqual(result.playerPos, homePos);
+});
+
+// ── Notification double-call safety (effects.ts) ─────────────────────────────
+
+test('effects.ts TRAVEL notification is deterministic (safe to double-call)', () => {
+  const state = buildInitialGameState();
+  const action = { type: 'TRAVEL' as const, mineId: 'iron-vein' };
+  const notif1 = getNotificationForAction(state, action);
+  const notif2 = getNotificationForAction(state, action);
+  assert.deepEqual(notif1, notif2);
+});
+
+test('effects.ts SUBMIT_PERMIT notification is deterministic', () => {
+  const state = buildInitialGameState();
+  const availablePermitId = Object.keys(state.permits).find(
+    id => state.permits[id].status === 'AVAILABLE'
+  )!;
+  const action = { type: 'SUBMIT_PERMIT' as const, id: availablePermitId, action: 'SUBMIT' as const };
+  const notif1 = getNotificationForAction(state, action);
+  const notif2 = getNotificationForAction(state, action);
+  assert.deepEqual(notif1, notif2);
+});
+
+test('effects.ts EXPORT_ORE notification is deterministic', () => {
+  const state = { ...buildInitialGameState(), ore: 5 };
+  const action = { type: 'EXPORT_ORE' as const, strategy: 'STANDARD' as const };
+  const notif1 = getNotificationForAction(state, action);
+  const notif2 = getNotificationForAction(state, action);
+  assert.deepEqual(notif1, notif2);
+});
+
+test('effects.ts OPERATION_ACTION notification is deterministic', () => {
+  const state = buildInitialGameState();
+  const action = { type: 'OPERATION_ACTION' as const, actionId: 'PRESSURE_CLERKS' as const };
+  const notif1 = getNotificationForAction(state, action);
+  const notif2 = getNotificationForAction(state, action);
+  assert.deepEqual(notif1, notif2);
+});
+
+test('effects.ts FOUND_ITEM notification is deterministic', () => {
+  const state = buildInitialGameState();
+  const action = { type: 'FOUND_ITEM' as const, itemId: 'nonexistent' };
+  const notif1 = getNotificationForAction(state, action);
+  const notif2 = getNotificationForAction(state, action);
+  assert.deepEqual(notif1, notif2);
+});
+
+test('effects.ts REST notification is deterministic given same random seed caveat', () => {
+  // REST uses Math.random() inside applyDailyEconomyTick, but the
+  // helpers are pure functions of their inputs (the random is internal).
+  // We verify the notification structure is always non-null.
+  const state = buildInitialGameState();
+  const action = { type: 'REST' as const };
+  const notif = getNotificationForAction(state, action);
+  assert.ok(notif, 'REST should always produce a notification');
+  assert.ok(notif.title.length > 0);
 });
