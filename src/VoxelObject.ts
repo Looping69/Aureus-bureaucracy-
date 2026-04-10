@@ -48,4 +48,22 @@ export class VoxelObject {
   public setRotation(y: number) {
     this.group.rotation.y = y;
   }
+
+  /**
+   * Toggle a subtle emissive glow on the object's mesh material.
+   * Used for tutorial "magnet" feedback on the Bureau.
+   */
+  public setHighlight(on: boolean, intensity: number = 0.15) {
+    this.group.traverse((child) => {
+      if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial) {
+        if (on) {
+          child.material.emissive.setHex(0xeab308);  // warm amber
+          child.material.emissiveIntensity = intensity;
+        } else {
+          child.material.emissive.setHex(0x000000);
+          child.material.emissiveIntensity = 0;
+        }
+      }
+    });
+  }
 }

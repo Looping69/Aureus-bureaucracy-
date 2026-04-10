@@ -36,6 +36,17 @@ export const OfficeScene = ({
   onBackToDirectory: () => void,
   onOperationAction: (actionId: OperationActionId) => void
 }) => {
+  // Track whether this is the first-ever Bureau entry for the "crossed a line" reward.
+  const isFirstBureauEntry = state.activeBuildingId === 'licensing_office' && 
+    (state.tutorialStep === 1 || state.tutorialStep === 2);
+  const [showEntrySplash, setShowEntrySplash] = React.useState(isFirstBureauEntry);
+
+  React.useEffect(() => {
+    if (!showEntrySplash) return;
+    const timer = setTimeout(() => setShowEntrySplash(false), 2200);
+    return () => clearTimeout(timer);
+  }, [showEntrySplash]);
+
   // If we are in a specific building, show that building's view
   if (state.activeBuildingId) {
     const building = state.buildings[state.activeBuildingId];
@@ -55,7 +66,17 @@ export const OfficeScene = ({
 
     // Otherwise show Building Dashboard (NPCs, Actions)
       return (
-        <div className="flex-1 overflow-auto p-4 flex flex-col gap-6 bg-slate-50">
+        <div className={`flex-1 overflow-auto p-4 flex flex-col gap-6 transition-colors duration-700 ${isFirstBureauEntry ? 'bg-slate-100' : 'bg-slate-50'} relative`}>
+          {/* First-entry "you crossed a line" splash */}
+          {showEntrySplash && (
+            <div className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none animate-pulse">
+              <div className="bg-black/80 backdrop-blur-sm rounded-2xl px-8 py-5 shadow-2xl border border-white/10">
+                <p className="text-white/90 text-sm font-black uppercase tracking-[0.3em] text-center">
+                  You crossed a line.
+                </p>
+              </div>
+            </div>
+          )}
           <ProgressGuide state={state} />
           <RunCyclePanel state={state} onOperationAction={onOperationAction} />
           <PoliticalPositionPanel state={state} />
@@ -83,7 +104,7 @@ export const OfficeScene = ({
             >
               {(state.tutorialStep === 2 || state.tutorialStep === 6) && building.npcId === 'licensing' && (
                 <div className="absolute right-4 top-1/2 -translate-y-1/2 text-blue-600 animate-bounce font-black text-xs uppercase tracking-widest">
-                  Talk to Him!
+                  {state.tutorialStep === 2 ? 'He decides.' : 'Talk to Him!'}
                 </div>
               )}
               <div className="relative">

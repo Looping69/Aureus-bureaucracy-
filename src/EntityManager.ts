@@ -66,6 +66,7 @@ export class EntityManager {
   private MAX_LIGHTS = 8;
   private npcMovement: Map<string, NpcMovementState> = new Map();
   private buildingsData: Record<string, Building> = {};
+  private highlightedBuildingId: string | null = null;
 
   // --- Initialization ---
   constructor(scene: THREE.Scene) {
@@ -176,6 +177,24 @@ export class EntityManager {
     collider.renderOrder = -1;
 
     return collider;
+  }
+
+  /**
+   * Highlight a building with an emissive glow (used for tutorial magnet).
+   * Pass `null` to clear any active highlight.
+   */
+  public setHighlightedBuilding(buildingId: string | null, intensity: number = 0.15) {
+    if (this.highlightedBuildingId === buildingId) return;
+    // Clear previous
+    if (this.highlightedBuildingId) {
+      const prev = this.buildings.get(this.highlightedBuildingId);
+      prev?.setHighlight(false);
+    }
+    this.highlightedBuildingId = buildingId;
+    if (buildingId) {
+      const target = this.buildings.get(buildingId);
+      target?.setHighlight(true, intensity);
+    }
   }
 
   // --- NPC Management ---

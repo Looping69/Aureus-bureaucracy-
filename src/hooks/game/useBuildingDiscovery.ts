@@ -15,6 +15,7 @@ export const useBuildingDiscovery = ({ state, setState, setNotification, enabled
     if (!enabled) return;
     setState(prev => {
       let changed = false;
+      let autoEnterBureau = false;
       const newKnownNpcIds = [...prev.knownNpcIds];
       let newObjectives = [...prev.objectives];
       let newTutorialStep = prev.tutorialStep;
@@ -31,6 +32,9 @@ export const useBuildingDiscovery = ({ state, setState, setNotification, enabled
               setNotification({ title: 'New Contact', msg: `You discovered the location of ${prev.npcs[b.npcId].name}.` });
 
               if (b.id === 'licensing_office' && prev.tutorialStep === 0) {
+                // Auto-enter the Bureau immediately on discovery — no prompt,
+                // no hesitation window.  Collapses the first interaction into
+                // a single seamless moment: approach → enter.
                 newTutorialStep = 1;
                 if (!isObjectiveComplete(newObjectives, 'start')) {
                   newObjectives = completeObjective(newObjectives, 'start');
@@ -38,11 +42,13 @@ export const useBuildingDiscovery = ({ state, setState, setNotification, enabled
                 newObjectives = upsertObjective(newObjectives, {
                   id: 'enter-bureau',
                   text: 'Enter the Bureau of Extraction.',
-                  isCompleted: false,
+                  isCompleted: true,
                   type: 'DISCOVER',
                   targetId: 'licensing_office'
                 });
-                setNotification({ title: 'Objective Complete', msg: 'You found the Bureau. Now head inside.' });
+                // Signal auto-entry – the rest of the state update below
+                // will transition the player directly into the office scene.
+                autoEnterBureau = true;
               }
             }
           }
@@ -50,7 +56,28 @@ export const useBuildingDiscovery = ({ state, setState, setNotification, enabled
       });
 
       if (!changed) return prev;
-      return { ...prev, buildings: newBuildings, knownNpcIds: newKnownNpcIds, objectives: newObjectives, tutorialStep: newTutorialStep };
+
+      const nextState: GameState = {
+        ...prev,
+        buildings: newBuildings,
+        knownNpcIds: newKnownNpcIds,
+        objectives: newObjectives,
+        tutorialStep: newTutorialStep,
+      };
+
+      // Auto-enter the Bureau: transition directly into the OFFICE scene so
+      // the player never sees a prompt or has a chance to wander.
+      if (autoEnterBureau) {
+        const bureau = newBuildings['licensing_office'];
+        return {
+          ...nextState,
+          activeBuildingId: 'licensing_office',
+          currentScene: 'OFFICE' as const,
+          explorationActive: !!(bureau.explorationItems && bureau.explorationItems.length > 0),
+        };
+      }
+
+      return nextState;
     });
   }, [enabled, state.playerPos, state.activeNPCId, state.permits, state.buildings, setNotification, setState]);
 };

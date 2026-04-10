@@ -58,13 +58,13 @@ export const TutorialOverlay: React.FC<TutorialOverlayProps> = ({
               <div className="mt-3 flex gap-4 items-start">
                 <div className="flex-1">
                   <p className="text-xs font-bold leading-tight">
-                    {tutorialStep === 0 && 'Welcome. You need a permit. Find the Bureau of Extraction (East of home).'}
-                    {tutorialStep === 1 && 'You found the Bureau! Tap the building to enter.'}
-                    {tutorialStep === 2 && 'Talk to Officer Vane to request a permit application.'}
+                    {tutorialStep === 0 && "They won't process anything until you step inside. Head east."}
+                    {tutorialStep === 1 && 'The Bureau is right there. Go.'}
+                    {tutorialStep === 2 && 'Officer Vane controls the permits. Talk to him.'}
                     {tutorialStep === 3 && "Vane authorized Form 17-B. Open the 'Active Filings' list."}
                     {tutorialStep === 4 && "Select 'Extraction Intent' and Submit Filing."}
                     {tutorialStep === 5 && 'Processing...'}
-                    {tutorialStep === 6 && 'Rejected! Typical. Talk to Vane again to sort this out.'}
+                    {tutorialStep === 6 && 'Rejected. Of course. Talk to Vane again — find his angle.'}
                     {tutorialStep === 7 && "Use your knowledge of Vane's desire for status to get approved."}
                   </p>
 
@@ -73,7 +73,7 @@ export const TutorialOverlay: React.FC<TutorialOverlayProps> = ({
                       onClick={onStartJourney}
                       className="mt-3 px-3 py-1.5 bg-white text-blue-600 rounded-lg font-black text-[10px] uppercase hover:bg-blue-50 transition-colors"
                     >
-                      Start Journey
+                      Go
                     </button>
                   )}
                 </div>
