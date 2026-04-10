@@ -406,3 +406,103 @@ test('effects.ts REST notification is deterministic given same random seed cavea
   assert.ok(notif, 'REST should always produce a notification');
   assert.ok(notif.title.length > 0);
 });
+
+// ── Relationship state detection & reactive text ─────────────────────────────
+
+import {
+  deriveRelationshipState,
+  detectRelationshipStateChanges,
+  buildRelationshipChangeNotification,
+  getRelationshipReactiveText,
+} from '../dialogue/relationshipState';
+
+test('deriveRelationshipState returns aligned for licensing with trust>=50 and leverage>=20', () => {
+  const state = buildInitialGameState();
+  const npc = { ...state.npcs.licensing, trustLevel: 55, leverage: 25 };
+  const rs = deriveRelationshipState('licensing', npc, state);
+  assert.equal(rs, 'aligned');
+});
+
+test('deriveRelationshipState returns friendly for fixer with trust>=30', () => {
+  const state = buildInitialGameState();
+  const npc = { ...state.npcs.fixer, trustLevel: 35 };
+  const rs = deriveRelationshipState('fixer', npc, state);
+  assert.equal(rs, 'friendly');
+});
+
+test('detectRelationshipStateChanges returns changes when state transitions', () => {
+  const state = buildInitialGameState();
+  const oldNpcs = state.npcs;
+  const newNpcs = {
+    ...oldNpcs,
+    fixer: { ...oldNpcs.fixer, relationshipState: 'friendly' as const },
+  };
+  const changes = detectRelationshipStateChanges(oldNpcs, newNpcs);
+  assert.equal(changes.length, 1);
+  assert.equal(changes[0].npcId, 'fixer');
+  assert.equal(changes[0].from, 'neutral');
+  assert.equal(changes[0].to, 'friendly');
+});
+
+test('detectRelationshipStateChanges returns empty when no changes', () => {
+  const state = buildInitialGameState();
+  const changes = detectRelationshipStateChanges(state.npcs, state.npcs);
+  assert.equal(changes.length, 0);
+});
+
+test('buildRelationshipChangeNotification returns null for empty changes', () => {
+  assert.equal(buildRelationshipChangeNotification([]), null);
+});
+
+test('buildRelationshipChangeNotification returns single NPC notification', () => {
+  const notif = buildRelationshipChangeNotification([
+    { npcId: 'fixer', npcName: 'Slink', from: 'neutral', to: 'friendly' },
+  ]);
+  assert.ok(notif);
+  assert.ok(notif.title.includes('Slink'));
+  assert.ok(notif.msg.includes('Neutral'));
+  assert.ok(notif.msg.includes('Friendly'));
+});
+
+test('buildRelationshipChangeNotification summarises multiple NPC changes', () => {
+  const notif = buildRelationshipChangeNotification([
+    { npcId: 'fixer', npcName: 'Slink', from: 'neutral', to: 'friendly' },
+    { npcId: 'chief', npcName: 'Okon', from: 'neutral', to: 'disillusioned' },
+  ]);
+  assert.ok(notif);
+  assert.equal(notif.title, 'Relationships Shifted');
+  assert.ok(notif.msg.includes('Slink'));
+  assert.ok(notif.msg.includes('Okon'));
+});
+
+test('getRelationshipReactiveText returns text for aligned licensing', () => {
+  const state = buildInitialGameState();
+  const npc = { ...state.npcs.licensing, relationshipState: 'aligned' as const };
+  const text = getRelationshipReactiveText(npc, state);
+  assert.ok(text, 'Expected reactive text for aligned licensing');
+  assert.ok(text.includes('professional'));
+});
+
+test('getRelationshipReactiveText returns text for watching inspector', () => {
+  const state = buildInitialGameState();
+  const npc = { ...state.npcs.inspector, relationshipState: 'watching' as const };
+  const text = getRelationshipReactiveText(npc, state);
+  assert.ok(text, 'Expected reactive text for watching inspector');
+  assert.ok(text.includes('attention'));
+});
+
+test('getRelationshipReactiveText returns text for friendly fixer', () => {
+  const state = buildInitialGameState();
+  const npc = { ...state.npcs.fixer, relationshipState: 'friendly' as const };
+  const text = getRelationshipReactiveText(npc, state);
+  assert.ok(text, 'Expected reactive text for friendly fixer');
+  assert.ok(text.includes('rhythm'));
+});
+
+test('getRelationshipReactiveText returns text for interested journalist', () => {
+  const state = buildInitialGameState();
+  const npc = { ...state.npcs.journalist, relationshipState: 'interested' as const };
+  const text = getRelationshipReactiveText(npc, state);
+  assert.ok(text, 'Expected reactive text for interested journalist');
+  assert.ok(text.includes('listening'));
+});

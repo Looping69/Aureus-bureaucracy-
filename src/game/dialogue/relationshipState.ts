@@ -74,6 +74,68 @@ export const refreshAllRelationshipStates = (
   return updated;
 };
 
+/** Human-readable labels for relationship state transitions. */
+const RELATIONSHIP_STATE_LABELS: Record<NpcRelationshipState, string> = {
+  neutral: 'Neutral',
+  aligned: 'Aligned',
+  complicit: 'Complicit',
+  opposed: 'Opposed',
+  watching: 'Watching',
+  targeting: 'Targeting',
+  friendly: 'Friendly',
+  dependent: 'Dependent',
+  interested: 'Interested',
+  invested: 'Invested',
+  supportive: 'Supportive',
+  disillusioned: 'Disillusioned',
+};
+
+/**
+ * Compare old and new NPC records and return descriptions of any
+ * relationship-state transitions.  Pure; no side-effects.
+ */
+export const detectRelationshipStateChanges = (
+  oldNpcs: Record<string, NPC>,
+  newNpcs: Record<string, NPC>,
+): Array<{ npcId: string; npcName: string; from: NpcRelationshipState; to: NpcRelationshipState }> => {
+  const changes: Array<{ npcId: string; npcName: string; from: NpcRelationshipState; to: NpcRelationshipState }> = [];
+  for (const [id, newNpc] of Object.entries(newNpcs)) {
+    const oldNpc = oldNpcs[id];
+    if (!oldNpc) continue;
+    if (oldNpc.relationshipState !== newNpc.relationshipState) {
+      changes.push({
+        npcId: id,
+        npcName: newNpc.name,
+        from: oldNpc.relationshipState,
+        to: newNpc.relationshipState,
+      });
+    }
+  }
+  return changes;
+};
+
+/**
+ * Build a single notification summarising relationship state changes,
+ * or `null` if no transitions occurred.
+ */
+export const buildRelationshipChangeNotification = (
+  changes: Array<{ npcId: string; npcName: string; from: NpcRelationshipState; to: NpcRelationshipState }>,
+): { title: string; msg: string } | null => {
+  if (changes.length === 0) return null;
+  if (changes.length === 1) {
+    const c = changes[0];
+    return {
+      title: `${c.npcName} — ${RELATIONSHIP_STATE_LABELS[c.to]}`,
+      msg: `Your standing with ${c.npcName} shifted from ${RELATIONSHIP_STATE_LABELS[c.from]} to ${RELATIONSHIP_STATE_LABELS[c.to]}.`,
+    };
+  }
+  const names = changes.map(c => c.npcName).join(', ');
+  return {
+    title: 'Relationships Shifted',
+    msg: `Your standing changed with ${names}.`,
+  };
+};
+
 /**
  * Get reactive dialogue text based on the NPC's relationship state
  * and the player's alignment with other factions.
@@ -93,6 +155,9 @@ export const getRelationshipReactiveText = (
           return '"I hear you\'ve been spending time at Slink\'s den. Interesting choice. I process all kinds of paperwork… but some files have a way of disappearing."';
         }
       }
+      if (rs === 'aligned') {
+        return '"You file the right forms, you pay the right fees, you ask the right questions. I appreciate a professional."';
+      }
       if (rs === 'complicit') {
         return '"We understand each other now. That\'s how a system works — smoothly, quietly, without anyone asking questions that don\'t need answers."';
       }
@@ -107,6 +172,9 @@ export const getRelationshipReactiveText = (
           state.npcs['fixer']?.relationshipState === 'dependent') {
         return '"Your association with known market irregularities has been noted. I\'d advise you to choose your allies more carefully."';
       }
+      if (rs === 'watching') {
+        return '"You have my attention. That can be a good thing — or a very bad one. Depends on what I see next."';
+      }
       if (rs === 'targeting') {
         return '"Every form you file, every step you take — I\'m watching. One mistake is all I need."';
       }
@@ -117,6 +185,9 @@ export const getRelationshipReactiveText = (
       if (state.npcs['chief']?.relationshipState === 'supportive') {
         return '"Playing saviour now? Funny. You said no to me yesterday. Today you\'re doing the same thing… just slower."';
       }
+      if (rs === 'friendly') {
+        return '"You\'re learning the rhythm. Stick with me and this town opens up in ways the Bureau never shows you."';
+      }
       if (rs === 'dependent') {
         return '"We\'re in deep now, you and me. Not the kind of partnership you walk away from."';
       }
@@ -126,6 +197,9 @@ export const getRelationshipReactiveText = (
       // Vox becomes dismissive if player leans Community
       if (state.npcs['chief']?.relationshipState === 'supportive' && rs === 'neutral') {
         return '"Grassroots hero? That doesn\'t sell papers. Come back when you have something with teeth."';
+      }
+      if (rs === 'interested') {
+        return '"I\'m listening. You\'ve got the look of someone who stumbles into stories worth printing. Keep talking."';
       }
       if (rs === 'invested') {
         return '"We have a deal. An exclusive. Don\'t forget — I own this story, and if you back out, the next headline is about you."';
