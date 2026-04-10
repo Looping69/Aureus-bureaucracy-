@@ -385,6 +385,13 @@ export class VoxelEngine {
     this.controls.update();
   }
 
+  /** Return the normalized light direction (sun during day, moon at night). */
+  private getLightDirection(): THREE.Vector3 {
+    return this.time >= 5 && this.time < 19
+      ? this.sun.position.clone().normalize()
+      : this.moon.position.clone().normalize();
+  }
+
   /**
    * Drive the day/night cycle to the given hour.
    * Updates sun/moon positions, directional-light intensity and colour, ambient
@@ -411,9 +418,8 @@ export class VoxelEngine {
     this.ambientLight.intensity = 0.1 + dayFactor * 0.2;
     this.hemiLight.intensity = 0.2 + dayFactor * 0.3;
 
-    // Compute sun/moon light direction (normalised)
-    const sunDir = this.sun.position.clone().normalize();
-    const moonDir = this.moon.position.clone().normalize();
+    // Compute normalised light direction via shared helper
+    const lightDir = this.getLightDirection();
 
     // Position the directional light relative to the *player* so the shadow
     // frustum always covers the area around the player.  The light offset
@@ -423,18 +429,18 @@ export class VoxelEngine {
     if (dayFactor > 0) {
       this.dirLight.intensity = dayFactor * 1.0;
       this.dirLight.position.set(
-        playerPos.x + sunDir.x * 80,
-        playerPos.y + sunDir.y * 80,
-        playerPos.z + sunDir.z * 80
+        playerPos.x + lightDir.x * 80,
+        playerPos.y + lightDir.y * 80,
+        playerPos.z + lightDir.z * 80
       );
       this.dirLight.color.setHex(0xffffff);
     } else {
       const nightFactor = 1 - dayFactor;
       this.dirLight.intensity = nightFactor * 0.3;
       this.dirLight.position.set(
-        playerPos.x + moonDir.x * 80,
-        playerPos.y + moonDir.y * 80,
-        playerPos.z + moonDir.z * 80
+        playerPos.x + lightDir.x * 80,
+        playerPos.y + lightDir.y * 80,
+        playerPos.z + lightDir.z * 80
       );
       this.dirLight.color.setHex(0xaaaaff);
     }
@@ -1772,9 +1778,7 @@ export class VoxelEngine {
     // Keep directional light shadow camera centered on the player each frame
     // so shadows stay visible near the player as they move
     this.dirLight.target.position.copy(this.currentPlayerPos);
-    const sunDir = this.sun.position.clone().normalize();
-    const moonDir = this.moon.position.clone().normalize();
-    const lightDir = this.time >= 5 && this.time < 19 ? sunDir : moonDir;
+    const lightDir = this.getLightDirection();
     this.dirLight.position.set(
       this.currentPlayerPos.x + lightDir.x * 80,
       this.currentPlayerPos.y + lightDir.y * 80,

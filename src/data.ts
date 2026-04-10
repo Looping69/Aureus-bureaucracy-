@@ -669,7 +669,7 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
         {
           text: "I see. Initiative. [Insight]",
           action: (s) => ({
-            tutorialStep: 5,
+            tutorialStep: 5, // Advance to 'Use Knowledge' step
             npcs: {
               ...s.npcs,
               'licensing': { 
