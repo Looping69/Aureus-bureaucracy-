@@ -17,7 +17,7 @@ import { applyFoundItem, applyTakePhoto } from '../actions/evidenceActions';
 import { applyDailyEconomyTick, applyOreExport } from '../economy';
 import { applyOperationAction } from '../runCycle';
 import { getBuildingAccessPosition } from '../../utils/buildingAccess';
-import { findPath } from '../../utils/pathfinding';
+import { findPath, invalidatePathfindingCache } from '../../utils/pathfinding';
 import { buildWorldSurfaceMap, getWorldSurfaceTile, WorldSurfaceMap } from '../../utils/worldSurface';
 import { WORLD_SIZE } from '../../utils/voxelConstants';
 import { refreshAllRelationshipStates } from '../dialogue/relationshipState';
@@ -142,6 +142,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       return { ...state, currentScene: 'WORLD' as const };
 
     case 'UPDATE_BUILDINGS':
+      invalidatePathfindingCache();
       return { ...state, buildings: action.buildings, currentScene: 'WORLD' as const };
 
     // ── Movement ──────────────────────────────────────────────────────────
