@@ -94,6 +94,9 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
   }, [recenterTrigger]);
 
   useEffect(() => {
+    let cancelled = false;
+    let resizeObserver: ResizeObserver | null = null;
+
     const reportProgress = (progress: number, phase: string) => {
       const nextProgress = Math.max(0, Math.min(100, progress));
       setLoadingProgress((prev) => Math.max(prev, nextProgress));
@@ -101,75 +104,108 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
       onProgressRef.current?.(nextProgress, phase);
     };
 
-    if (containerRef.current) {
+    // Yield to the browser between heavy steps so the loading screen can
+    // re-render and the GPU can process newly-added scene objects.
+    const yieldFrame = () =>
+      new Promise<void>((resolve) => {
+        requestAnimationFrame(() => resolve());
+      });
+
+    async function boot() {
+      if (!containerRef.current) return;
+
+      // ── Stage 1: Create the Three.js engine ──────────────────────────
       reportProgress(8, 'Booting render pipeline...');
+      await yieldFrame();
+      if (cancelled) return;
+
       engineRef.current = new VoxelEngine(
-        containerRef.current,
+        containerRef.current!,
         onStateChange,
         onCountChange,
         undefined, // onVoxelEdit
         onHoverPosition,
         onSelect
       );
-      reportProgress(18, 'Allocating render systems...');
 
+      // Start observing resizes now that the renderer exists
+      resizeObserver = new ResizeObserver(() => {
+        engineRef.current?.handleResize();
+      });
+      resizeObserver.observe(containerRef.current!);
+
+      reportProgress(18, 'Allocating render systems...');
+      await yieldFrame();
+      if (cancelled) return;
+
+      // ── Stage 2: Load terrain voxels (heaviest step) ─────────────────
       engineRef.current.loadInitialModel(voxels);
       reportProgress(58, 'Meshing terrain volume...');
-      
-      // Add buildings
+      // Yield so the GPU can compile terrain shaders on the next render
+      await yieldFrame();
+      if (cancelled) return;
+
+      // ── Stage 3: Add buildings and NPCs ──────────────────────────────
       buildings.forEach(b => {
         engineRef.current?.entities.addBuilding(b);
-        
-        // If building has an NPC, add them at the building's position
         if (b.npcId !== 'none' && npcs[b.npcId]) {
           engineRef.current?.entities.addNPC(npcs[b.npcId], b.pos);
         }
       });
       reportProgress(74, 'Registering city structures...');
+      await yieldFrame();
+      if (cancelled) return;
 
-      // Initialise NPC commuting routes
+      // ── Stage 4: Initialise NPC commuting routes ─────────────────────
       const buildingsMap: Record<string, Building> = {};
       buildings.forEach(b => { buildingsMap[b.id] = b; });
       engineRef.current.entities.initNpcMovement(npcs, buildingsMap);
       reportProgress(86, 'Deploying field personnel...');
+      await yieldFrame();
+      if (cancelled) return;
 
+      // ── Stage 5: Final scene setup ───────────────────────────────────
       engineRef.current.updateTime(time);
       reportProgress(92, 'Syncing daylight cycle...');
       engineRef.current.setPlayerPosition(
-        playerPos.x - WORLD_HALF_SIZE, 
-        playerPos.y - WORLD_HALF_SIZE, 
+        playerPos.x - WORLD_HALF_SIZE,
+        playerPos.y - WORLD_HALF_SIZE,
         playerSurfaceY,
-        isMoving, 
-        targetPos ? targetPos.x - WORLD_HALF_SIZE : undefined, 
+        isMoving,
+        targetPos ? targetPos.x - WORLD_HALF_SIZE : undefined,
         targetPos ? targetPos.y - WORLD_HALF_SIZE : undefined,
         path
       );
       reportProgress(97, 'Authorizing sector access...');
 
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          engineReadyRef.current = true;
-          reportProgress(100, 'Access Granted');
-          setLoading(false);
-          // Kick off the intro camera pull-back (close-up → normal isometric view)
-          engineRef.current?.playIntroAnimation();
-          if (!readyReportedRef.current) {
-            readyReportedRef.current = true;
-            onReadyRef.current?.();
-          }
-        });
-      });
+      // ── Stage 6: Warm-up frames ──────────────────────────────────────
+      // Render a few full frames while the loading screen is still visible
+      // so the GPU finishes compiling all remaining shaders.  This prevents
+      // the first visible frame from stuttering.
+      await yieldFrame();
+      if (cancelled) return;
+      await yieldFrame();
+      if (cancelled) return;
 
-      const resizeObserver = new ResizeObserver(() => {
-        engineRef.current?.handleResize();
-      });
-      resizeObserver.observe(containerRef.current);
-
-      return () => {
-        resizeObserver.disconnect();
-        engineRef.current?.cleanup();
-      };
+      // ── Stage 7: Reveal the world ────────────────────────────────────
+      engineReadyRef.current = true;
+      reportProgress(100, 'Access Granted');
+      setLoading(false);
+      // Kick off the intro camera pull-back (close-up → normal isometric view)
+      engineRef.current?.playIntroAnimation();
+      if (!readyReportedRef.current) {
+        readyReportedRef.current = true;
+        onReadyRef.current?.();
+      }
     }
+
+    boot();
+
+    return () => {
+      cancelled = true;
+      resizeObserver?.disconnect();
+      engineRef.current?.cleanup();
+    };
   // The engine owns its lifetime; we initialize it once and drive later updates
   // through the dedicated effects below.
   // eslint-disable-next-line react-hooks/exhaustive-deps
