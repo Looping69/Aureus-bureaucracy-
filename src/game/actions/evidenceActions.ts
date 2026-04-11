@@ -1,4 +1,4 @@
-import { OFFICE_ITEMS } from '../../data';
+import { OFFICE_ITEMS } from '../../data/officeItems';
 import { DirtItem, DirtType, GameState } from '../../types';
 import { GameNotification } from './mineActions';
 import { applyExhaustionCollapse } from '../exhaustion';

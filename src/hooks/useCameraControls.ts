@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { VoxelEngine } from '../VoxelEngine';
+import { VoxelEngine } from '../engine';
 
 export const useCameraControls = (engineRef: React.MutableRefObject<VoxelEngine | null>) => {
   useEffect(() => {

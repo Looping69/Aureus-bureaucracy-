@@ -17,7 +17,7 @@ import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, Hammer, Package, Flame, Boxes, Zap, Weight } from 'lucide-react';
 import { GameState, WorldHoverInfo, WorldPosition } from '../types';
-import { WORLD_CAMERA_AZIMUTH } from '../VoxelEngine';
+import { WORLD_CAMERA_AZIMUTH } from '../engine';
 import { isNightTime } from '../utils/dayNightCycle';
 import { VoxelWorldContainer } from './VoxelWorldContainer';
 import { AnalogStick, AnalogStickVector } from './AnalogStick';
@@ -25,14 +25,14 @@ import { buildWorldTerrainVoxels } from '../utils/worldSurface';
 import { WORLD_SIZE } from '../utils/voxelConstants';
 import { findPath } from '../utils/pathfinding';
 import { useContinuousAnalogMovement } from '../hooks/game/useContinuousAnalogMovement';
-import { VoxelCharacter } from '../VoxelCharacter';
+import { VoxelCharacter } from '../engine';
 import {
   MINE_WORLD_BUILDINGS,
   MINE_WORLD_ENTRANCE_POS,
   MINE_NODE_YIELDS,
   MINE_INTERACTION_RADIUS,
   NODE_HARVEST_COOLDOWN_MS,
-} from '../mineWorldData';
+} from '../worlds/mineWorldData';
 
 // ─── types ────────────────────────────────────────────────────────────────────
 interface NodeState {

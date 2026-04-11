@@ -7,7 +7,7 @@ import React from 'react';
 import { motion } from 'motion/react';
 import { Search, BookOpen, Trash2, Map, Box } from 'lucide-react';
 import { GameState, OfficeItem } from '../types';
-import { OFFICE_ITEMS } from '../data';
+import { OFFICE_ITEMS } from '../data/officeItems';
 
 const ICON_MAP: Record<string, any> = {
   BookOpen,

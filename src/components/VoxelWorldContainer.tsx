@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { VoxelEngine } from '../VoxelEngine';
+import { VoxelEngine } from '../engine';
 import { AppState, Building, EmergencyVehicle, MedicalNpc, NPC, StaminaPowerUp, VoxelData, WorldHoverInfo } from '../types';
 import { useCameraControls } from '../hooks/useCameraControls';
 import { WORLD_HALF_SIZE } from '../utils/voxelConstants';

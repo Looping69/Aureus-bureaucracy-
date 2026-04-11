@@ -16,7 +16,7 @@ import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { AnimatePresence, motion } from 'motion/react';
 import { ShieldAlert, X } from 'lucide-react';
 import { GameState } from './types';
-import { BUILDINGS } from './data';
+import { BUILDINGS } from './data/cityLayout';
 
 // ── Game state management ───────────────────────────────────────────────────
 import {
