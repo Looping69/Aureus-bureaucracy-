@@ -33,8 +33,8 @@ export const getProgressGuidance = (state: GameState): ProgressGuidance => {
 
   if (state.tutorialStep === 0) {
     return {
-      title: 'Step Inside',
-      detail: "They won't process anything until you walk through the door. The Bureau is east of home.",
+      title: 'Get a Permit',
+      detail: "You need a mining permit before you can extract anything. The Bureau of Extraction is east — head over there.",
       tone: 'INFO'
     };
   }
