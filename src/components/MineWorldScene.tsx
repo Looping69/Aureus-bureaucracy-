@@ -66,11 +66,11 @@ const SMELT_CHECK_INTERVAL_MS = 2500;
 const DEPOSIT_CHECK_INTERVAL_MS = 1500;
 
 /** How often (ms) the player mines one unit while standing still in a work zone */
-const WORK_MINE_INTERVAL_MS = 1800;
+const WORK_MINE_INTERVAL_MS = 9000;
 /** Maximum number of resource units the player can carry at once */
 const MAX_CARRY = VoxelCharacter.MAX_CARRY;
 /** How long (ms) each block takes to unload at the delivery zone */
-const UNLOAD_BLOCK_INTERVAL_MS = 400;
+const UNLOAD_BLOCK_INTERVAL_MS = 50;
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 const isNear = (a: WorldPosition, b: WorldPosition, radius: number) =>

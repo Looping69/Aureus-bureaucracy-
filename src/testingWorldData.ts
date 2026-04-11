@@ -358,7 +358,7 @@ export const TREE_INITIAL_AMOUNT = 28;
 export const TESTING_GATHER_RANGE = 7;
 
 /** Gather interval in milliseconds – longer for realistic pacing */
-export const TESTING_GATHER_INTERVAL_MS = 3000;
+export const TESTING_GATHER_INTERVAL_MS = 15000;
 
 /** Wood gained per gather tick */
 export const TESTING_YIELD_PER_TICK = 1;
@@ -369,8 +369,8 @@ export const LOG_DEPOT_ID = 'log_depot';
 /** Maximum number of logs the player can carry at once (visual blocks on back) */
 export const TESTING_CARRY_MAX = 6;
 
-/** Milliseconds between each block unloaded at the depot – matches gathering interval for balanced cycles */
-export const TESTING_UNLOAD_INTERVAL_MS = 3000;
+/** Milliseconds between each block unloaded at the depot – 8× faster than before for quick dropoff */
+export const TESTING_UNLOAD_INTERVAL_MS = 375;
 
 /**
  * Log pile stages placed at the depot position.
