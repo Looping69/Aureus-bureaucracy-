@@ -282,7 +282,10 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       return { ...state, tutorialStep: 99 };
 
     case 'START_JOURNEY':
-      return { ...state, tutorialStep: 1 };
+      // Acknowledge the button press but keep tutorialStep at 0 — the
+      // auto-entry system in useBuildingDiscovery will advance it when the
+      // player actually reaches the Bureau.
+      return state;
 
     // ── Endings ───────────────────────────────────────────────────────────
 

@@ -29,6 +29,10 @@ interface VoxelWorldProps {
   playerCarried?: number;
   /** Visual type for stacked carried blocks – 'ore' (default amber) or 'wood' (brown logs) */
   playerCarriedType?: 'ore' | 'wood';
+  /** Building ID to highlight with a subtle emissive glow (tutorial magnet) */
+  highlightBuildingId?: string | null;
+  /** Glow intensity for the highlighted building (0-1, default 0.15) */
+  highlightIntensity?: number;
 }
 
 export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({ 
@@ -50,7 +54,9 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
   onProgress,
   playerWorking,
   playerCarried,
-  playerCarriedType
+  playerCarriedType,
+  highlightBuildingId,
+  highlightIntensity
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<VoxelEngine | null>(null);
@@ -252,6 +258,15 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
     player.setCarriedType(playerCarriedType ?? 'ore');
     player.setCarriedAmount(playerCarried ?? 0);
   }, [playerCarried, playerCarriedType]);
+
+  // ── Drive building highlight glow from prop ────────────────────────────
+  useEffect(() => {
+    if (!engineRef.current) return;
+    engineRef.current.entities.setHighlightedBuilding(
+      highlightBuildingId ?? null,
+      highlightIntensity ?? 0.15
+    );
+  }, [highlightBuildingId, highlightIntensity]);
 
   return (
     <div ref={containerRef} className="w-full h-full relative">

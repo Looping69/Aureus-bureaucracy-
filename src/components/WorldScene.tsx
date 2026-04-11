@@ -207,6 +207,23 @@ export const WorldScene = ({
     };
   }, []);
 
+  // ── Bureau magnet behavior ──────────────────────────────────────────────
+  // Show "This is it." world text and a subtle glow when the player is
+  // approaching the Bureau during the early tutorial (before auto-entry at
+  // distance 4 triggers scene transition).
+  const bureau = state.buildings['licensing_office'];
+  const bureauApproachInfo = React.useMemo(() => {
+    if (state.tutorialStep !== 0 || !bureau) return null;
+    const dx = renderPlayerPos.x - bureau.pos.x;
+    const dy = renderPlayerPos.y - bureau.pos.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    // Show magnet feedback between 4-8 tiles (discovery auto-enters at < 4)
+    if (dist >= 8 || dist < 4) return null;
+    // Intensity ramps up as player gets closer: 0 at dist=8, 1 at dist=4
+    const intensity = 1 - (dist - 4) / 4;
+    return { dist, intensity };
+  }, [state.tutorialStep, bureau, renderPlayerPos.x, renderPlayerPos.y]);
+
   return (
     <div className={`flex-1 relative overflow-hidden transition-colors duration-1000 ${isNight ? 'bg-slate-950' : 'bg-slate-200'} cursor-crosshair`}>
       <VoxelWorldContainer 
@@ -226,7 +243,42 @@ export const WorldScene = ({
         showLoadingOverlay={showInitialLoadingOverlay}
         onReady={onInitialSceneReady}
         onProgress={onInitialLoadingProgress}
+        highlightBuildingId={bureauApproachInfo ? 'licensing_office' : null}
+        highlightIntensity={bureauApproachInfo ? bureauApproachInfo.intensity * 0.18 : 0}
       />
+
+      {/* Bureau magnet: world-space approach feedback */}
+      <AnimatePresence>
+        {bureauApproachInfo && (
+          <motion.div
+            key="bureau-magnet"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: bureauApproachInfo.intensity }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.6 }}
+            className="absolute inset-0 pointer-events-none z-[100] flex items-center justify-center"
+          >
+            {/* Directional vignette pulling toward Bureau (east) */}
+            <div
+              className="absolute inset-0"
+              style={{
+                background: `radial-gradient(ellipse 60% 80% at 70% 45%, rgba(234, 179, 8, ${0.06 * bureauApproachInfo.intensity}), transparent 70%)`,
+              }}
+            />
+            {/* Ambient world text — not UI, just presence */}
+            <motion.p
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.8, delay: 0.3 }}
+              className="text-white/60 text-sm font-black uppercase tracking-[0.35em] drop-shadow-[0_2px_8px_rgba(0,0,0,0.7)] select-none"
+              style={{ textShadow: '0 0 20px rgba(234, 179, 8, 0.4)' }}
+            >
+              This is it.
+            </motion.p>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Coordinate Display (debug only) */}
       {showDebug && (

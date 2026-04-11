@@ -33,24 +33,24 @@ export const getProgressGuidance = (state: GameState): ProgressGuidance => {
 
   if (state.tutorialStep === 0) {
     return {
-      title: 'Start Your Journey',
-      detail: 'Use the onboarding panel to begin; then head to the Bureau of Extraction.',
+      title: 'Step Inside',
+      detail: "They won't process anything until you walk through the door. The Bureau is east of home.",
       tone: 'INFO'
     };
   }
 
   if (state.tutorialStep === 1 && state.currentScene !== 'OFFICE') {
     return {
-      title: 'Go To The Bureau',
-      detail: 'Enter an office and find Officer Vane to unlock your first permit path.',
+      title: 'The Bureau Is Right There',
+      detail: "Don't stop now. Enter the building and find the licensing officer.",
       tone: 'INFO'
     };
   }
 
   if (state.tutorialStep === 2 && state.activeNPCId !== 'licensing') {
     return {
-      title: 'Talk To Officer Vane',
-      detail: 'Open dialogue with the licensing officer and ask about mining permits.',
+      title: 'Talk To Vane',
+      detail: 'Officer Vane controls what you can and cannot do here. Talk to him.',
       tone: 'INFO'
     };
   }
