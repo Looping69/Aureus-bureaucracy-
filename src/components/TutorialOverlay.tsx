@@ -1,8 +1,10 @@
 /**
  * @module TutorialOverlay
  * Collapsible tutorial guide shown during the early game.
- * Positioned at the top-left of the screen.  When minimised it collapses into
- * a small icon button on the left edge that the player can tap to reopen.
+ * Uses absolute positioning within the game container (max-w-md) so it
+ * stays anchored to the left edge of the mobile viewport.  When minimised
+ * it collapses into a touch-friendly icon button that can be tapped to
+ * reopen the guide panel.
  */
 import React from 'react';
 import { AnimatePresence, motion } from 'motion/react';
@@ -41,27 +43,27 @@ export const TutorialOverlay: React.FC<TutorialOverlayProps> = ({
   return (
     <AnimatePresence mode="wait">
       {tutorialMinimized ? (
-        /* ── Collapsed: icon button on the left edge ──────────────── */
+        /* ── Collapsed: touch-friendly icon on the left edge ──────── */
         <motion.button
           key="tutorial-icon"
-          initial={{ opacity: 0, x: -20 }}
+          initial={{ opacity: 0, x: -24 }}
           animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -20 }}
+          exit={{ opacity: 0, x: -24 }}
           onClick={onToggleMinimized}
-          className="fixed top-28 left-2 z-50 w-9 h-9 rounded-full bg-blue-600 text-white shadow-lg border-2 border-white/20 flex items-center justify-center pointer-events-auto hover:bg-blue-700 transition-colors"
+          className="pointer-events-auto absolute left-2 top-2 z-40 flex h-11 w-11 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg border-2 border-white/20 active:scale-95 transition-all"
           title={`Tutorial: Step ${tutorialStep + 1}`}
         >
-          <BookOpen size={16} />
+          <BookOpen size={18} />
         </motion.button>
       ) : (
-        /* ── Expanded: compact banner at the top-left ─────────────── */
+        /* ── Expanded: compact panel anchored top-left ────────────── */
         <motion.div
           key="tutorial-panel"
-          initial={{ opacity: 0, y: -20 }}
+          initial={{ opacity: 0, y: -16 }}
           animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -20 }}
-          className="fixed top-28 left-2 z-50 pointer-events-auto"
-          style={{ maxWidth: 'min(20rem, calc(100vw - 4rem))' }}
+          exit={{ opacity: 0, y: -16 }}
+          className="pointer-events-auto absolute left-2 top-2 z-40"
+          style={{ maxWidth: 'min(18rem, calc(100% - 3.5rem))' }}
         >
           <div className="bg-blue-600 text-white rounded-xl shadow-lg border-2 border-white/20 px-3 py-2.5 flex flex-col gap-1.5">
             {/* Header row */}
@@ -74,17 +76,17 @@ export const TutorialOverlay: React.FC<TutorialOverlayProps> = ({
               </span>
               <button
                 onClick={onToggleMinimized}
-                className="p-0.5 hover:bg-white/10 rounded transition-colors"
+                className="p-1.5 -m-1 hover:bg-white/10 rounded-lg transition-colors"
                 title="Collapse"
               >
-                <ChevronLeft size={14} />
+                <ChevronLeft size={16} />
               </button>
               <button
                 onClick={onClose}
-                className="p-0.5 hover:bg-white/10 rounded transition-colors"
+                className="p-1.5 -m-1 hover:bg-white/10 rounded-lg transition-colors"
                 title="Dismiss tutorial"
               >
-                <X size={14} />
+                <X size={16} />
               </button>
             </div>
 
@@ -94,7 +96,7 @@ export const TutorialOverlay: React.FC<TutorialOverlayProps> = ({
             {tutorialStep === 0 && (
               <button
                 onClick={onStartJourney}
-                className="self-start mt-0.5 px-3 py-1 bg-white text-blue-600 rounded-lg font-black text-[10px] uppercase hover:bg-blue-50 transition-colors"
+                className="self-start mt-0.5 px-4 py-1.5 bg-white text-blue-600 rounded-lg font-black text-[10px] uppercase active:scale-95 transition-all"
               >
                 Go
               </button>
