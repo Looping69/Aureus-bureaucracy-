@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Gold coin background -->
+  <circle cx="32" cy="32" r="30" fill="#D4A017" stroke="#B8860B" stroke-width="3"/>
+  <circle cx="32" cy="32" r="25" fill="none" stroke="#F5D060" stroke-width="1.5"/>
+  <!-- Letter A for Aureus -->
+  <path d="M32 12 L18 52 H25 L28 42 H36 L39 52 H46 Z M30 36 L32 22 L34 36 Z"
+        fill="#FFFDE7" stroke="#B8860B" stroke-width="0.5"/>
+  <!-- Small stamp/seal accent (bureaucracy) -->
+  <circle cx="48" cy="48" r="9" fill="#8B0000" stroke="#5C0000" stroke-width="1.5"/>
+  <rect x="44" y="45" width="8" height="2" rx="0.5" fill="#FFFDE7"/>
+  <rect x="45" y="49" width="6" height="1.5" rx="0.5" fill="#FFFDE7"/>
+</svg>

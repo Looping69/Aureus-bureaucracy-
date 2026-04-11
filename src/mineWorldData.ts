@@ -341,7 +341,7 @@ export const MINE_NODE_YIELDS: Record<string, number> = {
 };
 
 /** Cooldown in milliseconds before a node can be harvested again */
-export const NODE_HARVEST_COOLDOWN_MS = 8_000;
+export const NODE_HARVEST_COOLDOWN_MS = 40_000;
 
 /** Proximity radius (grid tiles) to trigger zone/node interactions */
 export const MINE_INTERACTION_RADIUS = 5;
