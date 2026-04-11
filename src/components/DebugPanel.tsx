@@ -1,3 +1,8 @@
+/**
+ * @module DebugPanel
+ * Developer debug panel showing raw game state values: meters, timers, active
+ * effects, and story flags.  Hidden in production builds.
+ */
 import React from 'react';
 import { Activity, Bug, Gauge, TimerReset } from 'lucide-react';
 import { GameState } from '../types';

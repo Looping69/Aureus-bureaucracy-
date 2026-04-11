@@ -1,3 +1,8 @@
+/**
+ * @module LightLoadingOverlay
+ * Lightweight translucent overlay shown during quick scene transitions
+ * (e.g. entering/exiting the mine) to mask the geometry swap.
+ */
 import React from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 

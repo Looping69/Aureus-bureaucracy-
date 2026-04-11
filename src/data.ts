@@ -67,6 +67,9 @@ export const INITIAL_NPCS: Record<string, NPC> = {
     role: 'Licensing Gatekeeper',
     persona: 'Insecure, obsessed with stamps and protocol.',
     motive: 'Wants to feel important and feared.',
+    belief: 'Stability is worth any compromise.',
+    tone: 'Calm, reasonable, quietly corrupt',
+    pressure: 'Normalize unethical behavior',
     vulnerability: {
       id: 'vane_status',
       description: 'Desperate for recognition and a promotion.',
@@ -84,7 +87,8 @@ export const INITIAL_NPCS: Record<string, NPC> = {
     workHours: { start: 9, end: 17 },
     homeBuildingId: 'house_south_a',
     workBuildingId: 'licensing_office',
-    moodShiftType: 'GRUMPY'
+    moodShiftType: 'GRUMPY',
+    relationshipState: 'neutral'
   },
   'union': {
     id: 'union',
@@ -92,6 +96,9 @@ export const INITIAL_NPCS: Record<string, NPC> = {
     role: 'Union Representative',
     persona: 'Gruff, talks about "the boys", loves backroom deals.',
     motive: 'Personal enrichment disguised as worker safety.',
+    belief: 'Every rule has a price tag.',
+    tone: 'Gruff, transactional, self-serving',
+    pressure: 'Loyalty vs personal gain',
     vulnerability: {
       id: 'sal_luxury',
       description: 'Has a taste for expensive, imported cigars.',
@@ -109,7 +116,8 @@ export const INITIAL_NPCS: Record<string, NPC> = {
     workHours: { start: 10, end: 22 },
     homeBuildingId: 'union_hall',
     workBuildingId: 'union_hall',
-    moodShiftType: 'HAPPY'
+    moodShiftType: 'HAPPY',
+    relationshipState: 'neutral'
   },
   'inspector': {
     id: 'inspector',
@@ -117,6 +125,9 @@ export const INITIAL_NPCS: Record<string, NPC> = {
     role: 'Safety Auditor',
     persona: 'Cold, robotic, cites sub-clauses from memory.',
     motive: 'Perfect compliance (or the appearance of it).',
+    belief: 'Order must be enforced, regardless of cost.',
+    tone: 'Cold, surgical, unforgiving',
+    pressure: 'Fear, exposure, consequences',
     vulnerability: {
       id: 'krell_past',
       description: 'Haunted by a structural failure in Sector 4.',
@@ -134,7 +145,8 @@ export const INITIAL_NPCS: Record<string, NPC> = {
     workHours: { start: 8, end: 16 },
     homeBuildingId: 'house_south_b',
     workBuildingId: 'inspector_hq',
-    moodShiftType: 'GRUMPY'
+    moodShiftType: 'GRUMPY',
+    relationshipState: 'neutral'
   },
   'fixer': {
     id: 'fixer',
@@ -142,6 +154,9 @@ export const INITIAL_NPCS: Record<string, NPC> = {
     role: 'Black Market Fixer',
     persona: 'Fast-talking, twitchy, knows everyone\'s secrets.',
     motive: 'Maximum chaos and profit.',
+    belief: 'Everything is a transaction.',
+    tone: 'Casual, dangerous, amused',
+    pressure: 'Shortcut vs integrity',
     vulnerability: {
       id: 'slink_debt',
       description: 'Owes a lot of money to off-world syndicates.',
@@ -159,7 +174,8 @@ export const INITIAL_NPCS: Record<string, NPC> = {
     workHours: { start: 18, end: 4 },
     homeBuildingId: 'fixer_den',
     workBuildingId: 'fixer_den',
-    moodShiftType: 'HAPPY'
+    moodShiftType: 'HAPPY',
+    relationshipState: 'neutral'
   },
   'journalist': {
     id: 'journalist',
@@ -167,6 +183,9 @@ export const INITIAL_NPCS: Record<string, NPC> = {
     role: 'Investigative Reporter',
     persona: 'Idealistic but cynical, looking for the "big one".',
     motive: 'Exposing the truth (or getting clicks).',
+    belief: 'Control the narrative, control the system.',
+    tone: 'Confident, strategic, detached',
+    pressure: 'Temptation of dominance',
     vulnerability: {
       id: 'vox_scoop',
       description: 'Desperate for a story that will make her famous.',
@@ -184,7 +203,8 @@ export const INITIAL_NPCS: Record<string, NPC> = {
     workHours: { start: 0, end: 24 },
     homeBuildingId: 'hotline_booth',
     workBuildingId: 'hotline_booth',
-    moodShiftType: 'NEUTRAL'
+    moodShiftType: 'NEUTRAL',
+    relationshipState: 'neutral'
   },
   'chief': {
     id: 'chief',
@@ -192,6 +212,9 @@ export const INITIAL_NPCS: Record<string, NPC> = {
     role: 'Local Community Leader',
     persona: 'Dignified, weary, protective of his people.',
     motive: 'Preserving the land and his community\'s health.',
+    belief: 'People matter more than systems.',
+    tone: 'Direct, emotional, grounded',
+    pressure: 'Guilt, empathy, sacrifice',
     vulnerability: {
       id: 'okon_health',
       description: 'His granddaughter is sick and needs rare medicine.',
@@ -209,7 +232,8 @@ export const INITIAL_NPCS: Record<string, NPC> = {
     workHours: { start: 6, end: 20 },
     homeBuildingId: 'chief_hut',
     workBuildingId: 'chief_hut',
-    moodShiftType: 'NEUTRAL'
+    moodShiftType: 'NEUTRAL',
+    relationshipState: 'neutral'
   },
   'resident_a': {
     id: 'resident_a',
@@ -217,6 +241,9 @@ export const INITIAL_NPCS: Record<string, NPC> = {
     role: 'Factory Worker',
     persona: 'Quiet, hardworking, keeps her head down.',
     motive: 'Providing for her family.',
+    belief: 'Keep your head down and survive.',
+    tone: 'Cautious, weary, honest',
+    pressure: 'Witness vs silence',
     vulnerability: {
       id: 'marta_debt',
       description: 'Behind on company housing payments.',
@@ -234,7 +261,8 @@ export const INITIAL_NPCS: Record<string, NPC> = {
     workHours: { start: 7, end: 15 },
     homeBuildingId: 'house_nw_d',
     workBuildingId: 'factory_west',
-    moodShiftType: 'NEUTRAL'
+    moodShiftType: 'NEUTRAL',
+    relationshipState: 'neutral'
   },
   'resident_b': {
     id: 'resident_b',
@@ -242,6 +270,9 @@ export const INITIAL_NPCS: Record<string, NPC> = {
     role: 'Clerk',
     persona: 'Nervous, meticulous, always checking over his shoulder.',
     motive: 'Staying out of trouble.',
+    belief: 'Following orders keeps you safe.',
+    tone: 'Anxious, precise, easily rattled',
+    pressure: 'Complicity vs conscience',
     vulnerability: {
       id: 'dag_files',
       description: 'Accidentally shredded an important audit report.',
@@ -259,7 +290,8 @@ export const INITIAL_NPCS: Record<string, NPC> = {
     workHours: { start: 9, end: 17 },
     homeBuildingId: 'house_ne_c',
     workBuildingId: 'office_east',
-    moodShiftType: 'GRUMPY'
+    moodShiftType: 'GRUMPY',
+    relationshipState: 'neutral'
   },
   'resident_c': {
     id: 'resident_c',
@@ -267,6 +299,9 @@ export const INITIAL_NPCS: Record<string, NPC> = {
     role: 'Miner',
     persona: 'Tough, laconic, covered in dust.',
     motive: 'Earning enough to leave this place.',
+    belief: 'Take what you can before the mine takes you.',
+    tone: 'Blunt, weary, practical',
+    pressure: 'Survival vs fairness',
     vulnerability: {
       id: 'pria_moonlight',
       description: 'Sells ore on the side to a rival company.',
@@ -284,7 +319,8 @@ export const INITIAL_NPCS: Record<string, NPC> = {
     workHours: { start: 6, end: 14 },
     homeBuildingId: 'house_sw_e',
     workBuildingId: 'mine_entrance',
-    moodShiftType: 'NEUTRAL'
+    moodShiftType: 'NEUTRAL',
+    relationshipState: 'neutral'
   },
   'resident_d': {
     id: 'resident_d',
@@ -292,6 +328,9 @@ export const INITIAL_NPCS: Record<string, NPC> = {
     role: 'Shift Supervisor',
     persona: 'Boisterous, likes a drink after work.',
     motive: 'Keep the operation running smoothly.',
+    belief: 'Loyalty is earned through shared sweat.',
+    tone: 'Boisterous, warm, stubborn',
+    pressure: 'Brotherhood vs truth',
     vulnerability: {
       id: 'tomek_injury',
       description: 'Hiding a chronic back injury to keep his position.',
@@ -309,7 +348,8 @@ export const INITIAL_NPCS: Record<string, NPC> = {
     workHours: { start: 8, end: 18 },
     homeBuildingId: 'house_east_f',
     workBuildingId: 'union_hall',
-    moodShiftType: 'HAPPY'
+    moodShiftType: 'HAPPY',
+    relationshipState: 'neutral'
   }
 };
 
@@ -320,7 +360,7 @@ export const INITIAL_PERMITS: Record<string, Permit> = {
     formNumber: '17-B',
     description: 'Preliminary declaration of intent to extract resources from the crust. Required for all mining operations.',
     cost: 50,
-    status: 'AVAILABLE',
+    status: 'LOCKED',
     unlocksFeature: 'prospecting'
   },
   'prospecting-license': {
@@ -481,7 +521,7 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
   'licensing': {
     'root': {
       id: 'root',
-      text: "Vane doesn't look up from his ledger. 'Form 1-A is the foundation of civilization. Without it, you are merely a loiterer with a shovel. What do you want?'",
+      text: "Vane arranges his stamps without looking up. 'You can do this properly… or you can do it quickly. I process both. I just don't remember both the same way.'",
       options: [
         {
           text: "I need a permit to start digging. (Tutorial)",
@@ -496,24 +536,18 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
           nextNodeId: 'tutorial_intro'
         },
         {
-          text: "I'm here for the Prospecting License.",
-          nextNodeId: 'prospecting',
-          condition: (s) => s.permits['prospecting-license'].status === 'AVAILABLE'
+          text: "I want it done right.",
+          nextNodeId: 'proper_path',
+          condition: (s) => s.permits['prospecting-license']?.status === 'AVAILABLE' || s.permits['extraction-intent']?.status === 'REJECTED'
         },
         {
-          text: "I need to discuss my rejected application (Form 17-B).",
-          nextNodeId: 'rejection_discussion',
-          condition: (s) => s.permits['extraction-intent'].status === 'REJECTED'
+          text: "Make it fast.",
+          nextNodeId: 'fast_path',
+          condition: (s) => s.permits['prospecting-license']?.status === 'AVAILABLE' || s.permits['extraction-intent']?.status === 'REJECTED'
         },
         {
-          text: "Your filing system is remarkably efficient, Officer.",
-          action: (s) => ({
-            npcs: {
-              ...s.npcs,
-              'licensing': { ...s.npcs['licensing'], trustLevel: Math.min(100, s.npcs['licensing'].trustLevel + 5) }
-            }
-          }),
-          nextNodeId: 'flattery'
+          text: "What do you mean by that?",
+          nextNodeId: 'system_reveal'
         },
         {
           text: "Chief Okon says you buried contamination reports.",
@@ -522,16 +556,94 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
         }
       ]
     },
+    'proper_path': {
+      id: 'proper_path',
+      text: "'Done right. Good. That means forms, reviews, waiting. The system rewards patience — or at least, it punishes impatience less.'",
+      options: [
+        {
+          text: "I'm here for the Prospecting License.",
+          nextNodeId: 'prospecting',
+          condition: (s) => s.permits['prospecting-license'].status === 'AVAILABLE'
+        },
+        {
+          text: "I need to discuss my rejected application.",
+          nextNodeId: 'rejection_discussion',
+          condition: (s) => s.permits['extraction-intent'].status === 'REJECTED'
+        },
+        { text: "I'll come back when I'm ready.", nextNodeId: 'root' }
+      ]
+    },
+    'fast_path': {
+      id: 'fast_path',
+      text: "'Fast it is. Nobody audits what nobody files. But fast leaves marks — the kind that show up later, when someone important is asking questions.'",
+      options: [
+        {
+          text: "I need to discuss my rejected application.",
+          nextNodeId: 'bribe_hint',
+          condition: (s) => s.permits['extraction-intent'].status === 'REJECTED'
+        },
+        {
+          text: "Show me how the real system works.",
+          action: (s) => ({
+            meters: {
+              ...s.meters,
+              exposure: Math.min(100, s.meters.exposure + 2)
+            }
+          }),
+          nextNodeId: 'system_reveal'
+        }
+      ]
+    },
+    'system_reveal': {
+      id: 'system_reveal',
+      text: "'Every permit has two paths. The one in the binder, and the one in the drawer. The drawer is faster, quieter, and costs you something you won't notice until later. That's how stability works — small compromises, stacked until they hold everything up.'",
+      options: [
+        {
+          text: "That sounds like corruption.",
+          action: (s) => ({
+            npcs: {
+              ...s.npcs,
+              'licensing': { ...s.npcs['licensing'], trustLevel: Math.max(0, s.npcs['licensing'].trustLevel - 3) }
+            }
+          }),
+          nextNodeId: 'corruption_pushback'
+        },
+        {
+          text: "I understand. Stability has a price.",
+          action: (s) => ({
+            npcs: {
+              ...s.npcs,
+              'licensing': { ...s.npcs['licensing'], trustLevel: Math.min(100, s.npcs['licensing'].trustLevel + 8) }
+            }
+          }),
+          nextNodeId: 'aligned_response'
+        }
+      ]
+    },
+    'corruption_pushback': {
+      id: 'corruption_pushback',
+      text: "'Call it what you like. But when your operation needs a signature by end of day, you'll be back. And the price won't have changed — only your willingness to pay it.'",
+      options: [
+        { text: "We'll see.", nextNodeId: 'root' }
+      ]
+    },
+    'aligned_response': {
+      id: 'aligned_response',
+      text: "He finally looks up. A thin, knowing smile. 'Now you're speaking my language. We'll do well together — as long as you remember who holds the stamps.'",
+      options: [
+        { text: "I won't forget.", nextNodeId: 'root' }
+      ]
+    },
     'tutorial_intro': {
       id: 'tutorial_intro',
-      text: "'New meat? Very well. You'll need Form 17-B. I've unlocked it in your file. Fill it out. Don't make mistakes.'",
+      text: "'New arrival. Here's how this works: Form 17-B gets you digging rights. Fill it correctly and I process it. Fill it wrong, and I process it anyway — into the rejection pile. Your choice.'",
       options: [
         { text: "I'll get right on it.", nextNodeId: 'root' }
       ]
     },
     'rejection_discussion': {
       id: 'rejection_discussion',
-      text: "'Ah, yes. The 17-B. Rejected for... let me see... 'Excessive Hopefulness'. A serious infraction. We can't have dreamers clogging up the tunnels.'",
+      text: "'The 17-B? Rejected for 'Excessive Hopefulness'. Don't look at me like that — I didn't make the rules. I just enforce them. Selectively.'",
       options: [
         {
           text: "This is absurd! I demand an appeal.",
@@ -545,19 +657,19 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
     },
     'appeal_denied': {
       id: 'appeal_denied',
-      text: "'Appeals require Form 99-Z, which is currently out of print. Come back in six to eight months.' He smirks, clearly enjoying this.",
+      text: "'Appeals require Form 99-Z, which is currently out of print. Come back in six to eight months.' He straightens a perfectly straight stack of papers.",
       options: [
         { text: "I don't have six months.", nextNodeId: 'bribe_hint' }
       ]
     },
     'bribe_hint': {
       id: 'bribe_hint',
-      text: "'Time is a luxury, isn't it? Just like... recognition. You know, the Regional Director is visiting soon. He values... initiative.'",
+      text: "'Time is a luxury, isn't it? Just like... recognition. The Regional Director is visiting soon. He values initiative — and so do I, when it's directed my way.'",
       options: [
         {
           text: "I see. Initiative. [Insight]",
           action: (s) => ({
-            tutorialStep: 5, // Advance to 'Use Knowledge' step
+            ...(s.tutorialStep === 6 && { tutorialStep: 7 }),
             npcs: {
               ...s.npcs,
               'licensing': { 
@@ -578,7 +690,7 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
           text: "I heard the Director is looking for 'efficient' officers... [Use Vulnerability]",
           condition: (s) => s.npcs['licensing'].vulnerability.discovered,
           action: (s) => ({
-            tutorialStep: 7, // Complete tutorial
+            ...(s.tutorialStep === 7 && { tutorialStep: 8 }),
             worldEffects: extendWorldEffect(s, 'bureauPull', 10),
             permits: {
               ...s.permits,
@@ -601,7 +713,7 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
           condition: (s) => s.money >= 50,
           action: (s) => ({
             money: s.money - 50,
-            tutorialStep: 7, // Complete tutorial
+            ...(s.tutorialStep === 7 && { tutorialStep: 8 }),
             permits: {
               ...s.permits,
               'extraction-intent': { ...s.permits['extraction-intent'], status: 'APPROVED' }
@@ -640,13 +752,6 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
           nextNodeId: 'approved'
         },
         { text: "I'll come back later.", nextNodeId: 'root' }
-      ]
-    },
-    'flattery': {
-      id: 'flattery',
-      text: "He pauses, a tiny smirk appearing. 'Efficiency is its own reward, but recognition... recognition is rare in this sector. You have a keen eye.'",
-      options: [
-        { text: "Just stating the obvious.", nextNodeId: 'root' }
       ]
     },
     'contamination_confrontation': {
@@ -705,19 +810,49 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
       options: [
         { text: "Thank you, Officer.", nextNodeId: 'root' }
       ]
+    },
+    'vane_signature_moment': {
+      id: 'vane_signature_moment',
+      text: "Vane slides a folder across the desk. Inside, you see your name on a violation report — one that should have ended your operation. He strikes a match and holds it to the corner of the page. 'This never existed. And neither does the favour you now owe me.'",
+      options: [
+        {
+          text: "…Thank you.",
+          action: (s) => ({
+            npcs: {
+              ...s.npcs,
+              licensing: { ...s.npcs.licensing, trustLevel: Math.min(100, s.npcs.licensing.trustLevel + 15), relationshipState: 'complicit' as const }
+            },
+            meters: {
+              ...s.meters,
+              exposure: Math.max(0, s.meters.exposure - 10)
+            }
+          }),
+          nextNodeId: 'root'
+        },
+        {
+          text: "I don't want to owe you anything.",
+          action: (s) => ({
+            npcs: {
+              ...s.npcs,
+              licensing: { ...s.npcs.licensing, trustLevel: Math.max(0, s.npcs.licensing.trustLevel - 10) }
+            }
+          }),
+          nextNodeId: 'root'
+        }
+      ]
     }
   },
   'chief': {
     'root': {
       id: 'root',
-      text: "Chief Okon stands by a small fire. 'The earth groans beneath your machines, stranger. Why have you come to our sector?'",
+      text: "Chief Okon watches you approach. His eyes carry the weight of generations. 'Systems come and go, stranger. People remain. What matters to you — the machine, or the lives it grinds through?'",
       options: [
         {
           text: "I'm just looking for work.",
           nextNodeId: 'work'
         },
         {
-          text: "I want to help your people. [Trust 30+]",
+          text: "The people. I want to help. [Trust 30+]",
           trustRequired: 30,
           condition: (s) => !hasStoryFlag(s, 'fixer_smuggling_tie') || hasStoryFlag(s, 'community_pact'),
           nextNodeId: 'help'
@@ -801,6 +936,41 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
       id: 'meds_given',
       text: "His eyes soften. 'You bring life to a dying place. We will not forget this.'",
       options: [{ text: "It was the right thing to do.", nextNodeId: 'root' }]
+    },
+    'okon_signature_moment': {
+      id: 'okon_signature_moment',
+      text: "Chief Okon stands before the village assembly. He points at you. 'This one came from outside. They had every reason to take and leave. Instead they brought medicine, fought for clean water, and stood with us when nobody else would.' He pauses. 'But I must ask you all — and I must ask you, outsider — are you here for us, or for what we can give you?' The village watches. Waiting.",
+      options: [
+        {
+          text: "I'm here for you. No strings.",
+          action: (s) => ({
+            npcs: {
+              ...s.npcs,
+              chief: { ...s.npcs.chief, trustLevel: Math.min(100, s.npcs.chief.trustLevel + 20), relationshipState: 'supportive' as const }
+            },
+            meters: {
+              ...s.meters,
+              trust: Math.min(100, s.meters.trust + 10)
+            }
+          }),
+          nextNodeId: 'root'
+        },
+        {
+          text: "I won't pretend I don't benefit. But the help is real.",
+          action: (s) => ({
+            npcs: {
+              ...s.npcs,
+              chief: { ...s.npcs.chief, trustLevel: Math.min(100, s.npcs.chief.trustLevel + 12) }
+            },
+            meters: {
+              ...s.meters,
+              trust: Math.min(100, s.meters.trust + 5),
+              influence: Math.min(100, s.meters.influence + 3)
+            }
+          }),
+          nextNodeId: 'root'
+        }
+      ]
     }
   },
   'union': {
@@ -881,7 +1051,7 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
   'journalist': {
     'root': {
       id: 'root',
-      text: "Elena Vox is frantically typing on a tablet. 'The Bureau is a black hole, and I'm the only one trying to shine a light. You got something for me, or are you just another cog in the machine?'",
+      text: "Elena Vox closes her tablet. 'Information is power. The only question is who holds it — and what they're willing to do with it. So. What have you got?'",
       options: [
         {
           text: "I have evidence of corruption. [Show Dirt]",
@@ -910,7 +1080,7 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
           nextNodeId: 'embargo_offer'
         },
         {
-          text: 'Vox is sitting on your embargo.',
+          text: 'Check on the embargo status.',
           condition: (s) => hasStoryFlag(s, 'vox_embargo'),
           nextNodeId: 'embargo_status'
         }
@@ -944,7 +1114,7 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
     },
     'exclusive_offer': {
       id: 'exclusive_offer',
-      text: "'You give me first rights, I give you a citywide detonation. No more quiet lanes after this.'",
+      text: "'This is the deal that locks everything else out. You give me first rights, and I blow this sector wide open. No more backchannels, no more quiet deals. After this, every ending but mine is closed.'",
       options: [
         {
           text: 'Run it. I want maximum daylight.',
@@ -958,10 +1128,14 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
             },
             npcs: {
               ...s.npcs,
-              journalist: { ...s.npcs.journalist, trustLevel: Math.min(100, s.npcs.journalist.trustLevel + 15) },
+              journalist: { ...s.npcs.journalist, trustLevel: Math.min(100, s.npcs.journalist.trustLevel + 15), relationshipState: 'invested' as const },
               licensing: { ...s.npcs.licensing, trustLevel: Math.max(0, s.npcs.licensing.trustLevel - 25) }
             }
           }),
+          nextNodeId: 'root'
+        },
+        {
+          text: "That's too permanent. I need options.",
           nextNodeId: 'root'
         }
       ]
@@ -1006,7 +1180,7 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
   'inspector': {
     'root': {
       id: 'root',
-      text: "Inspector Krell studies you in silence. 'Compliance is not a suggestion. What do you want?'",
+      text: "Inspector Krell doesn't sit. He stands at his desk like a sentry. 'Every operation in this sector exists because I allow it. What business do you have here?'",
       options: [
         {
           text: 'Request a formal safety sweep.',
@@ -1018,7 +1192,7 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
           nextNodeId: 'sector4_records'
         },
         {
-          text: 'Krell already heard about your fixer routes.',
+          text: "'You know about my fixer contacts.'",
           condition: (s) => hasStoryFlag(s, 'fixer_smuggling_tie') && !hasStoryFlag(s, 'reform_alliance'),
           nextNodeId: 'smuggling_conflict'
         },
@@ -1053,7 +1227,7 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
     },
     'smuggling_conflict': {
       id: 'smuggling_conflict',
-      text: "'You want compliance while running Slink's errands? End that relationship or bring me something big enough to justify the hypocrisy.'",
+      text: "'You want compliance while running Slink's errands? I enforce order regardless of cost. End that association or bring me something that justifies the hypocrisy.'",
       options: [
         { text: 'I will come back with leverage.', nextNodeId: 'root' }
       ]
@@ -1197,12 +1371,42 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
       id: 'blacklist_status',
       text: "'You chose the dirty lane. Do not expect inspections, approvals, or warnings from me.'",
       options: [{ text: 'Message received.', nextNodeId: 'root' }]
+    },
+    'krell_signature_moment': {
+      id: 'krell_signature_moment',
+      text: "Krell appears at your operation site, unannounced. He inspects every beam, every support, every permit on the wall. Then he tears one down. 'This signature is forged. Section 14-C. Your operation is suspended effective immediately.' He pauses. 'You had potential. But the law doesn't negotiate.'",
+      options: [
+        {
+          text: "You're making a mistake.",
+          action: (s) => ({
+            meters: {
+              ...s.meters,
+              exposure: Math.min(100, s.meters.exposure + 12)
+            },
+            npcs: {
+              ...s.npcs,
+              inspector: { ...s.npcs.inspector, trustLevel: Math.max(0, s.npcs.inspector.trustLevel - 20), relationshipState: 'targeting' as const }
+            }
+          }),
+          nextNodeId: 'root'
+        },
+        {
+          text: "…You're right. Help me fix this.",
+          action: (s) => ({
+            npcs: {
+              ...s.npcs,
+              inspector: { ...s.npcs.inspector, trustLevel: Math.min(100, s.npcs.inspector.trustLevel + 10) }
+            }
+          }),
+          nextNodeId: 'root'
+        }
+      ]
     }
   },
   'fixer': {
     'root': {
       id: 'root',
-      text: "Slink grins. 'You need speed, silence, or something that definitely isn't legal?'",
+      text: "Slink leans against the wall, flipping a coin. 'Everything has a price. The question is whether you're paying it now or later. Most people prefer later — that's where I make my money.'",
       options: [
         {
           text: 'Take a courier job for intel.',
@@ -1214,7 +1418,7 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
           nextNodeId: 'market_rumors'
         },
         {
-          text: 'Your village pact kills this business.',
+          text: "'I made a pact with the community.'",
           condition: (s) => hasStoryFlag(s, 'community_pact'),
           nextNodeId: 'fixer_pact_blocked'
         },
@@ -1313,6 +1517,42 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
             meters: {
               ...s.meters,
               influence: Math.min(100, s.meters.influence + 2)
+            }
+          }),
+          nextNodeId: 'root'
+        }
+      ]
+    },
+    'slink_signature_moment': {
+      id: 'slink_signature_moment',
+      text: "Your operation is collapsing. Guards at the gate, permits revoked, no way out. Then a truck pulls up — unmarked. Slink steps out, tosses you keys. 'Get in. Questions later.' He saved you instantly. But the manifest in the glove box has your name on a shipment you've never seen. The cost is invisible, and it's already been paid.",
+      options: [
+        {
+          text: "…What did you do?",
+          action: (s) => ({
+            storyFlags: addStoryFlag(s, 'fixer_smuggling_tie'),
+            npcs: {
+              ...s.npcs,
+              fixer: { ...s.npcs.fixer, trustLevel: Math.min(100, s.npcs.fixer.trustLevel + 15), relationshipState: 'dependent' as const }
+            },
+            meters: {
+              ...s.meters,
+              exposure: Math.min(100, s.meters.exposure + 5)
+            }
+          }),
+          nextNodeId: 'root'
+        },
+        {
+          text: "I don't want to know.",
+          action: (s) => ({
+            storyFlags: addStoryFlag(s, 'fixer_smuggling_tie'),
+            npcs: {
+              ...s.npcs,
+              fixer: { ...s.npcs.fixer, trustLevel: Math.min(100, s.npcs.fixer.trustLevel + 10), relationshipState: 'dependent' as const }
+            },
+            meters: {
+              ...s.meters,
+              exposure: Math.min(100, s.meters.exposure + 8)
             }
           }),
           nextNodeId: 'root'
@@ -1731,7 +1971,7 @@ const baseBuildings: Record<string, Building> = {
       npcId: 'journalist',
       name: 'Hotline Booth',
       type: 'HOTLINE',
-      isDiscovered: true,
+      isDiscovered: false,
       voxels: HOTLINE_BOOTH_VOXELS,
     },
     occupiedCityCells
@@ -1743,7 +1983,7 @@ const baseBuildings: Record<string, Building> = {
       npcId: 'chief',
       name: 'Chief\'s Hut',
       type: 'HOME',
-      isDiscovered: true,
+      isDiscovered: false,
       voxels: CHIEF_HUT_VOXELS,
     },
     occupiedCityCells
@@ -1755,7 +1995,7 @@ const baseBuildings: Record<string, Building> = {
       npcId: 'none',
       name: 'Sector 4 Entrance',
       type: 'MINE_ENTRANCE',
-      isDiscovered: true,
+      isDiscovered: false,
     },
     occupiedCityCells
   ),
@@ -1855,7 +2095,7 @@ const baseBuildings: Record<string, Building> = {
       npcId: 'resident_a',
       name: 'Dunn Residence',
       type: 'HOME',
-      isDiscovered: true,
+      isDiscovered: false,
       voxels: GENERIC_HOUSE_C_VOXELS,
     },
     occupiedCityCells
@@ -1867,7 +2107,7 @@ const baseBuildings: Record<string, Building> = {
       npcId: 'resident_b',
       name: 'Holt Residence',
       type: 'HOME',
-      isDiscovered: true,
+      isDiscovered: false,
       voxels: GENERIC_HOUSE_D_VOXELS,
     },
     occupiedCityCells
@@ -1879,7 +2119,7 @@ const baseBuildings: Record<string, Building> = {
       npcId: 'resident_c',
       name: 'Sato Residence',
       type: 'HOME',
-      isDiscovered: true,
+      isDiscovered: false,
       voxels: GENERIC_HOUSE_C_VOXELS,
     },
     occupiedCityCells
@@ -1891,7 +2131,7 @@ const baseBuildings: Record<string, Building> = {
       npcId: 'resident_d',
       name: 'Bray Residence',
       type: 'HOME',
-      isDiscovered: true,
+      isDiscovered: false,
       voxels: GENERIC_HOUSE_D_VOXELS,
     },
     occupiedCityCells

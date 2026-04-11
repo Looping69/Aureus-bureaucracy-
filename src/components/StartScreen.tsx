@@ -1,3 +1,8 @@
+/**
+ * @module StartScreen
+ * Game start / main-menu screen.  Presents the game title and a "Start Journey" CTA.
+ * Sets currentScene to 'WORLD' on confirmation.
+ */
 import React from 'react';
 import { motion } from 'motion/react';
 import { ChevronRight, FolderClock, Pickaxe, Save } from 'lucide-react';

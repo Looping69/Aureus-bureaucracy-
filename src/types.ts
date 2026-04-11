@@ -26,6 +26,17 @@ export interface DirtItem {
 }
 
 export type MoodShiftType = 'GRUMPY' | 'HAPPY' | 'NEUTRAL';
+export type RelationshipStateVane = 'neutral' | 'aligned' | 'complicit' | 'opposed';
+export type RelationshipStateInspector = 'neutral' | 'watching' | 'targeting';
+export type RelationshipStateFixer = 'neutral' | 'friendly' | 'dependent';
+export type RelationshipStateVox = 'neutral' | 'interested' | 'invested';
+export type RelationshipStateCommunity = 'neutral' | 'supportive' | 'disillusioned';
+export type NpcRelationshipState =
+  | RelationshipStateVane
+  | RelationshipStateInspector
+  | RelationshipStateFixer
+  | RelationshipStateVox
+  | RelationshipStateCommunity;
 
 export interface NPC {
   id: string;
@@ -33,6 +44,9 @@ export interface NPC {
   role: string;
   persona: string;
   motive: string;
+  belief: string;
+  tone: string;
+  pressure: string;
   vulnerability: {
     id: string;
     description: string;
@@ -51,6 +65,7 @@ export interface NPC {
   homeBuildingId?: string;
   workBuildingId?: string;
   moodShiftType: MoodShiftType;
+  relationshipState: NpcRelationshipState;
 }
 
 export interface Tile {
@@ -185,7 +200,7 @@ export interface GameState {
   objectives: Objective[];
   mines: Mine[];
   activeMineId: string | null;
-  currentScene: 'MINE' | 'MINE_WORLD' | 'OFFICE' | 'WORLD' | 'MENU' | 'CITY_PLANNER';
+  currentScene: 'MINE' | 'MINE_WORLD' | 'OFFICE' | 'WORLD' | 'MENU' | 'CITY_PLANNER' | 'TESTING';
   activeNPCId: string | null;
   activePermitId: string | null;
   activeBuildingId: string | null;

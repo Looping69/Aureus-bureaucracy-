@@ -1,5 +1,15 @@
+/**
+ * @module VoxelCharacter
+ * Builds and animates a voxel-art humanoid character using Three.js geometry.
+ *
+ * The character has four animation states (IDLE, WALKING, JUMPING, WORKING) and
+ * supports a visual carry-stack of up to {@link VoxelCharacter.MAX_CARRY} resource
+ * blocks on its back.  Block colours switch between ore (amber/gold) and wood
+ * (brown/sienna) via {@link VoxelCharacter.setCarriedType}.
+ */
 import * as THREE from 'three';
 
+/** Animation states for a {@link VoxelCharacter}. */
 export enum CharacterState {
   IDLE,
   WALKING,
@@ -7,6 +17,12 @@ export enum CharacterState {
   WORKING,
 }
 
+/**
+ * Voxel humanoid character composed of Three.js `BoxGeometry` meshes.
+ *
+ * Create one instance per character (player or NPC), add `group` to the scene,
+ * and call `update(deltaTime)` every animation frame.
+ */
 export class VoxelCharacter {
   public group: THREE.Group;
   private innerGroup: THREE.Group;
@@ -25,6 +41,7 @@ export class VoxelCharacter {
   private carryStack: THREE.Group;
   private carriedBlocks: THREE.Mesh[] = [];
   private _carriedCount = 0;
+  private _carriedType: 'ore' | 'wood' = 'ore';
 
   /** Maximum blocks this character can carry */
   public static readonly MAX_CARRY = 6;
@@ -348,6 +365,10 @@ export class VoxelCharacter {
     return group;
   }
 
+  /**
+   * Shifts all children of `group` downward by `y` so that the group origin
+   * acts as a shoulder/hip pivot rather than the geometric centre.
+   */
   private setupPivot(group: THREE.Group, x: number, y: number, z: number) {
     group.children.forEach(child => {
       child.position.y -= y;
@@ -355,6 +376,11 @@ export class VoxelCharacter {
     group.position.y += y;
   }
 
+  /**
+   * Transition to the WALKING state when `moving` is true, or return to IDLE
+   * when `moving` is false (unless already mid-air).
+   * @param moving - Whether the character is currently moving.
+   */
   public setMoving(moving: boolean) {
     if (moving && this.currentState !== CharacterState.WALKING) {
       this.setState(CharacterState.WALKING);
@@ -374,6 +400,21 @@ export class VoxelCharacter {
 
   // ── Carry-stack management ──────────────────────────────────────────────
 
+  /**
+   * Set whether carried blocks look like ore (amber/gold) or wood (brown logs).
+   * Re-colours any already-stacked blocks immediately.
+   */
+  public setCarriedType(type: 'ore' | 'wood') {
+    if (this._carriedType === type) return;
+    this._carriedType = type;
+    const colors = type === 'wood'
+      ? [0x8B4513, 0xA0522D, 0x6B3A2A]   // brown / sienna / dark-wood
+      : [0xc87941, 0xe0a840, 0xb07030];  // amber / gold tones
+    this.carriedBlocks.forEach((block, i) => {
+      (block.material as THREE.MeshStandardMaterial).color.setHex(colors[i % colors.length]);
+    });
+  }
+
   /** Set the number of visible ore blocks on the character's back (0..MAX_CARRY). */
   public setCarriedAmount(count: number) {
     const n = Math.max(0, Math.min(VoxelCharacter.MAX_CARRY, Math.floor(count)));
@@ -388,13 +429,17 @@ export class VoxelCharacter {
     }
 
     // Add missing blocks
-    const oreColors = [0xc87941, 0xe0a840, 0xb07030]; // amber/gold tones
+    const oreColors  = [0xc87941, 0xe0a840, 0xb07030];
+    const woodColors = [0x8B4513, 0xA0522D, 0x6B3A2A];
+    const colors = this._carriedType === 'wood' ? woodColors : oreColors;
+    const metalness = this._carriedType === 'wood' ? 0.0 : 0.3;
+    const roughness = this._carriedType === 'wood' ? 0.9 : 0.6;
     while (this.carriedBlocks.length < n) {
       const i = this.carriedBlocks.length;
-      const color = oreColors[i % oreColors.length];
+      const color = colors[i % colors.length];
       const block = new THREE.Mesh(
         new THREE.BoxGeometry(0.22, 0.15, 0.18),
-        new THREE.MeshStandardMaterial({ color, metalness: 0.3, roughness: 0.6 }),
+        new THREE.MeshStandardMaterial({ color, metalness, roughness }),
       );
       block.position.y = i * VoxelCharacter.CARRY_BLOCK_SPACING;
       block.rotation.y = (i * 0.4); // slight rotation for visual variety
@@ -418,6 +463,11 @@ export class VoxelCharacter {
     return true;
   }
 
+  /**
+   * Immediately transition to a new animation state, resetting `animationTime`
+   * and snapping limb rotations to their resting pose when entering IDLE.
+   * @param newState - The target {@link CharacterState}.
+   */
   public setState(newState: CharacterState) {
     if (this.currentState === newState) return;
     this.currentState = newState;
@@ -432,6 +482,18 @@ export class VoxelCharacter {
     }
   }
 
+  /**
+   * Advance the per-frame animation state machine.
+   *
+   * @param deltaTime - Seconds elapsed since the last frame.
+   *
+   * @remarks
+   * Each {@link CharacterState} drives a different procedural animation:
+   * - **IDLE** – subtle breathing bob and arm sway.
+   * - **WALKING** – sinusoidal leg/arm swing with a vertical bounce.
+   * - **JUMPING** – parabolic rise over 0.5 s, then auto-returns to IDLE.
+   * - **WORKING** – pickaxe-swing: right arm overhead, left arm braced, body dips on strike.
+   */
   public update(deltaTime: number) {
     this.animationTime += deltaTime;
 

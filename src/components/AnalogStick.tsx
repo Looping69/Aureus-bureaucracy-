@@ -1,3 +1,9 @@
+/**
+ * @module AnalogStick
+ * On-screen virtual analog stick for mobile player movement.
+ * Tracks pointer/touch input within a circular dead-zone and outer radius,
+ * emitting normalised XY deflection values [-1, 1] to the parent scene.
+ */
 import React from 'react';
 
 export interface AnalogStickVector {

@@ -359,4 +359,8 @@ export class EntityManager {
     this.lightPool.forEach(l => this.scene.remove(l));
     this.lightPool = [];
   }
+
+  public setHighlightedBuilding(_buildingId: string | null, _intensity: number = 0.15) {
+    // Building highlight shaders were removed in the mainline renderer refactor.
+  }
 }

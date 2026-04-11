@@ -1,3 +1,7 @@
+/**
+ * @module MineSceneFallback
+ * Error boundary fallback component shown if MineScene throws during render.
+ */
 import React from 'react';
 
 interface MineSceneFallbackProps {

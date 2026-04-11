@@ -3,7 +3,7 @@ import React from 'react';
 import { GameState } from '../../types';
 import { applyDailyEconomyTick } from '../../game/economy';
 import { applyExhaustionCollapse } from '../../game/exhaustion';
-import { DAY_NIGHT, isNightTime } from '../../utils/dayNightCycle';
+import { DAY_NIGHT, SUNRISE_HOUR, isNightTime } from '../../utils/dayNightCycle';
 
 interface UseTimeAndCurfewLoopArgs {
   setState: React.Dispatch<React.SetStateAction<GameState>>;
@@ -27,7 +27,7 @@ export const useTimeAndCurfewLoop = ({ setState, setNotification, homePos, enabl
           newTime -= 24;
         }
 
-        if (prev.time < DAY_NIGHT.SUNRISE_HOUR && newTime >= DAY_NIGHT.SUNRISE_HOUR) {
+        if (prev.time < SUNRISE_HOUR && newTime >= SUNRISE_HOUR) {
           newDay += 1;
           const daily = applyDailyEconomyTick({
             ...prev,

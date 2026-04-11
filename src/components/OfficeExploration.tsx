@@ -1,3 +1,8 @@
+/**
+ * @module OfficeExploration
+ * Office exploration mode: renders interactable items over the office background.
+ * Shown when GameState.explorationActive is true inside the OFFICE scene.
+ */
 import React from 'react';
 import { motion } from 'motion/react';
 import { Search, BookOpen, Trash2, Map, Box } from 'lucide-react';

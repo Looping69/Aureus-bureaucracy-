@@ -3,6 +3,20 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 
+/**
+ * @module VoxelEngine
+ * Core Three.js rendering engine for Aureus.  Owns the WebGL renderer, scene
+ * graph, physics world (cannon-es), RAF animation loop, entity manager, and all
+ * player/camera control logic.
+ *
+ * Key subsystems:
+ * - **World scene** – terrain voxels, buildings, sky dome, sun/moon, fog
+ * - **Player movement** – path-based click-to-move and analog-stick direct movement
+ * - **Camera** – locked isometric follow-cam (azimuth π/4, polar fixed)
+ * - **Voxel editing** – brush/eraser/road tools with optional symmetry
+ * - **Day/Night cycle** – light intensities and fog colour shift over a 0-24 float clock
+ */
+
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
@@ -11,23 +25,42 @@ import { CONFIG, COLORS, WORLD_HALF_SIZE, WORLD_SIZE } from './utils/voxelConsta
 import { EntityManager } from './EntityManager';
 import { GreedyMesher } from './utils/GreedyMesher';
 import { BuildingFootprint } from './utils/worldNavigation';
-import { getCelestialPosition, getDaylightFactor, isNightTime } from './utils/dayNightCycle';
+import {
+  DAY_NIGHT,
+  hoursToTicks,
+  isDaytime as isDaytimeTick,
+  getDaylightFactor,
+  getCelestialPosition,
+} from './utils/dayNightCycle';
 import backgroundData from '../background.json';
 
+// Locked isometric camera azimuth (45°) — kept constant to give a consistent city view
 export const WORLD_CAMERA_AZIMUTH = Math.PI / 4;
+// Camera offset from target: x=20, y=30, z=20 gives the isometric angle
 const WORLD_CAMERA_OFFSET = new THREE.Vector3(20, 30, 20);
+// Pre-computed distance for the OrbitControls polar/distance constraints
 const WORLD_CAMERA_DISTANCE = WORLD_CAMERA_OFFSET.length();
+// Pre-computed polar angle derived from WORLD_CAMERA_OFFSET.y
 const WORLD_CAMERA_POLAR = Math.acos(WORLD_CAMERA_OFFSET.y / WORLD_CAMERA_DISTANCE);
 
+/**
+ * Singleton-style Three.js engine that owns the entire rendering pipeline for
+ * one game scene.  Instantiate with a DOM container and callback functions;
+ * call {@link VoxelEngine.buildWorldScene} to populate terrain and entities;
+ * the RAF loop starts automatically in the constructor.
+ *
+ * Dispose by calling {@link VoxelEngine.cleanup} before unmounting the container.
+ */
 export class VoxelEngine {
-  private static readonly FOG_NEAR_DAY = 120;
-  private static readonly FOG_FAR_DAY = 280;
-  private static readonly FOG_NEAR_NIGHT = 80;
+  private static readonly FOG_NEAR_DAY = 120;    // Fog start distance during daytime (world units)
+  private static readonly FOG_FAR_DAY = 280;     // Fog end distance during daytime
+  private static readonly FOG_NEAR_NIGHT = 80;   // Fog compresses at night for atmosphere
   private static readonly FOG_FAR_NIGHT = 220;
-  private static readonly ANALOG_MOVE_CONVERGE_THRESHOLD = 0.05;
+  private static readonly ANALOG_MOVE_CONVERGE_THRESHOLD = 0.05; // Stop walking when XZ delta < 0.05 units
   private static readonly PLAYER_MOVE_SPEED = 12; // world units per second (XZ only)
-  private static readonly CAMERA_FOLLOW_DAMPING_XZ = 22;
-  private static readonly CAMERA_FOLLOW_DAMPING_Y = 14;
+  private static readonly CAMERA_FOLLOW_DAMPING_XZ = 22; // THREE.MathUtils.damp coefficient for XZ follow
+  private static readonly CAMERA_FOLLOW_DAMPING_Y = 14;  // Slower Y damping prevents jarring vertical jumps
+  // --- Scene & Renderer ---
   private container: HTMLElement;
   private scene: THREE.Scene;
   private camera: THREE.PerspectiveCamera;
@@ -56,13 +89,13 @@ export class VoxelEngine {
   private ghostVoxel: THREE.Mesh;
   private ghostSymmetryVoxel: THREE.Mesh;
   private hoverSelector: THREE.Mesh;
-  private objectiveSelector: THREE.Mesh;
   
   private voxels: SimulationVoxel[] = [];
   private currentVoxelData: VoxelData[] = [];
   private rebuildTargets: RebuildTarget[] = [];
   private rebuildStartTime: number = 0;
   
+  // --- App State & Callbacks ---
   private state: AppState = AppState.STABLE;
   private onStateChange: (state: AppState) => void;
   private onCountChange: (count: number) => void;
@@ -93,6 +126,13 @@ export class VoxelEngine {
   private sunOrbitOffset = new THREE.Vector3();
   private moonOrbitOffset = new THREE.Vector3();
 
+  // --- Intro camera animation state ---
+  private static readonly INTRO_CLOSE_DISTANCE = 8;            // Start zoomed in very close
+  private static readonly INTRO_DURATION_MS = 3000;            // Total pull-back duration (slower & smoother)
+  private introAnimationActive: boolean = false;
+  private introStartTime: number = 0;
+
+  // --- Constructor ---
   constructor(
     container: HTMLElement, 
     onStateChange: (state: AppState) => void,
@@ -163,15 +203,16 @@ export class VoxelEngine {
     this.dirLight.castShadow = true;
     this.dirLight.shadow.mapSize.width = 4096;
     this.dirLight.shadow.mapSize.height = 4096;
-    this.dirLight.shadow.camera.left = -100;
-    this.dirLight.shadow.camera.right = 100;
-    this.dirLight.shadow.camera.top = 100;
-    this.dirLight.shadow.camera.bottom = -100;
+    this.dirLight.shadow.camera.left = -60;
+    this.dirLight.shadow.camera.right = 60;
+    this.dirLight.shadow.camera.top = 60;
+    this.dirLight.shadow.camera.bottom = -60;
     this.dirLight.shadow.camera.near = 0.5;
-    this.dirLight.shadow.camera.far = 400;
+    this.dirLight.shadow.camera.far = 300;
     this.dirLight.shadow.bias = -0.0003;
     this.dirLight.shadow.normalBias = 0.04;
     this.scene.add(this.dirLight);
+    // Add target to scene so it can be repositioned to follow the player
     this.scene.add(this.dirLight.target);
 
     // Target Indicator
@@ -225,15 +266,7 @@ export class VoxelEngine {
       0x64748b
     );
     this.worldGrid.position.set(-0.5, CONFIG.FLOOR_Y + 0.02, -0.5);
-    const gridMaterial = this.worldGrid.material as THREE.Material | THREE.Material[];
-    const materials = Array.isArray(gridMaterial) ? gridMaterial : [gridMaterial];
-    materials.forEach((material) => {
-      if (material instanceof THREE.LineBasicMaterial) {
-        material.transparent = true;
-        material.opacity = 0;
-        material.depthWrite = false;
-      }
-    });
+    this.worldGrid.visible = false;
     this.scene.add(this.worldGrid);
 
     // Edge decorations – place motifs from background.json around the world
@@ -275,19 +308,6 @@ export class VoxelEngine {
     this.hoverSelector.visible = false;
     this.scene.add(this.hoverSelector);
 
-    const objectiveSelectorGeometry = new THREE.RingGeometry(0.8, 1.25, 40);
-    const objectiveSelectorMaterial = new THREE.MeshBasicMaterial({
-      color: 0xf59e0b,
-      transparent: true,
-      opacity: 0.75,
-      side: THREE.DoubleSide,
-      depthWrite: false
-    });
-    this.objectiveSelector = new THREE.Mesh(objectiveSelectorGeometry, objectiveSelectorMaterial);
-    this.objectiveSelector.rotation.x = -Math.PI / 2;
-    this.objectiveSelector.visible = false;
-    this.scene.add(this.objectiveSelector);
-
     // Entities (Player, Buildings, etc)
     this.entities = new EntityManager(this.scene);
 
@@ -307,6 +327,11 @@ export class VoxelEngine {
     this.animate();
   }
 
+  // --- Public API: Callbacks ---
+  /**
+   * Replace the callback functions registered at construction time.
+   * Useful when the parent React component re-renders and produces new closures.
+   */
   public setCallbacks(
     onStateChange: (state: AppState) => void,
     onCountChange: (count: number) => void,
@@ -319,6 +344,17 @@ export class VoxelEngine {
     this.onSelect = onSelect;
   }
 
+  public setObjectiveTarget(_target: WorldHoverInfo | null) {
+    // Objective selection visuals only exist in the world-scene UI layer on this branch.
+  }
+
+  // --- Public API: Camera ---
+  /**
+   * Translate both the camera position and its orbit target by the given XZ delta.
+   * The delta is applied in camera-relative space so WASD controls feel intuitive.
+   * @param dx - Strafing offset (camera-right axis).
+   * @param dz - Forward/backward offset (camera-forward axis).
+   */
   public moveCamera(dx: number, dz: number) {
     // Move camera relative to its current orientation for intuitive WASD controls
     const forward = new THREE.Vector3();
@@ -339,6 +375,10 @@ export class VoxelEngine {
     this.controls.update();
   }
 
+  /**
+   * Zoom the camera along its view direction, clamped to [minDistance, maxDistance].
+   * @param delta - Positive zooms in, negative zooms out.
+   */
   public zoomCamera(delta: number) {
     const zoomSpeed = 3;
     const direction = new THREE.Vector3();
@@ -359,80 +399,113 @@ export class VoxelEngine {
     this.controls.update();
   }
 
-  public updateTime(time: number) {
-    this.time = time;
-    const radius = 120;
-    const celestial = getCelestialPosition(time, radius);
-    const daylightFactor = getDaylightFactor(time);
-    const isNight = celestial.isNight;
-
-    if (isNight) {
-      this.moonOrbitOffset.set(celestial.x, celestial.y, celestial.z);
-      this.sunOrbitOffset.set(-celestial.x, -celestial.y, -celestial.z);
-    } else {
-      this.sunOrbitOffset.set(celestial.x, celestial.y, celestial.z);
-      this.moonOrbitOffset.set(-celestial.x, -celestial.y, -celestial.z);
-    }
-
-    this.sun.position.copy(this.currentCameraFocus).add(this.sunOrbitOffset);
-    this.moon.position.copy(this.currentCameraFocus).add(this.moonOrbitOffset);
-
-    this.ambientLight.intensity = THREE.MathUtils.lerp(0.14, 0.32, daylightFactor);
-    this.hemiLight.intensity = THREE.MathUtils.lerp(0.2, 0.55, daylightFactor);
-    this.hemiLight.color.setHex(isNight ? 0x0b1020 : 0x87CEEB);
-    this.hemiLight.groundColor.setHex(isNight ? 0x050510 : 0x3b82f6);
-
-    const activeOrbit = isNight ? this.moonOrbitOffset : this.sunOrbitOffset;
-    this.dirLight.position.copy(this.currentCameraFocus).add(activeOrbit);
-    this.dirLight.target.position.copy(this.currentCameraFocus);
-    this.dirLight.target.updateMatrixWorld();
-    this.dirLight.castShadow = !isNight;
-    this.dirLight.intensity = isNight ? 0.35 : 0.45 + daylightFactor * 1.0;
-    this.dirLight.color.setHex(isNight ? 0xccccff : (daylightFactor < 0.3 ? 0xffcd75 : 0xffffff));
-
-    const fogColor = isNight ? 0x050510 : (daylightFactor < 0.25 ? 0xffb36b : 0x87CEEB);
-    if (this.scene.fog) {
-      this.scene.fog.color.setHex(fogColor);
-      // Push fog far enough so world never vanishes during navigation
-      (this.scene.fog as THREE.Fog).near = isNight ? VoxelEngine.FOG_NEAR_NIGHT : VoxelEngine.FOG_NEAR_DAY;
-      (this.scene.fog as THREE.Fog).far = isNight ? VoxelEngine.FOG_FAR_NIGHT : VoxelEngine.FOG_FAR_DAY;
-    }
-
-    // Keep the floor colour in sync with the fog so it stays invisible
-    (this.floor.material as THREE.MeshBasicMaterial).color.setHex(fogColor);
-
-    // Update street lights
-    // Street lights are now handled by EntityManager light pool
-    
-    // Update Sky Dome Color
-    const skyMat = this.skyDome.material as THREE.MeshBasicMaterial;
-    if (isNight) {
-      skyMat.color.setHex(0x050510);
-    } else if (daylightFactor > 0.35) {
-      skyMat.color.setHex(0x87CEEB); // Day sky blue
-    } else {
-      skyMat.color.setHex(0xFFB36B); // Sunrise/sunset warmth
-    }
-
-    this.sun.visible = !isNight;
-    this.moon.visible = isNight;
-
-    const sunMat = this.sun.material as THREE.MeshBasicMaterial;
-    const moonMat = this.moon.material as THREE.MeshBasicMaterial;
-    sunMat.color.setHex(daylightFactor < 0.3 ? 0xffcd75 : 0xffdd44);
-    moonMat.color.setHex(0xccccff);
+  /** Return the normalized light direction (sun during day, moon at night). */
+  private getLightDirection(): THREE.Vector3 {
+    const activeOrbit = this.sun.visible ? this.sunOrbitOffset : this.moonOrbitOffset;
+    return activeOrbit.clone().normalize();
   }
 
   private updateCelestialAnchors() {
     this.sun.position.copy(this.currentCameraFocus).add(this.sunOrbitOffset);
     this.moon.position.copy(this.currentCameraFocus).add(this.moonOrbitOffset);
 
-    const activeOrbit = isNightTime(this.time) ? this.moonOrbitOffset : this.sunOrbitOffset;
+    const activeOrbit = this.sun.visible ? this.sunOrbitOffset : this.moonOrbitOffset;
     this.dirLight.position.copy(this.currentCameraFocus).add(activeOrbit);
     this.dirLight.target.position.copy(this.currentCameraFocus);
     this.dirLight.target.updateMatrixWorld();
   }
 
+  /**
+   * Drive the day/night cycle to the given hour.
+   * Uses the tick-based {@link DAY_NIGHT} system to compute sun/moon positions
+   * via {@link getCelestialPosition}, light intensities via
+   * {@link getDaylightFactor}, and shadow directions that follow the sun arc
+   * so building and terrain shadows sweep across the world throughout the day.
+   * @param time - Fractional hour in [0, 24).
+   */
+  public updateTime(time: number) {
+    this.time = time;
+
+    // Convert the fractional hour to the tick-based system
+    const ticks = hoursToTicks(time);
+
+    // --- Celestial positions via the day/night cycle module ---
+    const celestial = getCelestialPosition(ticks, 120);
+
+    // Moon is always positioned when it's night; during the day, park it below
+    // the horizon so it isn't visible.
+    if (celestial.isNight) {
+      this.moonOrbitOffset.set(celestial.x, celestial.y, celestial.z);
+      this.sunOrbitOffset.set(-celestial.x, -40, -celestial.z);
+      this.moon.visible = true;
+      this.sun.visible = false;
+    } else {
+      this.sunOrbitOffset.set(celestial.x, celestial.y, celestial.z);
+      this.moonOrbitOffset.set(-celestial.x, -40, -celestial.z);
+      this.moon.visible = false;
+      this.sun.visible = true;
+    }
+
+    // --- Daylight factor (0 at night, sine curve 0→1→0 during daytime) ---
+    const dayFactor = getDaylightFactor(ticks);
+    const isDay = isDaytimeTick(ticks);
+
+    this.ambientLight.intensity = 0.1 + dayFactor * 0.2;
+    this.hemiLight.intensity = 0.2 + dayFactor * 0.3;
+
+    // --- Directional light follows the visible celestial body ---
+    if (dayFactor > 0) {
+      this.dirLight.intensity = dayFactor * 1.0;
+      this.dirLight.color.setHex(0xffffff);
+    } else {
+      this.dirLight.intensity = 0.3;
+      this.dirLight.color.setHex(0xaaaaff);
+    }
+    this.updateCelestialAnchors();
+
+    const fogColor = isDay ? 0xe2e8f0 : 0x020617;
+    if (this.scene.fog) {
+      this.scene.fog.color.setHex(fogColor);
+      // Push fog far enough so world never vanishes during navigation
+      (this.scene.fog as THREE.Fog).near = isDay ? VoxelEngine.FOG_NEAR_DAY : VoxelEngine.FOG_NEAR_NIGHT;
+      (this.scene.fog as THREE.Fog).far = isDay ? VoxelEngine.FOG_FAR_DAY : VoxelEngine.FOG_FAR_NIGHT;
+    }
+
+    // Keep the floor colour in sync with the fog so it stays invisible
+    (this.floor.material as THREE.MeshBasicMaterial).color.setHex(fogColor);
+
+    // Update street lights
+    const isNight = !isDay;
+    // Street lights are now handled by EntityManager light pool
+    
+    // Update Sky Dome Color
+    const skyMat = this.skyDome.material as THREE.MeshBasicMaterial;
+    if (dayFactor > 0.5) {
+      skyMat.color.setHex(0x87CEEB); // Day sky blue
+    } else if (dayFactor > 0) {
+      skyMat.color.setHex(0xFF7F50); // Sunset/Sunrise orange
+    } else {
+      skyMat.color.setHex(0x020617); // Night sky dark
+    }
+  }
+
+  // --- Public API: Player ---
+  /**
+   * Set the player's target world position and movement state.
+   *
+   * For path-based movement (`isMoving=true`), a target indicator ring and path
+   * polyline are shown.  For analog-stick movement, the target is set directly and
+   * the character faces the movement direction.  The first call also snaps
+   * camera and character to avoid an interpolation glide from the origin.
+   *
+   * @param x        - Target X in Three.js world space.
+   * @param z        - Target Z in Three.js world space.
+   * @param surfaceY - Surface height (Y) at the target tile.
+   * @param isMoving - Whether the player is actively moving toward a path target.
+   * @param targetX  - End-of-path X (path-based movement only).
+   * @param targetZ  - End-of-path Z (path-based movement only).
+   * @param path     - World-grid waypoints for the path polyline.
+   */
   public setPlayerPosition(
     x: number,
     z: number,
@@ -499,6 +572,7 @@ export class VoxelEngine {
     }
   }
 
+  /** Snapshot the current voxel simulation state as plain {@link VoxelData} objects. */
   public getCurrentVoxelData(): VoxelData[] {
     return this.voxels.map(v => ({
       x: v.x,
@@ -508,6 +582,7 @@ export class VoxelEngine {
     }));
   }
 
+  /** Snap the camera follow target to the player's current position immediately. */
   public recenterOnPlayer() {
     this.targetCameraFocus.copy(this.currentPlayerPos);
     this.currentCameraFocus.copy(this.currentPlayerPos);
@@ -517,14 +592,58 @@ export class VoxelEngine {
     this.controls.update();
   }
 
-  public setObjectiveTarget(target: WorldHoverInfo | null) {
-    if (!target) {
-      this.objectiveSelector.visible = false;
-      return;
-    }
+  /**
+   * Kick off a smooth intro camera pull-back.  Starts with the camera
+   * zoomed tight on the player character and eases out to the normal
+   * isometric distance over {@link INTRO_DURATION_MS} milliseconds.
+   * Safe to call multiple times — subsequent calls are no-ops while
+   * an intro is already running.
+   */
+  public playIntroAnimation() {
+    if (this.introAnimationActive) return;
+    this.introAnimationActive = true;
+    this.introStartTime = performance.now();
 
-    this.objectiveSelector.position.set(target.x - WORLD_HALF_SIZE, target.z + 0.06, target.y - WORLD_HALF_SIZE);
-    this.objectiveSelector.visible = true;
+    // Snap focus on the player and position the camera at the close-up distance
+    this.targetCameraFocus.copy(this.currentPlayerPos);
+    this.currentCameraFocus.copy(this.currentPlayerPos);
+    this.controls.target.copy(this.currentCameraFocus);
+
+    const closeOffset = WORLD_CAMERA_OFFSET.clone()
+      .normalize()
+      .multiplyScalar(VoxelEngine.INTRO_CLOSE_DISTANCE);
+    this.camera.position.copy(this.currentCameraFocus).add(closeOffset);
+    this.enforceCameraBounds();
+    this.controls.update();
+  }
+
+  /** Advance the intro pull-back each frame.  Called from animate(). */
+  private updateIntroAnimation() {
+    if (!this.introAnimationActive) return;
+
+    const elapsed = performance.now() - this.introStartTime;
+    const t = Math.min(elapsed / VoxelEngine.INTRO_DURATION_MS, 1);
+
+    // Smooth ease-out (quartic) for a gradual, graceful deceleration
+    const ease = 1 - Math.pow(1 - t, 4);
+
+    const distance = THREE.MathUtils.lerp(
+      VoxelEngine.INTRO_CLOSE_DISTANCE,
+      WORLD_CAMERA_DISTANCE,
+      ease,
+    );
+
+    const direction = WORLD_CAMERA_OFFSET.clone().normalize();
+    this.camera.position
+      .copy(this.controls.target)
+      .addScaledVector(direction, distance);
+
+    this.enforceCameraBounds();
+    this.controls.update();
+
+    if (t >= 1) {
+      this.introAnimationActive = false;
+    }
   }
 
   private updateCameraFollow(deltaTime: number) {
@@ -1628,6 +1747,7 @@ export class VoxelEngine {
     }
   }
 
+  // --- Render Loop ---
   private animate() {
     this.animationId = requestAnimationFrame(this.animate);
     
@@ -1635,13 +1755,22 @@ export class VoxelEngine {
     const deltaTime = this.lastTime ? (now - this.lastTime) / 1000 : 0.016;
     this.lastTime = now;
 
-    // Snap Y to target surface height immediately so character stays on terrain
-    this.currentPlayerPos.y = this.targetPlayerPos.y;
-
-    // Interpolate only X/Z at constant speed so movement is horizontal
+    // Interpolate X/Z and Y at constant speed so movement is smooth in all axes
     const dx = this.targetPlayerPos.x - this.currentPlayerPos.x;
     const dz = this.targetPlayerPos.z - this.currentPlayerPos.z;
     const distXZ = Math.sqrt(dx * dx + dz * dz);
+
+    // Smoothly interpolate Y (surface height) to avoid snapping on terrain steps
+    const dy = this.targetPlayerPos.y - this.currentPlayerPos.y;
+    const absdy = Math.abs(dy);
+    if (absdy > VoxelEngine.ANALOG_MOVE_CONVERGE_THRESHOLD) {
+      const stepY = VoxelEngine.PLAYER_MOVE_SPEED * deltaTime;
+      this.currentPlayerPos.y = stepY >= absdy
+        ? this.targetPlayerPos.y
+        : this.currentPlayerPos.y + Math.sign(dy) * stepY;
+    } else {
+      this.currentPlayerPos.y = this.targetPlayerPos.y;
+    }
     if (distXZ > VoxelEngine.ANALOG_MOVE_CONVERGE_THRESHOLD) {
       const step = VoxelEngine.PLAYER_MOVE_SPEED * deltaTime;
       if (step >= distXZ) {
@@ -1669,6 +1798,7 @@ export class VoxelEngine {
 
     this.updateCameraFollow(deltaTime);
     this.updateCelestialAnchors();
+    this.updateIntroAnimation();
     this.enforceCameraBounds();
     this.controls.update();
     this.physicsWorld.step(1 / 60, deltaTime, 3);
@@ -1678,14 +1808,6 @@ export class VoxelEngine {
     if (this.targetIndicator.visible) {
       this.targetIndicator.scale.setScalar(1 + Math.sin(Date.now() * 0.01) * 0.1);
       this.targetIndicator.rotation.z += deltaTime;
-    }
-
-    if (this.objectiveSelector.visible) {
-      const pulse = 1 + Math.sin(now * 0.008) * 0.18;
-      this.objectiveSelector.scale.setScalar(pulse);
-      const material = this.objectiveSelector.material as THREE.MeshBasicMaterial;
-      material.opacity = 0.5 + Math.sin(now * 0.008) * 0.2;
-      this.objectiveSelector.rotation.z -= deltaTime * 0.8;
     }
 
     this.draw();

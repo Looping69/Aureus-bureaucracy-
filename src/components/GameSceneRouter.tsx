@@ -21,6 +21,9 @@ const OfficeScene = React.lazy(() =>
 const CityPlanner = React.lazy(() =>
   import('./CityPlanner').then((module) => ({ default: module.CityPlanner }))
 );
+const TestingWorldScene = React.lazy(() =>
+  import('./TestingWorldScene').then((module) => ({ default: module.TestingWorldScene }))
+);
 
 interface GameSceneRouterProps {
   state: GameState;
@@ -53,6 +56,7 @@ interface GameSceneRouterProps {
   onTravelTo: (buildingId: string) => void;
   onBackToDirectory: () => void;
   onOperationAction: (actionId: OperationActionId) => void;
+  onReturnTestingToWorld: () => void;
   suppressInitialWorldFallback?: boolean;
   showInitialWorldLoadingOverlay?: boolean;
   onInitialWorldReady?: () => void;
@@ -107,6 +111,7 @@ export const GameSceneRouter: React.FC<GameSceneRouterProps> = ({
   onTravelTo,
   onBackToDirectory,
   onOperationAction,
+  onReturnTestingToWorld,
   suppressInitialWorldFallback = false,
   showInitialWorldLoadingOverlay = true,
   onInitialWorldReady,
@@ -206,6 +211,26 @@ export const GameSceneRouter: React.FC<GameSceneRouterProps> = ({
                 state={state}
                 onUpdateBuildings={onUpdateBuildings}
                 onClose={onClosePlanner}
+              />
+            </React.Suspense>
+          </motion.div>
+        ) : state.currentScene === 'TESTING' ? (
+          <motion.div
+            key="testing"
+            initial={{ opacity: 0, scale: 1.05 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="flex-1 flex flex-col overflow-hidden touch-none"
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onWheel={onWheel}
+          >
+            <React.Suspense fallback={sceneLoading}>
+              <SceneMountSignal scene="TESTING" onMounted={onInitialSceneMounted} />
+              <TestingWorldScene
+                state={state}
+                onExit={onReturnTestingToWorld}
               />
             </React.Suspense>
           </motion.div>

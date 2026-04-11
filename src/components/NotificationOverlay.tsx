@@ -1,3 +1,8 @@
+/**
+ * @module NotificationOverlay
+ * Toast notification overlay for game events (permits approved, audits, subsidies).
+ * Notifications auto-dismiss after a short delay.
+ */
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { AlertTriangle } from 'lucide-react';

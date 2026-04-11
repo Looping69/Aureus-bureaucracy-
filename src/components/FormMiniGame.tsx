@@ -1,3 +1,9 @@
+/**
+ * @module FormMiniGame
+ * Mini-game overlay for form submission.
+ * Presents a time-pressured form-filling exercise; accuracy score affects permit
+ * approval probability.  Triggered when the player submits a permit via FORM_PROCESSING.
+ */
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Check, X, Timer, FileText, Stamp, AlertCircle, Zap } from 'lucide-react';

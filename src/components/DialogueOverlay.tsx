@@ -1,3 +1,10 @@
+/**
+ * @module DialogueOverlay
+ * Full-screen dialogue overlay rendered when an NPC conversation is active.
+ * Displays the NPC's avatar, name, current dialogue node text, and response options.
+ * Handles conditional option visibility (trust/leverage requirements) and applies
+ * state changes when an option is selected.
+ */
 import React, { useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, ShieldAlert, Heart, ChevronRight, FileText, Scale, Zap, MessageSquare, ArrowLeft, Clock, Smile, Frown } from 'lucide-react';
@@ -62,6 +69,11 @@ export const DialogueOverlay: React.FC<{
             <div className="flex-1">
               <h2 className="font-serif italic font-black text-2xl leading-tight">{npc.name}</h2>
               <p className="text-[10px] font-mono uppercase tracking-widest opacity-50">{npc.role}</p>
+              {npc.relationshipState && npc.relationshipState !== 'neutral' && (
+                <p className="text-[8px] font-black uppercase tracking-widest text-indigo-500 mt-0.5">
+                  {npc.relationshipState}
+                </p>
+              )}
               
               <div className="flex gap-4 mt-2">
                 <div className="flex-1">
@@ -175,7 +187,7 @@ export const DialogueOverlay: React.FC<{
           ) : (
             <>
               <p className="text-sm italic leading-relaxed">
-                {currentNode ? currentNode.text : getDefaultDialogueText(npc)}
+                {currentNode ? currentNode.text : getDefaultDialogueText(npc, state)}
               </p>
               {moodInfluence !== 0 && (
                 <div className={`mt-3 flex items-center gap-2 text-[10px] font-black uppercase tracking-wider ${moodInfluence > 0 ? 'text-emerald-600' : 'text-amber-600'}`}>

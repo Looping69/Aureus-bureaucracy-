@@ -1,3 +1,8 @@
+/**
+ * @module Meter
+ * Reusable horizontal progress bar component used for trust, influence, and
+ * exposure meters in the HUD and dialogue overlay.
+ */
 import React from 'react';
 import { motion } from 'motion/react';
 

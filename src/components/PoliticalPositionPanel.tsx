@@ -1,3 +1,8 @@
+/**
+ * @module PoliticalPositionPanel
+ * Panel visualising the player's political alignment and faction relationships.
+ * Tracks trust and leverage with each NPC faction and projects likely ending routes.
+ */
 import React from 'react';
 import { Landmark, ShieldBan, ChevronDown, ChevronUp, ScrollText, Telescope } from 'lucide-react';
 import { GameState } from '../types';
