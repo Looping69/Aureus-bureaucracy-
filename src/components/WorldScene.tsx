@@ -11,6 +11,7 @@ import { buildWorldTerrainVoxels } from '../utils/worldSurface';
 import { WORLD_SIZE } from '../utils/voxelConstants';
 import { useContinuousAnalogMovement } from '../hooks/game/useContinuousAnalogMovement';
 import { BUREAU_BUILDING_ID, getFtueCopy, isFtueWorldFunnelPhase } from '../game/ftue';
+import { isNightTime } from '../utils/dayNightCycle';
 
 export const WorldScene = ({ 
   state, 
@@ -43,7 +44,7 @@ export const WorldScene = ({
   const hoverRafRef = React.useRef<number | null>(null);
   const bureauAutoEnterRef = React.useRef(false);
   const lastFtuePhaseRef = React.useRef(state.ftuePhase);
-  const isNight = state.time >= 20 || state.time < 6;
+  const isNight = isNightTime(state.time);
   const ftueCopy = React.useMemo(() => getFtueCopy(state.ftuePhase), [state.ftuePhase]);
   const isBureauFunnelActive = isFtueWorldFunnelPhase(state.ftuePhase);
   const bureauBuilding = state.buildings[BUREAU_BUILDING_ID] ?? null;

@@ -4,6 +4,7 @@ import { GameState } from '../types';
 import { Meter } from './Meter';
 import { getActiveWorldEffects } from '../game/dialogue/worldEffects';
 import { getRunCycleSummary } from '../game/runCycle';
+import { isNightTime } from '../utils/dayNightCycle';
 
 export const Header = ({
   state,
@@ -20,7 +21,7 @@ export const Header = ({
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
   };
 
-  const isNight = state.time >= 20 || state.time < 6;
+  const isNight = isNightTime(state.time);
   const activeEffects = getActiveWorldEffects(state);
   const cycle = getRunCycleSummary(state);
 

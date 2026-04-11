@@ -11,6 +11,7 @@ import { CONFIG, COLORS, WORLD_HALF_SIZE, WORLD_SIZE } from './utils/voxelConsta
 import { EntityManager } from './EntityManager';
 import { GreedyMesher } from './utils/GreedyMesher';
 import { BuildingFootprint } from './utils/worldNavigation';
+import { getCelestialPosition, getDaylightFactor, isNightTime } from './utils/dayNightCycle';
 import backgroundData from '../background.json';
 
 export const WORLD_CAMERA_AZIMUTH = Math.PI / 4;
@@ -89,6 +90,8 @@ export class VoxelEngine {
   private targetRotationY: number = 0;
   private firstPositionSet: boolean = false;
   private requestedPlayerMoving: boolean = false;
+  private sunOrbitOffset = new THREE.Vector3();
+  private moonOrbitOffset = new THREE.Vector3();
 
   constructor(
     container: HTMLElement, 
@@ -167,7 +170,9 @@ export class VoxelEngine {
     this.dirLight.shadow.camera.near = 0.5;
     this.dirLight.shadow.camera.far = 400;
     this.dirLight.shadow.bias = -0.0003;
+    this.dirLight.shadow.normalBias = 0.04;
     this.scene.add(this.dirLight);
+    this.scene.add(this.dirLight.target);
 
     // Target Indicator
     const targetGeom = new THREE.RingGeometry(0.4, 0.5, 32);
@@ -356,58 +361,76 @@ export class VoxelEngine {
 
   public updateTime(time: number) {
     this.time = time;
-    const angle = ((time - 6) / 24) * Math.PI * 2;
     const radius = 120;
-    const x = Math.cos(angle) * radius;
-    const y = Math.sin(angle) * radius;
-    const z = Math.sin(angle * 0.5) * 20;
-    this.sun.position.set(x, y, z);
-    this.moon.position.set(-x, -y, -z);
-    
-    let dayFactor = 0;
-    if (time >= 5 && time < 7) dayFactor = (time - 5) / 2;
-    else if (time >= 7 && time < 17) dayFactor = 1;
-    else if (time >= 17 && time < 19) dayFactor = 1 - (time - 17) / 2;
+    const celestial = getCelestialPosition(time, radius);
+    const daylightFactor = getDaylightFactor(time);
+    const isNight = celestial.isNight;
 
-    this.ambientLight.intensity = 0.1 + dayFactor * 0.2;
-    this.hemiLight.intensity = 0.2 + dayFactor * 0.3;
-    
-    if (dayFactor > 0) {
-      this.dirLight.intensity = dayFactor * 1.0;
-      this.dirLight.position.copy(this.sun.position).normalize().multiplyScalar(100);
-      this.dirLight.color.setHex(0xffffff);
+    if (isNight) {
+      this.moonOrbitOffset.set(celestial.x, celestial.y, celestial.z);
+      this.sunOrbitOffset.set(-celestial.x, -celestial.y, -celestial.z);
     } else {
-      const nightFactor = 1 - dayFactor;
-      this.dirLight.intensity = nightFactor * 0.3;
-      this.dirLight.position.copy(this.moon.position).normalize().multiplyScalar(100);
-      this.dirLight.color.setHex(0xaaaaff);
+      this.sunOrbitOffset.set(celestial.x, celestial.y, celestial.z);
+      this.moonOrbitOffset.set(-celestial.x, -celestial.y, -celestial.z);
     }
 
-    const isDay = time >= 6 && time < 18;
-    const fogColor = isDay ? 0xe2e8f0 : 0x020617;
+    this.sun.position.copy(this.currentCameraFocus).add(this.sunOrbitOffset);
+    this.moon.position.copy(this.currentCameraFocus).add(this.moonOrbitOffset);
+
+    this.ambientLight.intensity = THREE.MathUtils.lerp(0.14, 0.32, daylightFactor);
+    this.hemiLight.intensity = THREE.MathUtils.lerp(0.2, 0.55, daylightFactor);
+    this.hemiLight.color.setHex(isNight ? 0x0b1020 : 0x87CEEB);
+    this.hemiLight.groundColor.setHex(isNight ? 0x050510 : 0x3b82f6);
+
+    const activeOrbit = isNight ? this.moonOrbitOffset : this.sunOrbitOffset;
+    this.dirLight.position.copy(this.currentCameraFocus).add(activeOrbit);
+    this.dirLight.target.position.copy(this.currentCameraFocus);
+    this.dirLight.target.updateMatrixWorld();
+    this.dirLight.castShadow = !isNight;
+    this.dirLight.intensity = isNight ? 0.35 : 0.45 + daylightFactor * 1.0;
+    this.dirLight.color.setHex(isNight ? 0xccccff : (daylightFactor < 0.3 ? 0xffcd75 : 0xffffff));
+
+    const fogColor = isNight ? 0x050510 : (daylightFactor < 0.25 ? 0xffb36b : 0x87CEEB);
     if (this.scene.fog) {
       this.scene.fog.color.setHex(fogColor);
       // Push fog far enough so world never vanishes during navigation
-      (this.scene.fog as THREE.Fog).near = isDay ? VoxelEngine.FOG_NEAR_DAY : VoxelEngine.FOG_NEAR_NIGHT;
-      (this.scene.fog as THREE.Fog).far = isDay ? VoxelEngine.FOG_FAR_DAY : VoxelEngine.FOG_FAR_NIGHT;
+      (this.scene.fog as THREE.Fog).near = isNight ? VoxelEngine.FOG_NEAR_NIGHT : VoxelEngine.FOG_NEAR_DAY;
+      (this.scene.fog as THREE.Fog).far = isNight ? VoxelEngine.FOG_FAR_NIGHT : VoxelEngine.FOG_FAR_DAY;
     }
 
     // Keep the floor colour in sync with the fog so it stays invisible
     (this.floor.material as THREE.MeshBasicMaterial).color.setHex(fogColor);
 
     // Update street lights
-    const isNight = time >= 19 || time < 6;
     // Street lights are now handled by EntityManager light pool
     
     // Update Sky Dome Color
     const skyMat = this.skyDome.material as THREE.MeshBasicMaterial;
-    if (dayFactor > 0.5) {
+    if (isNight) {
+      skyMat.color.setHex(0x050510);
+    } else if (daylightFactor > 0.35) {
       skyMat.color.setHex(0x87CEEB); // Day sky blue
-    } else if (dayFactor > 0) {
-      skyMat.color.setHex(0xFF7F50); // Sunset/Sunrise orange
     } else {
-      skyMat.color.setHex(0x020617); // Night sky dark
+      skyMat.color.setHex(0xFFB36B); // Sunrise/sunset warmth
     }
+
+    this.sun.visible = !isNight;
+    this.moon.visible = isNight;
+
+    const sunMat = this.sun.material as THREE.MeshBasicMaterial;
+    const moonMat = this.moon.material as THREE.MeshBasicMaterial;
+    sunMat.color.setHex(daylightFactor < 0.3 ? 0xffcd75 : 0xffdd44);
+    moonMat.color.setHex(0xccccff);
+  }
+
+  private updateCelestialAnchors() {
+    this.sun.position.copy(this.currentCameraFocus).add(this.sunOrbitOffset);
+    this.moon.position.copy(this.currentCameraFocus).add(this.moonOrbitOffset);
+
+    const activeOrbit = isNightTime(this.time) ? this.moonOrbitOffset : this.sunOrbitOffset;
+    this.dirLight.position.copy(this.currentCameraFocus).add(activeOrbit);
+    this.dirLight.target.position.copy(this.currentCameraFocus);
+    this.dirLight.target.updateMatrixWorld();
   }
 
   public setPlayerPosition(
@@ -1645,6 +1668,7 @@ export class VoxelEngine {
     this.entities.player.group.rotation.y += diff * Math.min(rotationLerpFactor, 0.5);
 
     this.updateCameraFollow(deltaTime);
+    this.updateCelestialAnchors();
     this.enforceCameraBounds();
     this.controls.update();
     this.physicsWorld.step(1 / 60, deltaTime, 3);

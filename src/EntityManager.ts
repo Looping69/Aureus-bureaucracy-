@@ -3,6 +3,7 @@ import { VoxelCharacter } from './VoxelCharacter';
 import { VoxelBuilding } from './VoxelBuilding';
 import { Building, NPC, WorldPosition } from './types';
 import { CONFIG, WORLD_HALF_SIZE } from './utils/voxelConstants';
+import { isNightTime } from './utils/dayNightCycle';
 import {
   getBuildingAccessPosition,
   getBuildingFootprint,
@@ -318,7 +319,7 @@ export class EntityManager {
     this.updateNpcCommute(time);
 
     // Update light pool based on proximity to player
-    const isNight = time >= 19 || time < 6;
+    const isNight = isNightTime(time);
     
     if (!isNight) {
       this.lightPool.forEach(l => l.intensity = 0);

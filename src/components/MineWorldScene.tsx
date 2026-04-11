@@ -18,6 +18,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, Hammer, Package, Flame, Boxes, Zap, Weight } from 'lucide-react';
 import { GameState, WorldHoverInfo, WorldPosition } from '../types';
 import { WORLD_CAMERA_AZIMUTH } from '../VoxelEngine';
+import { isNightTime } from '../utils/dayNightCycle';
 import { VoxelWorldContainer } from './VoxelWorldContainer';
 import { AnalogStick, AnalogStickVector } from './AnalogStick';
 import { buildWorldTerrainVoxels } from '../utils/worldSurface';
@@ -388,7 +389,7 @@ export const MineWorldScene = ({
     return () => { if (hoverRafRef.current !== null) cancelAnimationFrame(hoverRafRef.current); };
   }, []);
 
-  const isNight = state.time >= 20 || state.time < 6;
+  const isNight = isNightTime(state.time);
 
   // ── node info helper ──────────────────────────────────────────────────────
   const nodeInfo = (id: string) => {

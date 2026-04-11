@@ -49,6 +49,7 @@ import {
 import { getUnlockedEnding } from './game/endings';
 import { EMPTY_WORLD_EFFECTS } from './game/dialogue/worldEffects';
 import { applyOperationAction } from './game/runCycle';
+import { DAY_NIGHT } from './utils/dayNightCycle';
 // --- Main App ---
 
 const NOTIFICATION_AUTO_DISMISS_MS = 2800;
@@ -116,7 +117,7 @@ const buildInitialGameState = (): GameState => {
     pendingPermitAction: null,
     buildings: buildHydratedBuildings(),
     day: 1,
-    time: 8,
+    time: DAY_NIGHT.INITIAL_TIME_OF_DAY,
     playerPos: homePos,
     targetPos: null,
     path: [],

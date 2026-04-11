@@ -3,8 +3,7 @@ import React from 'react';
 import { GameState } from '../../types';
 import { applyDailyEconomyTick } from '../../game/economy';
 import { applyExhaustionCollapse } from '../../game/exhaustion';
-
-const DAY_NIGHT_TIME_SCALE = 0.08;
+import { DAY_NIGHT, isNightTime } from '../../utils/dayNightCycle';
 
 interface UseTimeAndCurfewLoopArgs {
   setState: React.Dispatch<React.SetStateAction<GameState>>;
@@ -18,8 +17,8 @@ export const useTimeAndCurfewLoop = ({ setState, setNotification, homePos, enabl
     if (!enabled) return;
     const timer = setInterval(() => {
       setState(prev => {
-        const ambientTimeStep = (prev.time >= 20 || prev.time < 6 ? 0.2 : 0.04) * DAY_NIGHT_TIME_SCALE;
-        let newTime = prev.time + ambientTimeStep;
+        const hoursPerSecond = DAY_NIGHT.HOURS_PER_DAY / DAY_NIGHT.REAL_SECONDS_PER_DAY;
+        let newTime = prev.time + hoursPerSecond;
         let newDay = prev.day;
         let newExposure = prev.meters.exposure;
         let newEnergy = prev.energy;
@@ -28,7 +27,7 @@ export const useTimeAndCurfewLoop = ({ setState, setNotification, homePos, enabl
           newTime -= 24;
         }
 
-        if (prev.time < 6 && newTime >= 6) {
+        if (prev.time < DAY_NIGHT.SUNRISE_HOUR && newTime >= DAY_NIGHT.SUNRISE_HOUR) {
           newDay += 1;
           const daily = applyDailyEconomyTick({
             ...prev,
@@ -46,7 +45,7 @@ export const useTimeAndCurfewLoop = ({ setState, setNotification, homePos, enabl
           return daily.nextState;
         }
 
-        const isNight = newTime >= 20 || newTime < 6;
+        const isNight = isNightTime(newTime);
         const isAtHome = prev.playerPos.x === homePos.x && prev.playerPos.y === homePos.y;
 
         if (isNight && !isAtHome) {
