@@ -32,6 +32,7 @@ import {
   MINE_INTERACTION_RADIUS,
   NODE_HARVEST_COOLDOWN_MS,
 } from '../mineWorldData';
+import { isDaytimeHours } from '../utils/dayNightCycle';
 
 // ─── types ────────────────────────────────────────────────────────────────────
 interface NodeState {
@@ -388,7 +389,7 @@ export const MineWorldScene = ({
     return () => { if (hoverRafRef.current !== null) cancelAnimationFrame(hoverRafRef.current); };
   }, []);
 
-  const isNight = state.time >= 20 || state.time < 6;
+  const isNight = !isDaytimeHours(state.time);
 
   // ── node info helper ──────────────────────────────────────────────────────
   const nodeInfo = (id: string) => {

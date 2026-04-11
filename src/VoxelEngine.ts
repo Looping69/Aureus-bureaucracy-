@@ -25,6 +25,13 @@ import { CONFIG, COLORS, WORLD_HALF_SIZE, WORLD_SIZE } from './utils/voxelConsta
 import { EntityManager } from './EntityManager';
 import { GreedyMesher } from './utils/GreedyMesher';
 import { BuildingFootprint } from './utils/worldNavigation';
+import {
+  DAY_NIGHT,
+  hoursToTicks,
+  isDaytime as isDaytimeTick,
+  getDaylightFactor,
+  getCelestialPosition,
+} from './utils/dayNightCycle';
 import backgroundData from '../background.json';
 
 // Locked isometric camera azimuth (45°) — kept constant to give a consistent city view
@@ -387,43 +394,51 @@ export class VoxelEngine {
 
   /** Return the normalized light direction (sun during day, moon at night). */
   private getLightDirection(): THREE.Vector3 {
-    return this.time >= 5 && this.time < 19
-      ? this.sun.position.clone().normalize()
-      : this.moon.position.clone().normalize();
+    const ticks = hoursToTicks(this.time);
+    const celestial = getCelestialPosition(ticks, 120);
+    return new THREE.Vector3(celestial.x, celestial.y, celestial.z).normalize();
   }
 
   /**
    * Drive the day/night cycle to the given hour.
-   * Updates sun/moon positions, directional-light intensity and colour, ambient
-   * light, fog near/far distances, sky dome colour, and street-light activation.
-   * The directional light position and shadow camera follow the player so shadows
-   * are always rendered near the player and move across the world as the sun moves.
+   * Uses the tick-based {@link DAY_NIGHT} system to compute sun/moon positions
+   * via {@link getCelestialPosition}, light intensities via
+   * {@link getDaylightFactor}, and shadow directions that follow the sun arc
+   * so building and terrain shadows sweep across the world throughout the day.
    * @param time - Fractional hour in [0, 24).
    */
   public updateTime(time: number) {
     this.time = time;
-    const angle = ((time - 6) / 24) * Math.PI * 2;
-    const radius = 120;
-    const x = Math.cos(angle) * radius;
-    const y = Math.sin(angle) * radius;
-    const z = Math.sin(angle * 0.5) * 20;
-    this.sun.position.set(x, y, z);
-    this.moon.position.set(-x, -y, -z);
-    
-    let dayFactor = 0;
-    if (time >= 5 && time < 7) dayFactor = (time - 5) / 2;
-    else if (time >= 7 && time < 17) dayFactor = 1;
-    else if (time >= 17 && time < 19) dayFactor = 1 - (time - 17) / 2;
+
+    // Convert the fractional hour to the tick-based system
+    const ticks = hoursToTicks(time);
+
+    // --- Celestial positions via the day/night cycle module ---
+    const sunPos = getCelestialPosition(ticks, 120);
+    this.sun.position.set(sunPos.x, sunPos.y, sunPos.z);
+
+    // Moon is always positioned when it's night; during the day, park it below
+    // the horizon so it isn't visible.
+    if (sunPos.isNight) {
+      this.moon.position.set(sunPos.x, sunPos.y, sunPos.z);
+      this.sun.position.set(-sunPos.x, -40, -sunPos.z);
+      this.moon.visible = true;
+      this.sun.visible = false;
+    } else {
+      this.moon.position.set(-sunPos.x, -40, -sunPos.z);
+      this.moon.visible = false;
+      this.sun.visible = true;
+    }
+
+    // --- Daylight factor (0 at night, sine curve 0→1→0 during daytime) ---
+    const dayFactor = getDaylightFactor(ticks);
+    const isDay = isDaytimeTick(ticks);
 
     this.ambientLight.intensity = 0.1 + dayFactor * 0.2;
     this.hemiLight.intensity = 0.2 + dayFactor * 0.3;
 
-    // Compute normalised light direction via shared helper
+    // --- Directional light follows the visible celestial body ---
     const lightDir = this.getLightDirection();
-
-    // Position the directional light relative to the *player* so the shadow
-    // frustum always covers the area around the player.  The light offset
-    // encodes the current sun/moon angle so shadows move across the world.
     const playerPos = this.currentPlayerPos;
 
     if (dayFactor > 0) {
@@ -435,8 +450,7 @@ export class VoxelEngine {
       );
       this.dirLight.color.setHex(0xffffff);
     } else {
-      const nightFactor = 1 - dayFactor;
-      this.dirLight.intensity = nightFactor * 0.3;
+      this.dirLight.intensity = 0.3;
       this.dirLight.position.set(
         playerPos.x + lightDir.x * 80,
         playerPos.y + lightDir.y * 80,
@@ -448,7 +462,6 @@ export class VoxelEngine {
     // Point the directional light at the player so shadow camera is centered there
     this.dirLight.target.position.copy(playerPos);
 
-    const isDay = time >= 6 && time < 18;
     const fogColor = isDay ? 0xe2e8f0 : 0x020617;
     if (this.scene.fog) {
       this.scene.fog.color.setHex(fogColor);
@@ -461,7 +474,7 @@ export class VoxelEngine {
     (this.floor.material as THREE.MeshBasicMaterial).color.setHex(fogColor);
 
     // Update street lights
-    const isNight = time >= 19 || time < 6;
+    const isNight = !isDay;
     // Street lights are now handled by EntityManager light pool
     
     // Update Sky Dome Color

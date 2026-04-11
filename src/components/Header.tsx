@@ -10,6 +10,7 @@ import { GameState } from '../types';
 import { Meter } from './Meter';
 import { getActiveWorldEffects } from '../game/dialogue/worldEffects';
 import { getRunCycleSummary } from '../game/runCycle';
+import { isDaytimeHours } from '../utils/dayNightCycle';
 
 export const Header = ({ state, onOpenUtilities }: { state: GameState; onOpenUtilities: () => void }) => {
   const formatTime = (t: number) => {
@@ -18,7 +19,7 @@ export const Header = ({ state, onOpenUtilities }: { state: GameState; onOpenUti
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
   };
 
-  const isNight = state.time >= 20 || state.time < 6;
+  const isNight = !isDaytimeHours(state.time);
   const activeEffects = getActiveWorldEffects(state);
   const cycle = getRunCycleSummary(state);
 

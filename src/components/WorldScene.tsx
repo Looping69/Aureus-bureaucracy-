@@ -8,6 +8,7 @@ import { AnalogStick, AnalogStickVector } from './AnalogStick';
 import { getBuildingAccessPosition } from '../utils/buildingAccess';
 import { getBuildingFootprint } from '../utils/worldNavigation';
 import { buildWorldTerrainVoxels } from '../utils/worldSurface';
+import { isDaytimeHours } from '../utils/dayNightCycle';
 import { WORLD_SIZE } from '../utils/voxelConstants';
 import { useContinuousAnalogMovement } from '../hooks/game/useContinuousAnalogMovement';
 
@@ -39,7 +40,7 @@ export const WorldScene = ({
   const [analogInput, setAnalogInput] = React.useState<AnalogStickVector>({ x: 0, y: 0, magnitude: 0, active: false });
   const pendingHoverPosRef = React.useRef<WorldHoverInfo | null>(null);
   const hoverRafRef = React.useRef<number | null>(null);
-  const isNight = state.time >= 20 || state.time < 6;
+  const isNight = !isDaytimeHours(state.time);
   const homeFootprint = React.useMemo(
     () => state.buildings.player_home ? getBuildingFootprint(state.buildings.player_home) : null,
     [state.buildings]
