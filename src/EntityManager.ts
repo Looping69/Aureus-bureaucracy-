@@ -19,6 +19,7 @@ import {
   getStructureBaseHeight,
 } from './utils/worldNavigation';
 import { findNpcPath } from './utils/pathfinding';
+import { isDaytimeHours } from './utils/dayNightCycle';
 
 // NPC colour palettes so each resident looks distinct
 const NPC_PALETTES: Record<string, { shirt: number; pants: number; hair: number; skin: number; shoes: number; belt: number }> = {
@@ -382,7 +383,7 @@ export class EntityManager {
     this.updateNpcCommute(time, deltaTime);
 
     // Update light pool based on proximity to player
-    const isNight = time >= 19 || time < 6;
+    const isNight = !isDaytimeHours(time);
     
     if (!isNight) {
       this.lightPool.forEach(l => l.intensity = 0);

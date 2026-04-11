@@ -39,6 +39,7 @@ import {
   TESTING_CARRY_MAX,
   TESTING_UNLOAD_INTERVAL_MS,
 } from '../testingWorldData';
+import { isDaytimeHours } from '../utils/dayNightCycle';
 
 // ─── types ────────────────────────────────────────────────────────────────────
 interface ResourceNodeState {
@@ -361,7 +362,7 @@ export const TestingWorldScene = ({
     return () => { if (hoverRafRef.current !== null) cancelAnimationFrame(hoverRafRef.current); };
   }, []);
 
-  const isNight = state.time >= 20 || state.time < 6;
+  const isNight = !isDaytimeHours(state.time);
   const totalWood = deposited; // total logs deposited at the depot
 
   // ── render ────────────────────────────────────────────────────────────
