@@ -125,8 +125,8 @@ export class VoxelEngine {
   private requestedPlayerMoving: boolean = false;
 
   // --- Intro camera animation state ---
-  private static readonly INTRO_CLOSE_DISTANCE = 12;          // Start zoomed in close to character
-  private static readonly INTRO_DURATION_MS = 2200;            // Total pull-back duration
+  private static readonly INTRO_CLOSE_DISTANCE = 8;            // Start zoomed in very close
+  private static readonly INTRO_DURATION_MS = 3000;            // Total pull-back duration (slower & smoother)
   private introAnimationActive: boolean = false;
   private introStartTime: number = 0;
 
@@ -623,8 +623,8 @@ export class VoxelEngine {
     const elapsed = performance.now() - this.introStartTime;
     const t = Math.min(elapsed / VoxelEngine.INTRO_DURATION_MS, 1);
 
-    // Smooth ease-out (cubic)
-    const ease = 1 - Math.pow(1 - t, 3);
+    // Smooth ease-out (quartic) for a gradual, graceful deceleration
+    const ease = 1 - Math.pow(1 - t, 4);
 
     const distance = THREE.MathUtils.lerp(
       VoxelEngine.INTRO_CLOSE_DISTANCE,

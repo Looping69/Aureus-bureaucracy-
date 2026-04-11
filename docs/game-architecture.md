@@ -71,7 +71,7 @@ The game uses Three.js WebGL rendering for real-time 3D isometric visualisation.
 - **Follow Camera:** Locks onto the player position with smooth damping (XZ coefficient 22, Y coefficient 14).
 - **Isometric Lock:** Azimuth fixed at π/4 (45°), polar angle fixed at ~55.77°. Rotation and pan are disabled.
 - **Zoom Range:** 10 – 100 world units from target.
-- **Intro Animation:** On scene load the camera starts at a close-up distance (12 units) focused on the player character and smoothly pulls back to the normal isometric offset over ~2.2 seconds using a cubic ease-out curve.
+- **Intro Animation:** On scene load the camera starts at a close-up distance (8 units) focused on the player character and smoothly pulls back to the normal isometric offset over ~3 seconds using a quartic ease-out curve.  The world scene initialises in async stages with `requestAnimationFrame` yields between heavy steps so the loading screen stays responsive and the GPU can compile shaders before the scene is revealed.
 
 ### Rendering Architecture
 - **Renderer:** `THREE.WebGLRenderer` with PCF shadow maps (4096 × 4096).
