@@ -253,15 +253,13 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
         entities.addNPC(npcs[b.npcId], b.pos);
       }
     });
-    entities.syncMedicalNpcs(medicalNpcs);
-    entities.syncEmergencyVehicles(emergencyVehicles);
-    entities.syncStaminaPowerUps(staminaPowerUps);
-
     // Re-initialise NPC commuting routes
     const buildingsMap: Record<string, Building> = {};
     buildings.forEach(b => { buildingsMap[b.id] = b; });
     entities.initNpcMovement(npcs, buildingsMap);
-  }, [buildings, emergencyVehicles, medicalNpcs, staminaPowerUps]);
+    // Medical NPCs, vehicles, and power-ups are synced by their own
+    // dedicated effects below – keep them out of this heavy rebuild loop.
+  }, [buildings]);
 
   useEffect(() => {
     if (engineRef.current) {

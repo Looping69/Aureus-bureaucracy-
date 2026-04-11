@@ -22,18 +22,17 @@ const PLAYER_RECOVERY_STAMINA = 55;
 
 const sanitizePosition = (
   pos: WorldPosition,
-  state: GameState,
+  surfaceMap: ReturnType<typeof buildWorldSurfaceMap>,
 ): WorldPosition => {
-  const surfaceMap = buildWorldSurfaceMap(state.buildings);
   const tile = getNearestWalkableTile(pos, surfaceMap, 10);
   return tile ? { x: tile.x, y: tile.y } : pos;
 };
 
 const findNearbyWalkableTile = (
-  state: GameState,
+  surfaceMap: ReturnType<typeof buildWorldSurfaceMap>,
   target: WorldPosition,
   offset: WorldPosition,
-) => sanitizePosition({ x: target.x + offset.x, y: target.y + offset.y }, state);
+) => sanitizePosition({ x: target.x + offset.x, y: target.y + offset.y }, surfaceMap);
 
 const buildPowerUp = (
   id: string,
@@ -232,8 +231,9 @@ export const triggerPlayerCollapse = (state: GameState): GameState => {
 
   const medicIds = Object.keys(state.medicalNpcs).slice(0, 2);
   const vehicle = Object.values(state.emergencyVehicles)[0] ?? null;
-  const targetPos = sanitizePosition(state.playerPos, state);
-  const stagingPos = findNearbyWalkableTile(state, targetPos, { x: 0, y: 2 });
+  const surfaceMap = buildWorldSurfaceMap(state.buildings);
+  const targetPos = sanitizePosition(state.playerPos, surfaceMap);
+  const stagingPos = findNearbyWalkableTile(surfaceMap, targetPos, { x: 0, y: 2 });
   const destinationPos = state.buildings.player_home
     ? getBuildingAccessPosition(state.buildings.player_home)
     : state.playerPos;
@@ -243,7 +243,7 @@ export const triggerPlayerCollapse = (state: GameState): GameState => {
     const medic = nextMedicalNpcs[medicId];
     if (!medic) return;
     const reviveOffset = index === 0 ? { x: -1, y: 0 } : { x: 1, y: 0 };
-    const rescueAnchor = findNearbyWalkableTile(state, targetPos, reviveOffset);
+    const rescueAnchor = findNearbyWalkableTile(surfaceMap, targetPos, reviveOffset);
     nextMedicalNpcs[medicId] = {
       ...medic,
       state: 'RESPONDING',
