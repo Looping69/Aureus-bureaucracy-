@@ -1,4 +1,20 @@
-// Re-export barrel – new code should import from 'worlds/testingWorldData'.
+export {
+  ORE_NODE_VOXELS,
+  COAL_NODE_VOXELS,
+  GEM_NODE_VOXELS,
+  MINE_ENTRANCE_ARCH_VOXELS,
+  LOADING_ZONE_VOXELS,
+  UNLOADING_ZONE_VOXELS,
+  DELIVERY_ZONE_VOXELS,
+  MINE_PATH_VOXELS,
+  ROCK_HILL_VOXELS,
+  MINE_WORLD_ENTRANCE_POS,
+  MINE_WORLD_BUILDINGS,
+  MINE_NODE_YIELDS,
+  NODE_HARVEST_COOLDOWN_MS,
+  MINE_INTERACTION_RADIUS,
+} from './mineWorldData';
+
 export {
   TREE_NODE_VOXELS,
   LOG_DEPOT_VOXELS,
@@ -19,4 +35,4 @@ export {
   TESTING_UNLOAD_INTERVAL_MS,
   LOG_PILE_BUILDINGS,
   LOG_PILE_THRESHOLDS,
-} from './worlds/testingWorldData';
+} from './testingWorldData';

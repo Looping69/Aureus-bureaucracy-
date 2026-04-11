@@ -18,7 +18,7 @@ import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, MapPin, TreePine, Package, Weight } from 'lucide-react';
 import { GameState, WorldHoverInfo, WorldPosition } from '../types';
-import { WORLD_CAMERA_AZIMUTH } from '../VoxelEngine';
+import { WORLD_CAMERA_AZIMUTH } from '../engine';
 import { VoxelWorldContainer } from './VoxelWorldContainer';
 import { AnalogStick, AnalogStickVector } from './AnalogStick';
 import { buildWorldTerrainVoxels } from '../utils/worldSurface';
@@ -38,7 +38,7 @@ import {
   LOG_PILE_THRESHOLDS,
   TESTING_CARRY_MAX,
   TESTING_UNLOAD_INTERVAL_MS,
-} from '../testingWorldData';
+} from '../worlds/testingWorldData';
 import { isDaytimeHours } from '../utils/dayNightCycle';
 
 // ─── types ────────────────────────────────────────────────────────────────────

@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import React from 'react';
 import { GameState, Permit } from '../../types';
-import { REJECTION_REASONS } from '../../data';
+import { REJECTION_REASONS } from '../../data/permits';
 import { applyPermitApproval } from '../../game/permitProgression';
 import { isWorldEffectActive } from '../../game/dialogue/worldEffects';
 import { hasStoryFlag } from '../../game/dialogue/storyFlags';

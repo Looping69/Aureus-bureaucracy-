@@ -2,7 +2,7 @@ import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { DoorOpen, MapPin, MoveDiagonal2, X } from 'lucide-react';
 import { GameState, WorldHoverInfo, WorldPosition } from '../types';
-import { WORLD_CAMERA_AZIMUTH } from '../VoxelEngine';
+import { WORLD_CAMERA_AZIMUTH } from '../engine';
 import { VoxelWorldContainer } from './VoxelWorldContainer';
 import { AnalogStick, AnalogStickVector } from './AnalogStick';
 import { getBuildingAccessPosition } from '../utils/buildingAccess';

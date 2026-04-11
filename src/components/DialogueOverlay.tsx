@@ -9,7 +9,7 @@ import React, { useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, ShieldAlert, Heart, ChevronRight, FileText, Scale, Zap, MessageSquare, ArrowLeft, Clock, Smile, Frown } from 'lucide-react';
 import { GameState, NPC, DialogueNode, DialogueOption } from '../types';
-import { DIALOGUE_TREES } from '../data';
+import { DIALOGUE_TREES } from '../data/dialogues';
 import { buildSpecialDialogueOptions } from '../game/dialogue/specialOptions';
 import { getDefaultDialogueText, getNpcMoodInfluence, isNpcAvailableAtTime } from '../game/dialogue/status';
 
