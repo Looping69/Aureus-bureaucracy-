@@ -8,9 +8,11 @@ import { AnalogStick, AnalogStickVector } from './AnalogStick';
 import { getBuildingAccessPosition } from '../utils/buildingAccess';
 import { getBuildingFootprint } from '../utils/worldNavigation';
 import { buildWorldTerrainVoxels } from '../utils/worldSurface';
-import { isDaytimeHours } from '../utils/dayNightCycle';
 import { WORLD_SIZE } from '../utils/voxelConstants';
 import { useContinuousAnalogMovement } from '../hooks/game/useContinuousAnalogMovement';
+import { BUREAU_BUILDING_ID, getFtueCopy, isFtueWorldFunnelPhase } from '../game/ftue';
+import { isNightTime } from '../utils/dayNightCycle';
+import { WorldStatusOverlay } from './WorldStatusOverlay';
 
 export const WorldScene = ({ 
   state, 
@@ -38,9 +40,19 @@ export const WorldScene = ({
   const [buildingPromptId, setBuildingPromptId] = React.useState<string | null>(null);
   const [recenterTrigger, setRecenterTrigger] = React.useState(0);
   const [analogInput, setAnalogInput] = React.useState<AnalogStickVector>({ x: 0, y: 0, magnitude: 0, active: false });
+  const [showBureauDiscoveryFeedback, setShowBureauDiscoveryFeedback] = React.useState(false);
   const pendingHoverPosRef = React.useRef<WorldHoverInfo | null>(null);
   const hoverRafRef = React.useRef<number | null>(null);
-  const isNight = !isDaytimeHours(state.time);
+  const bureauAutoEnterRef = React.useRef(false);
+  const lastFtuePhaseRef = React.useRef(state.ftuePhase);
+  const isNight = isNightTime(state.time);
+  const ftueCopy = React.useMemo(() => getFtueCopy(state.ftuePhase), [state.ftuePhase]);
+  const isBureauFunnelActive = isFtueWorldFunnelPhase(state.ftuePhase);
+  const bureauBuilding = state.buildings[BUREAU_BUILDING_ID] ?? null;
+  const bureauAccessPos = React.useMemo(
+    () => (bureauBuilding ? getBuildingAccessPosition(bureauBuilding) : null),
+    [bureauBuilding]
+  );
   const homeFootprint = React.useMemo(
     () => state.buildings.player_home ? getBuildingFootprint(state.buildings.player_home) : null,
     [state.buildings]
@@ -133,14 +145,26 @@ export const WorldScene = ({
     onMove({ x: target.x, y: target.y });
   }, [onMove]);
   const handleWorldSelect = React.useCallback((target: WorldHoverInfo) => {
+    if (state.playerStatus.condition !== 'ACTIVE') {
+      return;
+    }
     setPendingSelection(target);
 
     if (target.kind === 'GROUND') {
+      if (state.ftuePhase === 'enter_bureau' && bureauAccessPos) {
+        onMove(bureauAccessPos, { ignoreDrag: true });
+        return;
+      }
       confirmGroundMove(target);
       return;
     }
 
     if (target.kind === 'NPC' && target.id) {
+      if (isBureauFunnelActive && target.id !== bureauBuilding?.npcId && bureauAccessPos) {
+        onMove(bureauAccessPos);
+        return;
+      }
+
       // Only interact if player is close enough, otherwise move toward them
       const dx = Math.abs(state.playerPos.x - target.x);
       const dy = Math.abs(state.playerPos.y - target.y);
@@ -156,6 +180,25 @@ export const WorldScene = ({
       const building = state.buildings[target.id];
       if (!building) return;
 
+       if (isBureauFunnelActive) {
+        if (building.id !== BUREAU_BUILDING_ID) {
+          if (bureauAccessPos) {
+            onMove(bureauAccessPos);
+          }
+          return;
+        }
+
+        const accessPos = getBuildingAccessPosition(building);
+        const dx = Math.abs(state.playerPos.x - accessPos.x);
+        const dy = Math.abs(state.playerPos.y - accessPos.y);
+        if (dx <= 2 && dy <= 2) {
+          onInteract('none', building.id);
+        } else {
+          onMove(accessPos);
+        }
+        return;
+      }
+
       // Show the entry prompt for every interactable building type so
       // the player can choose to move to it or enter it directly.
       const interactableTypes = ['OFFICE', 'HOME', 'MINE_ENTRANCE', 'PUB', 'HOTLINE'];
@@ -166,7 +209,7 @@ export const WorldScene = ({
 
       onMove(getBuildingAccessPosition(building));
     }
-  }, [confirmGroundMove, onInteract, onMove, state.buildings]);
+  }, [bureauAccessPos, bureauBuilding?.npcId, confirmGroundMove, isBureauFunnelActive, onInteract, onMove, state.buildings, state.playerPos.x, state.playerPos.y, state.playerStatus.condition]);
   const flushHoverPosition = React.useCallback(() => {
     hoverRafRef.current = null;
     const pending = pendingHoverPosRef.current;
@@ -190,6 +233,30 @@ export const WorldScene = ({
   }, [flushHoverPosition]);
 
   const promptedBuilding = buildingPromptId ? state.buildings[buildingPromptId] : null;
+  const bureauDistance = React.useMemo(() => {
+    if (!bureauAccessPos) return Number.POSITIVE_INFINITY;
+    return Math.hypot(state.playerPos.x - bureauAccessPos.x, state.playerPos.y - bureauAccessPos.y);
+  }, [bureauAccessPos, state.playerPos.x, state.playerPos.y]);
+  const isPlayerNearBureau = bureauDistance <= 2;
+  const bureauDirection = React.useMemo(() => {
+    if (!bureauAccessPos) return '';
+    const dx = bureauAccessPos.x - state.playerPos.x;
+    const dy = bureauAccessPos.y - state.playerPos.y;
+    const horizontal = dx > 0 ? 'east' : dx < 0 ? 'west' : '';
+    const vertical = dy > 0 ? 'south' : dy < 0 ? 'north' : '';
+    return [vertical, horizontal].filter(Boolean).join('-') || 'here';
+  }, [bureauAccessPos, state.playerPos.x, state.playerPos.y]);
+  const objectiveTarget = React.useMemo<WorldHoverInfo | null>(() => {
+    if (!isBureauFunnelActive || !bureauAccessPos) return null;
+    return {
+      x: bureauAccessPos.x,
+      y: bureauAccessPos.y,
+      z: 1,
+      kind: 'BUILDING',
+      id: BUREAU_BUILDING_ID,
+      label: bureauBuilding?.name
+    };
+  }, [bureauAccessPos, bureauBuilding?.name, isBureauFunnelActive]);
 
   const isPlayerNearBuilding = React.useMemo(() => {
     if (!promptedBuilding) return false;
@@ -207,22 +274,41 @@ export const WorldScene = ({
     };
   }, []);
 
-  // ── Bureau magnet behavior ──────────────────────────────────────────────
-  // Show "This is it." world text and a subtle glow when the player is
-  // approaching the Bureau during the early tutorial (before auto-entry at
-  // distance 4 triggers scene transition).
-  const bureau = state.buildings['licensing_office'];
-  const bureauApproachInfo = React.useMemo(() => {
-    if (state.tutorialStep !== 0 || !bureau) return null;
-    const dx = renderPlayerPos.x - bureau.pos.x;
-    const dy = renderPlayerPos.y - bureau.pos.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    // Show magnet feedback between 4-8 tiles (discovery auto-enters at < 4)
-    if (dist >= 8 || dist < 4) return null;
-    // Intensity ramps up as player gets closer: 0 at dist=8, 1 at dist=4
-    const intensity = 1 - (dist - 4) / 4;
-    return { dist, intensity };
-  }, [state.tutorialStep, bureau, renderPlayerPos.x, renderPlayerPos.y]);
+  React.useEffect(() => {
+    const justDiscoveredBureau = lastFtuePhaseRef.current !== 'enter_bureau' && state.ftuePhase === 'enter_bureau';
+    lastFtuePhaseRef.current = state.ftuePhase;
+
+    if (!justDiscoveredBureau) return;
+
+    setShowBureauDiscoveryFeedback(true);
+    const timer = window.setTimeout(() => setShowBureauDiscoveryFeedback(false), 1800);
+    return () => window.clearTimeout(timer);
+  }, [state.ftuePhase]);
+
+  React.useEffect(() => {
+    if (
+      state.currentScene !== 'WORLD' ||
+      state.ftuePhase !== 'enter_bureau' ||
+      !bureauAccessPos ||
+      isPlayerNearBureau ||
+      state.targetPos
+    ) {
+      return;
+    }
+
+    onMove(bureauAccessPos, { ignoreDrag: true });
+  }, [bureauAccessPos, isPlayerNearBureau, onMove, state.currentScene, state.ftuePhase, state.targetPos]);
+
+  React.useEffect(() => {
+    if (!isBureauFunnelActive || !bureauBuilding || !isPlayerNearBureau) {
+      bureauAutoEnterRef.current = false;
+      return;
+    }
+
+    if (bureauAutoEnterRef.current) return;
+    bureauAutoEnterRef.current = true;
+    onInteract('none', bureauBuilding.id);
+  }, [bureauBuilding, isBureauFunnelActive, isPlayerNearBureau, onInteract]);
 
   return (
     <div className={`flex-1 relative overflow-hidden transition-colors duration-1000 ${isNight ? 'bg-slate-950' : 'bg-slate-200'} cursor-crosshair`}>
@@ -240,45 +326,17 @@ export const WorldScene = ({
         onCountChange={noopCountChange}
         onHoverPosition={handleHoverPosition}
         onSelect={handleWorldSelect}
+        objectiveTarget={objectiveTarget}
         showLoadingOverlay={showInitialLoadingOverlay}
         onReady={onInitialSceneReady}
         onProgress={onInitialLoadingProgress}
-        highlightBuildingId={bureauApproachInfo ? 'licensing_office' : null}
-        highlightIntensity={bureauApproachInfo ? bureauApproachInfo.intensity * 0.18 : 0}
+        playerDowned={state.playerStatus.condition !== 'ACTIVE'}
+        playerRescued={state.rescueMission.playerAttachedToVehicle}
+        staminaPowerUps={state.staminaPowerUps}
+        medicalNpcs={state.medicalNpcs}
+        emergencyVehicles={state.emergencyVehicles}
       />
-
-      {/* Bureau magnet: world-space approach feedback */}
-      <AnimatePresence>
-        {bureauApproachInfo && (
-          <motion.div
-            key="bureau-magnet"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: bureauApproachInfo.intensity }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.6 }}
-            className="absolute inset-0 pointer-events-none z-[100] flex items-center justify-center"
-          >
-            {/* Directional vignette pulling toward Bureau (east) */}
-            <div
-              className="absolute inset-0"
-              style={{
-                background: `radial-gradient(ellipse 60% 80% at 70% 45%, rgba(234, 179, 8, ${0.06 * bureauApproachInfo.intensity}), transparent 70%)`,
-              }}
-            />
-            {/* Ambient world text — not UI, just presence */}
-            <motion.p
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.8, delay: 0.3 }}
-              className="text-white/60 text-sm font-black uppercase tracking-[0.35em] drop-shadow-[0_2px_8px_rgba(0,0,0,0.7)] select-none"
-              style={{ textShadow: '0 0 20px rgba(234, 179, 8, 0.4)' }}
-            >
-              This is it.
-            </motion.p>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <WorldStatusOverlay state={state} />
 
       {/* Coordinate Display (debug only) */}
       {showDebug && (
@@ -405,6 +463,50 @@ export const WorldScene = ({
       {/* UI Overlay */}
       <AnalogStick onChange={setAnalogInput} isNight={isNight} />
 
+      {isBureauFunnelActive && bureauBuilding && (
+        <>
+          <AnimatePresence>
+            {showBureauDiscoveryFeedback && state.ftuePhase === 'enter_bureau' && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.92, y: 12 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 1.04, y: -8 }}
+                className="absolute inset-x-6 top-24 z-40 rounded-3xl border-2 border-amber-300 bg-amber-50/95 px-5 py-4 shadow-2xl backdrop-blur-sm"
+              >
+                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-amber-700">Objective Located</p>
+                <p className="mt-1 text-lg font-black text-amber-950">Bureau of Extraction</p>
+                <p className="mt-1 text-xs font-semibold text-amber-900/85">
+                  Target acquired. Hold your line. We are pulling you straight to the door.
+                </p>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <div className="absolute left-4 right-16 top-4 z-30 rounded-2xl border border-amber-300 bg-amber-100/95 px-4 py-3 shadow-xl backdrop-blur-sm">
+            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-amber-800">Primary Target</p>
+            <div className="mt-1 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-black text-amber-950">{bureauBuilding.name}</p>
+                <p className="text-xs font-semibold text-amber-900/80">{ftueCopy.body}</p>
+              </div>
+              <div className="shrink-0 rounded-full bg-amber-500 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-white">
+                {isPlayerNearBureau ? 'Enter Now' : bureauDirection}
+              </div>
+            </div>
+          </div>
+
+          <div className="absolute left-4 right-4 bottom-28 z-30 flex justify-center pointer-events-none">
+            <div className="rounded-full bg-black/80 px-4 py-2 text-center text-[10px] font-black uppercase tracking-[0.22em] text-white shadow-xl">
+              {state.ftuePhase === 'enter_bureau'
+                ? (isPlayerNearBureau ? 'No pause. Entry is happening.' : 'Stay on the Bureau line. Drift gets overridden.')
+                : hoverInfo?.id === BUREAU_BUILDING_ID
+                  ? 'Tap the Bureau. We will move you in.'
+                  : 'Crosshair matters now. Put it on the Bureau and tap.'}
+            </div>
+          </div>
+        </>
+      )}
+
       <div className="absolute bottom-4 right-4">
         <button 
           onClick={(e) => {
@@ -420,7 +522,7 @@ export const WorldScene = ({
       </div>
       
       <AnimatePresence>
-        {promptedBuilding && (
+        {promptedBuilding && !isBureauFunnelActive && (
           <motion.div
             key="building-entry-prompt"
             initial={{ opacity: 0, y: 20 }}

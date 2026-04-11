@@ -2,10 +2,12 @@ import { useEffect } from 'react';
 import React from 'react';
 import { GameState } from '../../types';
 import { applyDailyEconomyTick } from '../../game/economy';
-import { applyExhaustionCollapse } from '../../game/exhaustion';
-import { isDaytimeHours, DAY_NIGHT } from '../../utils/dayNightCycle';
-
-const DAY_NIGHT_TIME_SCALE = 0.08;
+import { DAY_NIGHT, SUNRISE_HOUR, isNightTime } from '../../utils/dayNightCycle';
+import {
+  applyStaminaRecovery,
+  collectNearbyStaminaPowerUps,
+  triggerPlayerCollapse,
+} from '../../game/staminaRescue';
 
 interface UseTimeAndCurfewLoopArgs {
   setState: React.Dispatch<React.SetStateAction<GameState>>;
@@ -19,8 +21,8 @@ export const useTimeAndCurfewLoop = ({ setState, setNotification, homePos, enabl
     if (!enabled) return;
     const timer = setInterval(() => {
       setState(prev => {
-        const ambientTimeStep = (!isDaytimeHours(prev.time) ? 0.2 : 0.04) * DAY_NIGHT_TIME_SCALE;
-        let newTime = prev.time + ambientTimeStep;
+        const hoursPerSecond = DAY_NIGHT.HOURS_PER_DAY / DAY_NIGHT.REAL_SECONDS_PER_DAY;
+        let newTime = prev.time + hoursPerSecond;
         let newDay = prev.day;
         let newExposure = prev.meters.exposure;
         let newEnergy = prev.energy;
@@ -29,7 +31,7 @@ export const useTimeAndCurfewLoop = ({ setState, setNotification, homePos, enabl
           newTime -= 24;
         }
 
-        if (prev.time < 6 && newTime >= 6) {
+        if (prev.time < SUNRISE_HOUR && newTime >= SUNRISE_HOUR) {
           newDay += 1;
           const daily = applyDailyEconomyTick({
             ...prev,
@@ -47,7 +49,7 @@ export const useTimeAndCurfewLoop = ({ setState, setNotification, homePos, enabl
           return daily.nextState;
         }
 
-        const isNight = !isDaytimeHours(newTime);
+        const isNight = isNightTime(newTime);
         const isAtHome = prev.playerPos.x === homePos.x && prev.playerPos.y === homePos.y;
 
         if (isNight && !isAtHome) {
@@ -55,22 +57,7 @@ export const useTimeAndCurfewLoop = ({ setState, setNotification, homePos, enabl
           newEnergy = Math.max(0, newEnergy - 0.1);
         }
 
-        if (newEnergy <= 0) {
-          const collapsed = applyExhaustionCollapse({
-            ...prev,
-            time: newTime,
-            day: newDay,
-            energy: newEnergy,
-            meters: {
-              ...prev.meters,
-              exposure: newExposure
-            }
-          });
-          setNotification(collapsed.notification);
-          return collapsed.nextState;
-        }
-
-        return {
+        let nextState: GameState = {
           ...prev,
           time: newTime,
           day: newDay,
@@ -80,6 +67,27 @@ export const useTimeAndCurfewLoop = ({ setState, setNotification, homePos, enabl
             exposure: newExposure
           }
         };
+
+        nextState = applyStaminaRecovery(nextState, 1);
+
+        const collectionResult = collectNearbyStaminaPowerUps(nextState);
+        nextState = collectionResult.nextState;
+        if (collectionResult.collected.length > 0) {
+          setNotification({
+            title: 'Stamina Restored',
+            msg: `${collectionResult.collected.map((powerUp) => powerUp.label).join(', ')} collected. Recovery window extended.`,
+          });
+        }
+
+        if (newEnergy <= 0 || nextState.stamina.current <= 0) {
+          setNotification({
+            title: 'Collapse',
+            msg: 'Stamina is gone. You are down until medical gets you back up.',
+          });
+          return triggerPlayerCollapse(nextState);
+        }
+
+        return nextState;
       });
     }, 1000);
     return () => clearInterval(timer);

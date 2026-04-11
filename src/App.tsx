@@ -58,6 +58,7 @@ import { SideNavPanel } from './components/SideNavPanel';
 
 import { getBuildingAccessPosition } from './utils/buildingAccess';
 import { OperationActionId } from './game/runCycle';
+import { canPlayerAct } from './game/staminaRescue';
 
 const NOTIFICATION_AUTO_DISMISS_MS = 2800;
 const STARTUP_OVERLAY_HIDE_MS = 180;
@@ -232,11 +233,13 @@ function GameUI({
     pos: { x: number; y: number },
     options?: { ignoreDrag?: boolean },
   ) => {
+    if (!canPlayerAct(state)) return;
     if (!options?.ignoreDrag && dragDistanceRef.current > 10) return;
     dispatch({ type: 'MOVE', pos });
   };
 
   const handleDirectMove = (pos: { x: number; y: number }) => {
+    if (!canPlayerAct(state)) return;
     dispatch({ type: 'DIRECT_MOVE', pos });
   };
 
@@ -347,6 +350,7 @@ function GameUI({
   };
 
   const handleWorldInteract = (npcId: string, bId: string) => {
+    if (!canPlayerAct(state)) return;
     beginTrackedAction(
       `world_interact:${npcId !== 'none' ? `npc:${npcId}` : `building:${bId}`}`,
     );
@@ -393,7 +397,6 @@ function GameUI({
         onMine={handleMine}
         onMineAction={handleMineAction}
         onOpenMine={openMineScene}
-        onRest={handleRest}
         onRecenter={() => { /* recenter is self-contained within WorldScene */ }}
         onSelectMine={handleTravel}
         onCloseMinePicker={() => setShowMinePicker(false)}
@@ -445,6 +448,7 @@ function GameUI({
       <LightLoadingOverlay visible={showSceneTransitionLoading} />
 
       <TutorialOverlay
+        ftuePhase={state.ftuePhase}
         tutorialStep={state.tutorialStep}
         tutorialMinimized={state.tutorialMinimized}
         onToggleMinimized={() => dispatch({ type: 'TOGGLE_TUTORIAL_MINIMIZED' })}

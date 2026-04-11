@@ -69,6 +69,8 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({
             <div>Scene: <span className="font-black">{state.currentScene}</span></div>
             <div>Day/Time: <span className="font-black">{state.day} / {state.time.toFixed(2)}</span></div>
             <div>Energy: <span className="font-black">{state.energy.toFixed(1)}</span></div>
+            <div>Stamina: <span className="font-black">{state.stamina.current.toFixed(1)}</span></div>
+            <div>Status: <span className="font-black">{state.playerStatus.condition}</span></div>
             <div>Money: <span className="font-black">${state.money}</span></div>
           </div>
 

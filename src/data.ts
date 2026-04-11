@@ -1598,8 +1598,8 @@ export const OFFICE_ITEMS: Record<string, OfficeItem> = {
 };
 
 const CITY_CELL_SIZE = 14;
-const CITY_GRID_WIDTH = 11;
-const CITY_GRID_HEIGHT = 11;
+const CITY_GRID_WIDTH = 13;
+const CITY_GRID_HEIGHT = 13;
 const CITY_ORIGIN = {
   x: WORLD_CENTER - Math.floor((CITY_GRID_WIDTH - 1) * CITY_CELL_SIZE / 2),
   y: WORLD_CENTER - Math.floor((CITY_GRID_HEIGHT - 1) * CITY_CELL_SIZE / 2),
@@ -1735,111 +1735,174 @@ const normalizeWorldLayout = (buildings: Record<string, Building>) => {
 const occupiedCityCells = new Set<string>();
 
 // ── Road network ─────────────────────────────────────────────────────
-// Two main roads form a connected cross through the centre of the grid.
-//   Main Avenue  (NS) : x = 5, y = 1 → 9   (9 tiles, vertical)
-//   Cross Street (EW) : y = 5, x = 1 → 9   (9 tiles, horizontal)
-// An additional north lane connects the upper buildings.
-//   North Lane   (EW) : y = 8, x = 2 → 8   (7 tiles, horizontal)
-// Intersections use a dedicated cross tile whose centre-lines point in
-// both directions so the lane markings match the connecting segments.
+// The city is rebuilt around larger structures rather than squeezing
+// oversized footprints into the old compact grid. Roads remain on the
+// 14-unit tile cadence so the existing road voxel pieces still join up.
+//
+// Layout:
+// - Main Avenue runs north/south through the middle of town.
+// - Grand Crossing carries the civic core east/west.
+// - North Terrace serves housing and the fixer quarter.
+// - South Works serves the inspector/factory district.
 
 const cityStreets: Record<string, Building> = {
-  // Main Avenue extends from bottom to top of grid (NS tiles)
   ...createPlacedTiles(
-    'main_ave_s',
+    'main_ave_low',
     'ROAD',
-    createCityLine({ x: 5, y: 0 }, { x: 5, y: 4 }),
+    createCityLine({ x: 6, y: 0 }, { x: 6, y: 1 }),
     ROAD_NS_VOXELS,
     occupiedCityCells
   ),
-  // Main Avenue / Cross Street intersection
   ...createPlacedTiles(
-    'main_cross',
+    'main_ave_mid_a',
     'ROAD',
-    [{ x: 5, y: 5 }],
+    createCityLine({ x: 6, y: 3 }, { x: 6, y: 3 }),
+    ROAD_NS_VOXELS,
+    occupiedCityCells
+  ),
+  ...createPlacedTiles(
+    'main_ave_mid_b',
+    'ROAD',
+    createCityLine({ x: 6, y: 5 }, { x: 6, y: 5 }),
+    ROAD_NS_VOXELS,
+    occupiedCityCells
+  ),
+  ...createPlacedTiles(
+    'main_ave_mid_c',
+    'ROAD',
+    createCityLine({ x: 6, y: 7 }, { x: 6, y: 7 }),
+    ROAD_NS_VOXELS,
+    occupiedCityCells
+  ),
+  ...createPlacedTiles(
+    'main_ave_high',
+    'ROAD',
+    createCityLine({ x: 6, y: 9 }, { x: 6, y: 9 }),
+    ROAD_NS_VOXELS,
+    occupiedCityCells
+  ),
+  ...createPlacedTiles(
+    'main_ave_top',
+    'ROAD',
+    createCityLine({ x: 6, y: 11 }, { x: 6, y: 11 }),
+    ROAD_NS_VOXELS,
+    occupiedCityCells
+  ),
+  ...createPlacedTiles(
+    'south_works_w',
+    'ROAD',
+    createCityLine({ x: 0, y: 2 }, { x: 5, y: 2 }),
+    ROAD_EW_VOXELS,
+    occupiedCityCells
+  ),
+  ...createPlacedTiles(
+    'south_works_e',
+    'ROAD',
+    createCityLine({ x: 7, y: 2 }, { x: 12, y: 2 }),
+    ROAD_EW_VOXELS,
+    occupiedCityCells
+  ),
+  ...createPlacedTiles(
+    'south_market_w',
+    'ROAD',
+    createCityLine({ x: 0, y: 4 }, { x: 5, y: 4 }),
+    ROAD_EW_VOXELS,
+    occupiedCityCells
+  ),
+  ...createPlacedTiles(
+    'south_market_e',
+    'ROAD',
+    createCityLine({ x: 7, y: 4 }, { x: 12, y: 4 }),
+    ROAD_EW_VOXELS,
+    occupiedCityCells
+  ),
+  ...createPlacedTiles(
+    'grand_cross_w',
+    'ROAD',
+    createCityLine({ x: 0, y: 6 }, { x: 5, y: 6 }),
+    ROAD_EW_VOXELS,
+    occupiedCityCells
+  ),
+  ...createPlacedTiles(
+    'grand_cross_e',
+    'ROAD',
+    createCityLine({ x: 7, y: 6 }, { x: 12, y: 6 }),
+    ROAD_EW_VOXELS,
+    occupiedCityCells
+  ),
+  ...createPlacedTiles(
+    'north_market_w',
+    'ROAD',
+    createCityLine({ x: 0, y: 8 }, { x: 5, y: 8 }),
+    ROAD_EW_VOXELS,
+    occupiedCityCells
+  ),
+  ...createPlacedTiles(
+    'north_market_e',
+    'ROAD',
+    createCityLine({ x: 7, y: 8 }, { x: 12, y: 8 }),
+    ROAD_EW_VOXELS,
+    occupiedCityCells
+  ),
+  ...createPlacedTiles(
+    'north_terrace_w',
+    'ROAD',
+    createCityLine({ x: 0, y: 10 }, { x: 5, y: 10 }),
+    ROAD_EW_VOXELS,
+    occupiedCityCells
+  ),
+  ...createPlacedTiles(
+    'north_terrace_e',
+    'ROAD',
+    createCityLine({ x: 7, y: 10 }, { x: 12, y: 10 }),
+    ROAD_EW_VOXELS,
+    occupiedCityCells
+  ),
+  ...createPlacedTiles(
+    'avenue_cross_south',
+    'ROAD',
+    [{ x: 6, y: 2 }],
     ROAD_CROSS_VOXELS,
     occupiedCityCells
   ),
-  // Main Avenue between the two EW roads (NS tiles)
   ...createPlacedTiles(
-    'main_ave_m',
+    'avenue_cross_market_s',
     'ROAD',
-    createCityLine({ x: 5, y: 6 }, { x: 5, y: 7 }),
-    ROAD_NS_VOXELS,
-    occupiedCityCells
-  ),
-  // Main Avenue / North Lane intersection
-  ...createPlacedTiles(
-    'main_north',
-    'ROAD',
-    [{ x: 5, y: 8 }],
+    [{ x: 6, y: 4 }],
     ROAD_CROSS_VOXELS,
     occupiedCityCells
   ),
-  // Main Avenue north end (NS tile – stops at y=9 because mine entrance is at y=10)
   ...createPlacedTiles(
-    'main_ave_n',
+    'avenue_cross_main',
     'ROAD',
-    createCityLine({ x: 5, y: 9 }, { x: 5, y: 9 }),
-    ROAD_NS_VOXELS,
+    [{ x: 6, y: 6 }],
+    ROAD_CROSS_VOXELS,
     occupiedCityCells
   ),
-  // Cross Street extends from left edge to right edge (EW tiles)
   ...createPlacedTiles(
-    'cross_st_w',
+    'avenue_cross_market_n',
     'ROAD',
-    createCityLine({ x: 0, y: 5 }, { x: 4, y: 5 }),
-    ROAD_EW_VOXELS,
+    [{ x: 6, y: 8 }],
+    ROAD_CROSS_VOXELS,
     occupiedCityCells
   ),
-  // Cross Street east of intersection (EW tiles)
   ...createPlacedTiles(
-    'cross_st_e',
+    'avenue_cross_north',
     'ROAD',
-    createCityLine({ x: 6, y: 5 }, { x: 10, y: 5 }),
-    ROAD_EW_VOXELS,
-    occupiedCityCells
-  ),
-  // North Lane extends from left edge to right edge (EW tiles)
-  ...createPlacedTiles(
-    'north_ln_w',
-    'ROAD',
-    createCityLine({ x: 0, y: 8 }, { x: 4, y: 8 }),
-    ROAD_EW_VOXELS,
-    occupiedCityCells
-  ),
-  // North Lane east of intersection (EW tiles)
-  ...createPlacedTiles(
-    'north_ln_e',
-    'ROAD',
-    createCityLine({ x: 6, y: 8 }, { x: 10, y: 8 }),
-    ROAD_EW_VOXELS,
+    [{ x: 6, y: 10 }],
+    ROAD_CROSS_VOXELS,
     occupiedCityCells
   ),
 };
 
 // ── Building placement ───────────────────────────────────────────────
-// Buildings are positioned on the 11 × 11 city grid so that every
-// structure sits directly adjacent to at least one road cell.
-// Roads now extend to the grid edges for a more complete feel.
-// (Y increases upward in the diagram; top row = y 10.)
-//
-//    0  1  2  3  4  5  6  7  8  9  10
-// 10 .  .  .  .  .  ME .  .  .  .  .
-//  9 .  .  .  PH .  R  .  .  .  FD .
-//  8 R  R  R  R  R  +  R  R  R  R  R
-//  7 .  .  .  CP .  R  .  UH .  .  .
-//  6 .  .  .  .  .  R  .  .  .  .  .
-//  5 R  R  R  R  R  +  R  R  R  R  R
-//  4 .  .  HB .  .  R  .  LO .  .  .
-//  3 .  CH .  .  .  R  .  .  .  .  .
-//  2 .  .  .  .  .  R  .  .  IH .  .
-//  1 .  .  .  .  .  R  .  .  .  .  .
-//  0 .  .  .  .  .  R  .  .  .  .  .
+// Buildings sit on a wider 13x13 planning grid with intentional empty lots
+// around the bigger footprints. Story-critical structures remain on the road
+// network and keep their original IDs.
 
 const baseBuildings: Record<string, Building> = {
   player_home: createPlacedBuilding(
-    { x: 3, y: 9 },
+    { x: 2, y: 9 },
     {
       id: 'player_home',
       npcId: 'none',
@@ -1851,7 +1914,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   licensing_office: createPlacedBuilding(
-    { x: 7, y: 4 },
+    { x: 2, y: 7 },
     {
       id: 'licensing_office',
       npcId: 'licensing',
@@ -1864,7 +1927,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   union_hall: createPlacedBuilding(
-    { x: 7, y: 7 },
+    { x: 8, y: 7 },
     {
       id: 'union_hall',
       npcId: 'union',
@@ -1877,7 +1940,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   inspector_hq: createPlacedBuilding(
-    { x: 8, y: 2 },
+    { x: 12, y: 3 },
     {
       id: 'inspector_hq',
       npcId: 'inspector',
@@ -1890,7 +1953,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   fixer_den: createPlacedBuilding(
-    { x: 9, y: 9 },
+    { x: 10, y: 9 },
     {
       id: 'fixer_den',
       npcId: 'fixer',
@@ -1902,7 +1965,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   hotline_booth: createPlacedBuilding(
-    { x: 2, y: 4 },
+    { x: 0, y: 5 },
     {
       id: 'hotline_booth',
       npcId: 'journalist',
@@ -1914,7 +1977,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   chief_hut: createPlacedBuilding(
-    { x: 1, y: 3 },
+    { x: 0, y: 7 },
     {
       id: 'chief_hut',
       npcId: 'chief',
@@ -1926,7 +1989,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   mine_entrance: createPlacedBuilding(
-    { x: 5, y: 10 },
+    { x: 6, y: 12 },
     {
       id: 'mine_entrance',
       npcId: 'none',
@@ -1937,7 +2000,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   central_park: createPlacedBuilding(
-    { x: 3, y: 7 },
+    { x: 4, y: 7 },
     {
       id: 'central_park',
       npcId: 'none',
@@ -1952,7 +2015,7 @@ const baseBuildings: Record<string, Building> = {
 
   // ── Extra buildings ────────────────────────────────────────────────
   house_south_a: createPlacedBuilding(
-    { x: 3, y: 1 },
+    { x: 4, y: 1 },
     {
       id: 'house_south_a',
       npcId: 'none',
@@ -1964,7 +2027,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   house_south_b: createPlacedBuilding(
-    { x: 7, y: 1 },
+    { x: 10, y: 1 },
     {
       id: 'house_south_b',
       npcId: 'none',
@@ -1976,7 +2039,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   office_east: createPlacedBuilding(
-    { x: 9, y: 3 },
+    { x: 10, y: 7 },
     {
       id: 'office_east',
       npcId: 'none',
@@ -1988,19 +2051,19 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   factory_west: createPlacedBuilding(
-    { x: 1, y: 6 },
+    { x: 2, y: 3 },
     {
       id: 'factory_west',
       npcId: 'none',
       name: 'Processing Plant',
-      type: 'OFFICE',
+      type: 'INDUSTRIAL',
       isDiscovered: true,
       voxels: FACTORY_VOXELS,
     },
     occupiedCityCells
   ),
   house_north_a: createPlacedBuilding(
-    { x: 7, y: 9 },
+    { x: 5, y: 3 },
     {
       id: 'house_north_a',
       npcId: 'none',
@@ -2012,7 +2075,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   house_west_c: createPlacedBuilding(
-    { x: 1, y: 9 },
+    { x: 2, y: 5 },
     {
       id: 'house_west_c',
       npcId: 'none',
@@ -2038,7 +2101,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   house_ne_c: createPlacedBuilding(
-    { x: 6, y: 9 },
+    { x: 7, y: 9 },
     {
       id: 'house_ne_c',
       npcId: 'resident_b',
@@ -2050,7 +2113,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   house_sw_e: createPlacedBuilding(
-    { x: 4, y: 3 },
+    { x: 8, y: 3 },
     {
       id: 'house_sw_e',
       npcId: 'resident_c',
@@ -2062,7 +2125,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   house_east_f: createPlacedBuilding(
-    { x: 9, y: 7 },
+    { x: 0, y: 1 },
     {
       id: 'house_east_f',
       npcId: 'resident_d',
@@ -2076,7 +2139,7 @@ const baseBuildings: Record<string, Building> = {
 
   // ── Foliage / green spaces ─────────────────────────────────────────
   tree_sw_1: createPlacedBuilding(
-    { x: 1, y: 1 },
+    { x: 0, y: 0 },
     {
       id: 'tree_sw_1',
       npcId: 'none',
@@ -2088,7 +2151,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   tree_se_1: createPlacedBuilding(
-    { x: 9, y: 1 },
+    { x: 12, y: 0 },
     {
       id: 'tree_se_1',
       npcId: 'none',
@@ -2100,7 +2163,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   garden_east: createPlacedBuilding(
-    { x: 9, y: 6 },
+    { x: 10, y: 5 },
     {
       id: 'garden_east',
       npcId: 'none',
@@ -2112,7 +2175,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   tree_ne_1: createPlacedBuilding(
-    { x: 9, y: 10 },
+    { x: 12, y: 11 },
     {
       id: 'tree_ne_1',
       npcId: 'none',
@@ -2124,7 +2187,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   bush_w_1: createPlacedBuilding(
-    { x: 1, y: 4 },
+    { x: 2, y: 0 },
     {
       id: 'bush_w_1',
       npcId: 'none',
@@ -2136,7 +2199,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   tree_nw_1: createPlacedBuilding(
-    { x: 1, y: 10 },
+    { x: 0, y: 11 },
     {
       id: 'tree_nw_1',
       npcId: 'none',
@@ -2148,7 +2211,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   garden_center: createPlacedBuilding(
-    { x: 3, y: 4 },
+    { x: 4, y: 5 },
     {
       id: 'garden_center',
       npcId: 'none',
@@ -2160,7 +2223,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   tree_mid_east: createPlacedBuilding(
-    { x: 7, y: 6 },
+    { x: 8, y: 5 },
     {
       id: 'tree_mid_east',
       npcId: 'none',
@@ -2176,7 +2239,7 @@ const baseBuildings: Record<string, Building> = {
 
   // ── Imported voxel model buildings ─────────────────────────────────
   asset_tower_a: createPlacedBuilding(
-    { x: 0, y: 2 },
+    { x: 0, y: 9 },
     {
       id: 'asset_tower_a',
       npcId: 'none',
@@ -2188,7 +2251,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   asset_block_b: createPlacedBuilding(
-    { x: 2, y: 6 },
+    { x: 0, y: 3 },
     {
       id: 'asset_block_b',
       npcId: 'none',
@@ -2200,7 +2263,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   asset_hall_c: createPlacedBuilding(
-    { x: 8, y: 4 },
+    { x: 12, y: 9 },
     {
       id: 'asset_hall_c',
       npcId: 'none',
@@ -2212,7 +2275,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   asset_depot_d: createPlacedBuilding(
-    { x: 10, y: 4 },
+    { x: 12, y: 1 },
     {
       id: 'asset_depot_d',
       npcId: 'none',
@@ -2224,7 +2287,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   asset_quarters_e: createPlacedBuilding(
-    { x: 6, y: 3 },
+    { x: 12, y: 7 },
     {
       id: 'asset_quarters_e',
       npcId: 'none',

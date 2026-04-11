@@ -18,6 +18,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, Hammer, Package, Flame, Boxes, Zap, Weight } from 'lucide-react';
 import { GameState, WorldHoverInfo, WorldPosition } from '../types';
 import { WORLD_CAMERA_AZIMUTH } from '../VoxelEngine';
+import { isNightTime } from '../utils/dayNightCycle';
 import { VoxelWorldContainer } from './VoxelWorldContainer';
 import { AnalogStick, AnalogStickVector } from './AnalogStick';
 import { buildWorldTerrainVoxels } from '../utils/worldSurface';
@@ -32,7 +33,6 @@ import {
   MINE_INTERACTION_RADIUS,
   NODE_HARVEST_COOLDOWN_MS,
 } from '../mineWorldData';
-import { isDaytimeHours } from '../utils/dayNightCycle';
 
 // ─── types ────────────────────────────────────────────────────────────────────
 interface NodeState {
@@ -66,11 +66,11 @@ const SMELT_CHECK_INTERVAL_MS = 2500;
 const DEPOSIT_CHECK_INTERVAL_MS = 1500;
 
 /** How often (ms) the player mines one unit while standing still in a work zone */
-const WORK_MINE_INTERVAL_MS = 9000;
+const WORK_MINE_INTERVAL_MS = 1800;
 /** Maximum number of resource units the player can carry at once */
 const MAX_CARRY = VoxelCharacter.MAX_CARRY;
 /** How long (ms) each block takes to unload at the delivery zone */
-const UNLOAD_BLOCK_INTERVAL_MS = 50;
+const UNLOAD_BLOCK_INTERVAL_MS = 400;
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 const isNear = (a: WorldPosition, b: WorldPosition, radius: number) =>
@@ -389,7 +389,7 @@ export const MineWorldScene = ({
     return () => { if (hoverRafRef.current !== null) cancelAnimationFrame(hoverRafRef.current); };
   }, []);
 
-  const isNight = !isDaytimeHours(state.time);
+  const isNight = isNightTime(state.time);
 
   // ── node info helper ──────────────────────────────────────────────────────
   const nodeInfo = (id: string) => {

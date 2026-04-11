@@ -1,25 +1,27 @@
-/**
- * @module Header
- * Game HUD header bar.
- * Displays the player's key resources (money, ore, energy, exposure) and the
- * current in-game day and time.
- */
 import React from 'react';
-import { DollarSign, AlertTriangle, Megaphone, Database, Briefcase, Wrench } from 'lucide-react';
+import { DollarSign, AlertTriangle, Megaphone, Database, Briefcase, Wrench, HeartPulse } from 'lucide-react';
 import { GameState } from '../types';
 import { Meter } from './Meter';
 import { getActiveWorldEffects } from '../game/dialogue/worldEffects';
 import { getRunCycleSummary } from '../game/runCycle';
-import { isDaytimeHours } from '../utils/dayNightCycle';
+import { isNightTime } from '../utils/dayNightCycle';
 
-export const Header = ({ state, onOpenUtilities }: { state: GameState; onOpenUtilities: () => void }) => {
+export const Header = ({
+  state,
+  onOpenUtilities,
+  compactFtueHud = false
+}: {
+  state: GameState;
+  onOpenUtilities: () => void;
+  compactFtueHud?: boolean;
+}) => {
   const formatTime = (t: number) => {
     const hours = Math.floor(t);
     const minutes = Math.floor((t % 1) * 60);
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
   };
 
-  const isNight = !isDaytimeHours(state.time);
+  const isNight = isNightTime(state.time);
   const activeEffects = getActiveWorldEffects(state);
   const cycle = getRunCycleSummary(state);
 
@@ -49,14 +51,31 @@ export const Header = ({ state, onOpenUtilities }: { state: GameState; onOpenUti
             <AlertTriangle size={14} className={state.energy < 20 ? "text-red-600 animate-pulse" : isNight ? "text-blue-400" : "text-blue-600"} />
             {Math.floor(state.energy)}%
           </div>
-          <div className="flex items-center gap-1 font-mono text-sm font-bold" title="Incriminating Evidence">
-            <Megaphone size={14} className="text-red-600" />
-            {state.evidence}
+          <div className="flex items-center gap-1 font-mono text-sm font-bold" title="Stamina">
+            <HeartPulse
+              size={14}
+              className={
+                state.playerStatus.condition !== 'ACTIVE'
+                  ? 'text-rose-600 animate-pulse'
+                  : state.stamina.current < 25
+                    ? 'text-amber-500 animate-pulse'
+                    : 'text-emerald-500'
+              }
+            />
+            {Math.floor(state.stamina.current)}%
           </div>
           <div className="flex items-center gap-1 font-mono text-sm font-bold" title="Ore">
             <Database size={14} className="text-amber-600" />
             {state.ore}
           </div>
+          {!compactFtueHud && (
+            <>
+              <div className="flex items-center gap-1 font-mono text-sm font-bold" title="Incriminating Evidence">
+                <Megaphone size={14} className="text-red-600" />
+                {state.evidence}
+              </div>
+            </>
+          )}
           <button
             onClick={onOpenUtilities}
             className={`w-9 h-9 rounded-full flex items-center justify-center border transition-colors ${
@@ -70,12 +89,14 @@ export const Header = ({ state, onOpenUtilities }: { state: GameState; onOpenUti
           </button>
         </div>
       </div>
-      <div className="grid grid-cols-3 gap-4">
-        <Meter label="Trust" value={state.meters.trust} color="bg-blue-500" />
-        <Meter label="Influence" value={state.meters.influence} color="bg-purple-500" />
-        <Meter label="Exposure" value={state.meters.exposure} color="bg-red-500" />
-      </div>
-      {activeEffects.length > 0 && (
+      {!compactFtueHud && (
+        <div className="grid grid-cols-3 gap-4">
+          <Meter label="Trust" value={state.meters.trust} color="bg-blue-500" />
+          <Meter label="Influence" value={state.meters.influence} color="bg-purple-500" />
+          <Meter label="Exposure" value={state.meters.exposure} color="bg-red-500" />
+        </div>
+      )}
+      {!compactFtueHud && activeEffects.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {activeEffects.map(effect => (
             <div

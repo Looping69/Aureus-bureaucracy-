@@ -5,6 +5,10 @@ import { applyDialogueChoiceAction, applyDirectMoveAction, gameReducer } from '.
 import { getNotificationForAction } from './effects';
 import { buildWorldSurfaceMap, getWorldSurfaceTile } from '../../utils/worldSurface';
 import { WORLD_SIZE } from '../../utils/voxelConstants';
+import {
+  collectNearbyStaminaPowerUps,
+  triggerPlayerCollapse,
+} from '../staminaRescue';
 
 const findWalkableTileNear = (x: number, y: number, radius = 6) => {
   const state = buildInitialGameState();
@@ -65,6 +69,35 @@ test('DIRECT_MOVE rejects moves when energy is depleted', () => {
   const { candidate } = findWalkableTileNear(state.playerPos.x, state.playerPos.y);
   const result = gameReducer(state, { type: 'DIRECT_MOVE', pos: candidate });
   assert.deepEqual(result.playerPos, state.playerPos);
+});
+
+test('triggerPlayerCollapse dispatches medics and locks the player', () => {
+  const state = buildInitialGameState();
+  const collapsed = triggerPlayerCollapse({
+    ...state,
+    stamina: { ...state.stamina, current: 0 },
+  });
+
+  assert.equal(collapsed.playerStatus.condition, 'COLLAPSING');
+  assert.equal(collapsed.rescueMission.phase, 'DISPATCHED');
+  assert.equal(collapsed.rescueMission.assignedMedicIds.length, 2);
+  assert.equal(collapsed.path.length, 0);
+});
+
+test('collectNearbyStaminaPowerUps restores stamina and removes the pickup', () => {
+  const state = buildInitialGameState();
+  const powerUp = state.staminaPowerUps[0];
+  const lowStamina = {
+    ...state,
+    playerPos: powerUp.pos,
+    stamina: { ...state.stamina, current: 20 },
+  };
+
+  const result = collectNearbyStaminaPowerUps(lowStamina);
+
+  assert.equal(result.collected.length, 1);
+  assert.equal(result.nextState.staminaPowerUps.length, state.staminaPowerUps.length - 1);
+  assert.equal(result.nextState.stamina.current, 20 + powerUp.restoreAmount);
 });
 
 // ── DIALOGUE_CHOICE ──────────────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { VoxelEngine } from '../VoxelEngine';
-import { Building, NPC, AppState, VoxelData, WorldHoverInfo } from '../types';
+import { AppState, Building, EmergencyVehicle, MedicalNpc, NPC, StaminaPowerUp, VoxelData, WorldHoverInfo } from '../types';
 import { useCameraControls } from '../hooks/useCameraControls';
 import { WORLD_HALF_SIZE } from '../utils/voxelConstants';
 import { buildWorldSurfaceMap, getWorldSurfaceHeight } from '../utils/worldSurface';
@@ -20,6 +20,7 @@ interface VoxelWorldProps {
   onCountChange: (count: number) => void;
   onHoverPosition?: (pos: WorldHoverInfo | null) => void;
   onSelect?: (target: WorldHoverInfo, tapCount: number) => void;
+  objectiveTarget?: WorldHoverInfo | null;
   showLoadingOverlay?: boolean;
   onReady?: () => void;
   onProgress?: (progress: number, phase: string) => void;
@@ -33,6 +34,11 @@ interface VoxelWorldProps {
   highlightBuildingId?: string | null;
   /** Glow intensity for the highlighted building (0-1, default 0.15) */
   highlightIntensity?: number;
+  playerDowned?: boolean;
+  playerRescued?: boolean;
+  staminaPowerUps?: StaminaPowerUp[];
+  medicalNpcs?: Record<string, MedicalNpc>;
+  emergencyVehicles?: Record<string, EmergencyVehicle>;
 }
 
 export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({ 
@@ -49,6 +55,7 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
   onCountChange,
   onHoverPosition,
   onSelect,
+  objectiveTarget,
   showLoadingOverlay = true,
   onReady,
   onProgress,
@@ -56,7 +63,12 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
   playerCarried,
   playerCarriedType,
   highlightBuildingId,
-  highlightIntensity
+  highlightIntensity,
+  playerDowned = false,
+  playerRescued = false,
+  staminaPowerUps = [],
+  medicalNpcs = {},
+  emergencyVehicles = {},
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<VoxelEngine | null>(null);
@@ -152,6 +164,9 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
           engineRef.current?.entities.addNPC(npcs[b.npcId], b.pos);
         }
       });
+      engineRef.current.entities.syncMedicalNpcs(medicalNpcs);
+      engineRef.current.entities.syncEmergencyVehicles(emergencyVehicles);
+      engineRef.current.entities.syncStaminaPowerUps(staminaPowerUps);
       reportProgress(74, 'Registering city structures...');
       await yieldFrame();
       if (cancelled) return;
@@ -238,12 +253,15 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
         entities.addNPC(npcs[b.npcId], b.pos);
       }
     });
+    entities.syncMedicalNpcs(medicalNpcs);
+    entities.syncEmergencyVehicles(emergencyVehicles);
+    entities.syncStaminaPowerUps(staminaPowerUps);
 
     // Re-initialise NPC commuting routes
     const buildingsMap: Record<string, Building> = {};
     buildings.forEach(b => { buildingsMap[b.id] = b; });
     entities.initNpcMovement(npcs, buildingsMap);
-  }, [buildings]);
+  }, [buildings, emergencyVehicles, medicalNpcs, staminaPowerUps]);
 
   useEffect(() => {
     if (engineRef.current) {
@@ -267,6 +285,12 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
 
   useEffect(() => {
     if (engineRef.current) {
+      engineRef.current.setObjectiveTarget(objectiveTarget ?? null);
+    }
+  }, [objectiveTarget]);
+
+  useEffect(() => {
+    if (engineRef.current) {
       engineRef.current.setCallbacks(
         onStateChange,
         onCountChange,
@@ -286,6 +310,27 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
       player.setWorking(false);
     }
   }, [playerWorking]);
+
+  useEffect(() => {
+    if (!engineRef.current) return;
+    engineRef.current.entities.player.setDowned(playerDowned);
+    engineRef.current.entities.player.setEscorted(playerRescued);
+  }, [playerDowned, playerRescued]);
+
+  useEffect(() => {
+    if (!engineRef.current) return;
+    engineRef.current.entities.syncMedicalNpcs(medicalNpcs);
+  }, [medicalNpcs]);
+
+  useEffect(() => {
+    if (!engineRef.current) return;
+    engineRef.current.entities.syncEmergencyVehicles(emergencyVehicles);
+  }, [emergencyVehicles]);
+
+  useEffect(() => {
+    if (!engineRef.current) return;
+    engineRef.current.entities.syncStaminaPowerUps(staminaPowerUps);
+  }, [staminaPowerUps]);
 
   // ── Drive visual carry-stack from prop ──────────────────────────────────
   useEffect(() => {

@@ -1,4 +1,5 @@
 import { GameState, Permit } from '../types';
+import { getFtueCopy, isFtueActive } from './ftue';
 
 export interface ProgressGuidance {
   title: string;
@@ -25,35 +26,20 @@ const withMoneyBlocker = (state: GameState, permit: Permit | undefined, fallback
 };
 
 export const getProgressGuidance = (state: GameState): ProgressGuidance => {
+  if (isFtueActive(state)) {
+    const ftueCopy = getFtueCopy(state.ftuePhase);
+    return {
+      title: ftueCopy.title,
+      detail: ftueCopy.body,
+      tone: 'INFO'
+    };
+  }
+
   const extractionIntent = state.permits['extraction-intent'];
   const prospecting = state.permits['prospecting-license'];
   const miningIron = state.permits['mining-permit-iron'];
   const exportLicense = state.permits['export-license'];
   const ironMine = state.mines.find(m => m.id === 'iron-vein');
-
-  if (state.tutorialStep === 0) {
-    return {
-      title: 'Get a Permit',
-      detail: "You need a mining permit before you can extract anything. The Bureau of Extraction is east — head over there.",
-      tone: 'INFO'
-    };
-  }
-
-  if (state.tutorialStep === 1 && state.currentScene !== 'OFFICE') {
-    return {
-      title: 'The Bureau Is Right There',
-      detail: "Don't stop now. Enter the building and find the licensing officer.",
-      tone: 'INFO'
-    };
-  }
-
-  if (state.tutorialStep === 2 && state.activeNPCId !== 'licensing') {
-    return {
-      title: 'Talk To Vane',
-      detail: 'Officer Vane controls what you can and cannot do here. Talk to him.',
-      tone: 'INFO'
-    };
-  }
 
   if (extractionIntent && extractionIntent.status !== 'APPROVED') {
     if (extractionIntent.status === 'PENDING') {

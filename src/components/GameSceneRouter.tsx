@@ -38,7 +38,6 @@ interface GameSceneRouterProps {
   onMine: (tileId: string) => void;
   onMineAction: (action: string) => void;
   onOpenMine: () => void;
-  onRest: () => void;
   onRecenter: () => void;
   onSelectMine: (mineId: string) => void;
   onCloseMinePicker: () => void;
@@ -94,7 +93,6 @@ export const GameSceneRouter: React.FC<GameSceneRouterProps> = ({
   onMine,
   onMineAction,
   onOpenMine,
-  onRest,
   onRecenter,
   onSelectMine,
   onCloseMinePicker,

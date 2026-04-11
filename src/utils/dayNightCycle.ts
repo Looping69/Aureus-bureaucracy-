@@ -13,6 +13,7 @@
 // ---------------------------------------------------------------------------
 
 export const DAY_NIGHT = {
+    HOURS_PER_DAY: 24,
     TICKS_PER_DAY: 24000,
     REAL_SECONDS_PER_DAY: 180,
     SUNRISE_TICK: 5000,
@@ -52,6 +53,10 @@ export function ticksToHours(ticks: number): number {
     return (ticks / DAY_NIGHT.TICKS_PER_DAY) * 24;
 }
 
+export const SUNRISE_HOUR = ticksToHours(DAY_NIGHT.SUNRISE_TICK);
+export const NOON_HOUR = ticksToHours(DAY_NIGHT.NOON_TICK);
+export const SUNSET_HOUR = ticksToHours(DAY_NIGHT.SUNSET_TICK);
+
 // ---------------------------------------------------------------------------
 // Core functions
 // ---------------------------------------------------------------------------
@@ -72,6 +77,10 @@ export function isDaytime(timeOfDay: number): boolean {
  */
 export function isDaytimeHours(hours: number): boolean {
     return isDaytime(hoursToTicks(hours));
+}
+
+export function isNightTime(hours: number): boolean {
+    return !isDaytimeHours(hours);
 }
 
 export function getDaylightFactor(timeOfDay: number): number {

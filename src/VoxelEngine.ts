@@ -123,6 +123,8 @@ export class VoxelEngine {
   private targetRotationY: number = 0;
   private firstPositionSet: boolean = false;
   private requestedPlayerMoving: boolean = false;
+  private sunOrbitOffset = new THREE.Vector3();
+  private moonOrbitOffset = new THREE.Vector3();
 
   // --- Intro camera animation state ---
   private static readonly INTRO_CLOSE_DISTANCE = 8;            // Start zoomed in very close
@@ -208,6 +210,7 @@ export class VoxelEngine {
     this.dirLight.shadow.camera.near = 0.5;
     this.dirLight.shadow.camera.far = 300;
     this.dirLight.shadow.bias = -0.0003;
+    this.dirLight.shadow.normalBias = 0.04;
     this.scene.add(this.dirLight);
     // Add target to scene so it can be repositioned to follow the player
     this.scene.add(this.dirLight.target);
@@ -341,6 +344,10 @@ export class VoxelEngine {
     this.onSelect = onSelect;
   }
 
+  public setObjectiveTarget(_target: WorldHoverInfo | null) {
+    // Objective selection visuals only exist in the world-scene UI layer on this branch.
+  }
+
   // --- Public API: Camera ---
   /**
    * Translate both the camera position and its orbit target by the given XZ delta.
@@ -394,9 +401,18 @@ export class VoxelEngine {
 
   /** Return the normalized light direction (sun during day, moon at night). */
   private getLightDirection(): THREE.Vector3 {
-    const ticks = hoursToTicks(this.time);
-    const celestial = getCelestialPosition(ticks, 120);
-    return new THREE.Vector3(celestial.x, celestial.y, celestial.z).normalize();
+    const activeOrbit = this.sun.visible ? this.sunOrbitOffset : this.moonOrbitOffset;
+    return activeOrbit.clone().normalize();
+  }
+
+  private updateCelestialAnchors() {
+    this.sun.position.copy(this.currentCameraFocus).add(this.sunOrbitOffset);
+    this.moon.position.copy(this.currentCameraFocus).add(this.moonOrbitOffset);
+
+    const activeOrbit = this.sun.visible ? this.sunOrbitOffset : this.moonOrbitOffset;
+    this.dirLight.position.copy(this.currentCameraFocus).add(activeOrbit);
+    this.dirLight.target.position.copy(this.currentCameraFocus);
+    this.dirLight.target.updateMatrixWorld();
   }
 
   /**
@@ -414,18 +430,18 @@ export class VoxelEngine {
     const ticks = hoursToTicks(time);
 
     // --- Celestial positions via the day/night cycle module ---
-    const sunPos = getCelestialPosition(ticks, 120);
-    this.sun.position.set(sunPos.x, sunPos.y, sunPos.z);
+    const celestial = getCelestialPosition(ticks, 120);
 
     // Moon is always positioned when it's night; during the day, park it below
     // the horizon so it isn't visible.
-    if (sunPos.isNight) {
-      this.moon.position.set(sunPos.x, sunPos.y, sunPos.z);
-      this.sun.position.set(-sunPos.x, -40, -sunPos.z);
+    if (celestial.isNight) {
+      this.moonOrbitOffset.set(celestial.x, celestial.y, celestial.z);
+      this.sunOrbitOffset.set(-celestial.x, -40, -celestial.z);
       this.moon.visible = true;
       this.sun.visible = false;
     } else {
-      this.moon.position.set(-sunPos.x, -40, -sunPos.z);
+      this.sunOrbitOffset.set(celestial.x, celestial.y, celestial.z);
+      this.moonOrbitOffset.set(-celestial.x, -40, -celestial.z);
       this.moon.visible = false;
       this.sun.visible = true;
     }
@@ -438,29 +454,14 @@ export class VoxelEngine {
     this.hemiLight.intensity = 0.2 + dayFactor * 0.3;
 
     // --- Directional light follows the visible celestial body ---
-    const lightDir = this.getLightDirection();
-    const playerPos = this.currentPlayerPos;
-
     if (dayFactor > 0) {
       this.dirLight.intensity = dayFactor * 1.0;
-      this.dirLight.position.set(
-        playerPos.x + lightDir.x * 80,
-        playerPos.y + lightDir.y * 80,
-        playerPos.z + lightDir.z * 80
-      );
       this.dirLight.color.setHex(0xffffff);
     } else {
       this.dirLight.intensity = 0.3;
-      this.dirLight.position.set(
-        playerPos.x + lightDir.x * 80,
-        playerPos.y + lightDir.y * 80,
-        playerPos.z + lightDir.z * 80
-      );
       this.dirLight.color.setHex(0xaaaaff);
     }
-
-    // Point the directional light at the player so shadow camera is centered there
-    this.dirLight.target.position.copy(playerPos);
+    this.updateCelestialAnchors();
 
     const fogColor = isDay ? 0xe2e8f0 : 0x020617;
     if (this.scene.fog) {
@@ -1796,16 +1797,7 @@ export class VoxelEngine {
     this.entities.player.group.rotation.y += diff * Math.min(rotationLerpFactor, 0.5);
 
     this.updateCameraFollow(deltaTime);
-
-    // Keep directional light shadow camera centered on the player each frame
-    // so shadows stay visible near the player as they move
-    this.dirLight.target.position.copy(this.currentPlayerPos);
-    const lightDir = this.getLightDirection();
-    this.dirLight.position.set(
-      this.currentPlayerPos.x + lightDir.x * 80,
-      this.currentPlayerPos.y + lightDir.y * 80,
-      this.currentPlayerPos.z + lightDir.z * 80
-    );
+    this.updateCelestialAnchors();
     this.updateIntroAnimation();
     this.enforceCameraBounds();
     this.controls.update();

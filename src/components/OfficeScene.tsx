@@ -1,9 +1,3 @@
-/**
- * @module OfficeScene
- * 2-D office exploration scene rendered as a CSS-positioned room layout.
- * The player clicks on items (files, evidence, clues) to interact with them;
- * found items are recorded in GameState.foundOfficeItemIds.
- */
 import React from 'react';
 import { GameState } from '../types';
 import { ChevronRight, Stamp, MapPin, Building2 } from 'lucide-react';
@@ -12,6 +6,7 @@ import { PoliticalPositionPanel } from './PoliticalPositionPanel';
 import { ProgressGuide } from './ProgressGuide';
 import { RunCyclePanel } from './RunCyclePanel';
 import { OperationActionId } from '../game/runCycle';
+import { shouldHighlightForm17B, shouldHighlightVane, shouldLockBureauDirectory } from '../game/ftue';
 
 export const OfficeScene = ({ 
   state, 
@@ -36,16 +31,10 @@ export const OfficeScene = ({
   onBackToDirectory: () => void,
   onOperationAction: (actionId: OperationActionId) => void
 }) => {
-  // Track whether this is the first-ever Bureau entry for the "crossed a line" reward.
-  const isFirstBureauEntry = state.activeBuildingId === 'licensing_office' && 
-    (state.tutorialStep === 1 || state.tutorialStep === 2);
-  const [showEntrySplash, setShowEntrySplash] = React.useState(isFirstBureauEntry);
-
-  React.useEffect(() => {
-    if (!showEntrySplash) return;
-    const timer = setTimeout(() => setShowEntrySplash(false), 2200);
-    return () => clearTimeout(timer);
-  }, [showEntrySplash]);
+  const highlightVane = shouldHighlightVane(state);
+  const highlightForm17B = shouldHighlightForm17B(state);
+  const lockDirectory = shouldLockBureauDirectory(state) && state.activeBuildingId === 'licensing_office';
+  const showMetaPanels = state.ftuePhase === 'ftue_complete' || state.tutorialStep === 99;
 
   // If we are in a specific building, show that building's view
   if (state.activeBuildingId) {
@@ -66,28 +55,24 @@ export const OfficeScene = ({
 
     // Otherwise show Building Dashboard (NPCs, Actions)
       return (
-        <div className={`flex-1 overflow-auto p-4 flex flex-col gap-6 transition-colors duration-700 ${isFirstBureauEntry ? 'bg-slate-100' : 'bg-slate-50'} relative`}>
-          {/* First-entry "you crossed a line" splash */}
-          {showEntrySplash && (
-            <div className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none animate-pulse">
-              <div className="bg-black/80 backdrop-blur-sm rounded-2xl px-8 py-5 shadow-2xl border border-white/10">
-                <p className="text-white/90 text-sm font-black uppercase tracking-[0.3em] text-center">
-                  You crossed a line.
-                </p>
-              </div>
-            </div>
-          )}
+        <div className="flex-1 overflow-auto p-4 flex flex-col gap-6 bg-slate-50">
           <ProgressGuide state={state} />
-          <RunCyclePanel state={state} onOperationAction={onOperationAction} />
-          <PoliticalPositionPanel state={state} />
+          {showMetaPanels && <RunCyclePanel state={state} onOperationAction={onOperationAction} />}
+          {showMetaPanels && <PoliticalPositionPanel state={state} />}
 
         <div className="flex items-center justify-between mb-2">
-          <button 
-            onClick={onBackToDirectory}
-            className="text-xs font-bold uppercase tracking-widest opacity-50 hover:opacity-100 flex items-center gap-1"
-          >
-            ← Directory
-          </button>
+          {lockDirectory ? (
+            <div className="text-xs font-bold uppercase tracking-widest text-blue-700 flex items-center gap-1">
+              Hold The Line
+            </div>
+          ) : (
+            <button 
+              onClick={onBackToDirectory}
+              className="text-xs font-bold uppercase tracking-widest opacity-50 hover:opacity-100 flex items-center gap-1"
+            >
+              ← Directory
+            </button>
+          )}
           <div className="text-[10px] font-mono uppercase opacity-30">
             {building.name}
           </div>
@@ -99,12 +84,12 @@ export const OfficeScene = ({
             <button 
               onClick={() => onSelectNPC(building.npcId)}
               className={`w-full flex items-center gap-3 p-3 bg-white border rounded-xl shadow-sm hover:shadow-md transition-all text-left group relative overflow-hidden
-                ${(state.tutorialStep === 2 || state.tutorialStep === 6) && building.npcId === 'licensing' ? 'border-blue-500 ring-4 ring-blue-500/20 z-10' : 'border-black/5'}
+                ${highlightVane && building.npcId === 'licensing' ? 'border-blue-500 ring-4 ring-blue-500/20 z-10' : 'border-black/5'}
               `}
             >
-              {(state.tutorialStep === 2 || state.tutorialStep === 6) && building.npcId === 'licensing' && (
+              {highlightVane && building.npcId === 'licensing' && (
                 <div className="absolute right-4 top-1/2 -translate-y-1/2 text-blue-600 animate-bounce font-black text-xs uppercase tracking-widest">
-                  {state.tutorialStep === 2 ? 'He decides.' : 'Talk to Him!'}
+                  Vane. Now.
                 </div>
               )}
               <div className="relative">
@@ -152,12 +137,12 @@ export const OfficeScene = ({
                   title={`Open ${permit.formNumber}. Fee: $${permit.status === 'REJECTED' ? 100 : permit.cost}.`}
                   className={`flex items-center gap-3 p-3 border rounded-xl shadow-sm hover:shadow-md transition-all text-left relative overflow-hidden
                     ${permit.status === 'APPROVED' ? 'bg-emerald-50 border-emerald-100' : 'bg-white border-black/5'}
-                    ${state.tutorialStep === 3 && permit.id === 'extraction-intent' ? 'border-blue-500 ring-4 ring-blue-500/20 z-10' : ''}
+                    ${highlightForm17B && permit.id === 'extraction-intent' ? 'border-blue-500 ring-4 ring-blue-500/20 z-10' : ''}
                   `}
                 >
-                  {state.tutorialStep === 3 && permit.id === 'extraction-intent' && (
+                  {highlightForm17B && permit.id === 'extraction-intent' && (
                     <div className="absolute right-12 top-1/2 -translate-y-1/2 text-blue-600 animate-bounce font-black text-xs uppercase tracking-widest">
-                      Open This
+                      Open 17-B
                     </div>
                   )}
                   <div className={`w-10 h-10 rounded-lg flex items-center justify-center
@@ -186,32 +171,16 @@ export const OfficeScene = ({
   }
 
   // Directory View (Default when no active building)
-  // Only show buildings that are discovered AND have gameplay relevance:
-  // - Has an NPC to interact with
-  // - Has exploration items to find
-  // - Is the mine entrance
-  // - Is the player's home
-  // Filter out decorative buildings (generic houses, parks, landmarks, trees, roads, etc.)
-  const DIRECTORY_BUILDING_IDS = new Set([
-    'player_home',
-    'licensing_office',
-    'union_hall',
-    'inspector_hq',
-    'fixer_den',
-    'hotline_booth',
-    'chief_hut',
-    'mine_entrance',
-    'central_park'
-  ]);
   const discoveredBuildings = Object.values(state.buildings).filter(b => 
-    b.isDiscovered && DIRECTORY_BUILDING_IDS.has(b.id)
+    b.isDiscovered && 
+    (b.npcId !== 'none' || (b.explorationItems && b.explorationItems.length > 0) || b.type === 'MINE_ENTRANCE' || b.type === 'HOME' || b.id === 'central_park')
   );
 
   return (
     <div className="flex-1 overflow-auto p-4 flex flex-col gap-6 bg-slate-100">
       <ProgressGuide state={state} />
-      <RunCyclePanel state={state} onOperationAction={onOperationAction} />
-      <PoliticalPositionPanel state={state} />
+      {showMetaPanels && <RunCyclePanel state={state} onOperationAction={onOperationAction} />}
+      {showMetaPanels && <PoliticalPositionPanel state={state} />}
 
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-black italic font-serif">Directory</h2>
@@ -221,6 +190,47 @@ export const OfficeScene = ({
       </div>
 
       <div className="grid grid-cols-1 gap-3">
+        {/* Active Permits Section */}
+        <div className="bg-white p-4 rounded-2xl shadow-sm border border-emerald-100/50 mb-4">
+          <h3 className="text-xs font-black uppercase tracking-widest mb-3 flex items-center gap-2 text-emerald-900">
+            <Stamp size={14} className="text-emerald-600" /> Active Permits
+          </h3>
+          <div className="space-y-2">
+            {Object.values(state.permits)
+              .filter(p => p.status !== 'LOCKED' && p.status !== 'REJECTED')
+              .map(permit => (
+                <button
+                  key={permit.id}
+                  onClick={() => onSelectPermit(permit.id)}
+                  title={`Review ${permit.formNumber}. Current status: ${permit.status}.`}
+                  className="w-full flex items-center justify-between p-2 bg-slate-50 hover:bg-emerald-50 rounded-lg border border-transparent hover:border-emerald-200 transition-all group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-2 h-2 rounded-full ${
+                      permit.status === 'APPROVED' ? 'bg-emerald-500' : 
+                      permit.status === 'PENDING' ? 'bg-amber-500 animate-pulse' : 'bg-slate-300'
+                    }`} />
+                    <div className="text-left">
+                      <div className="text-xs font-bold text-slate-700 group-hover:text-emerald-800">{permit.name}</div>
+                      <div className="text-[10px] font-mono text-slate-400">{permit.formNumber}</div>
+                    </div>
+                  </div>
+                  <div className={`text-[10px] font-bold px-2 py-1 rounded-md ${
+                    permit.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-700' : 
+                    permit.status === 'PENDING' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'
+                  }`}>
+                    {permit.status}
+                  </div>
+                </button>
+              ))}
+              {Object.values(state.permits).filter(p => p.status !== 'LOCKED' && p.status !== 'REJECTED').length === 0 && (
+                <div className="text-center py-4 text-[10px] text-slate-400 italic">
+                  No active permits. Visit the Licensing Office.
+                </div>
+              )}
+          </div>
+        </div>
+
         {discoveredBuildings.map(building => (
           <div 
             key={building.id}
