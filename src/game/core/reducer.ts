@@ -21,12 +21,14 @@ import { findPath, invalidatePathfindingCache } from '../../utils/pathfinding';
 import { buildWorldSurfaceMap, getWorldSurfaceTile, WorldSurfaceMap } from '../../utils/worldSurface';
 import { WORLD_SIZE } from '../../utils/voxelConstants';
 import { refreshAllRelationshipStates } from '../dialogue/relationshipState';
+import { applyStaminaDrain, canPlayerAct } from '../staminaRescue';
 
 export const applyDirectMoveAction = (
   state: GameState,
   pos: { x: number; y: number },
   options?: { surfaceMap?: WorldSurfaceMap },
 ): GameState => {
+  if (!canPlayerAct(state)) return state;
   const sameTile = state.playerPos.x === pos.x && state.playerPos.y === pos.y;
   const shouldClearPath = state.path.length > 0 || state.targetPos !== null;
   if (sameTile && !shouldClearPath) return state;
@@ -38,7 +40,8 @@ export const applyDirectMoveAction = (
   }
   const energyCost = sameTile ? 0 : 0.35;
   if (energyCost > 0 && state.energy <= energyCost) return state;
-  return { ...state, playerPos: pos, path: [], targetPos: null, energy: state.energy - energyCost };
+  const movedState = { ...state, playerPos: pos, path: [], targetPos: null, energy: state.energy - energyCost };
+  return sameTile ? movedState : applyStaminaDrain(movedState, state.stamina.analogDrainPerStep);
 };
 
 export const applyDialogueChoiceAction = (
@@ -148,6 +151,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     // ── Movement ──────────────────────────────────────────────────────────
 
     case 'MOVE': {
+      if (!canPlayerAct(state)) return state;
       const { pos } = action;
       if (state.playerPos.x === pos.x && state.playerPos.y === pos.y) return state;
       const path = findPath(state.playerPos, pos, state.buildings);
@@ -170,9 +174,17 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       const restedState: GameState = {
         ...state,
         energy: state.maxEnergy,
+        stamina: {
+          ...state.stamina,
+          current: state.stamina.max,
+        },
         day: state.day + 1,
         time: 6,
         playerPos: homePos,
+        playerStatus: {
+          condition: 'ACTIVE',
+          phaseElapsed: 0,
+        },
       };
       return applyDailyEconomyTick(restedState).nextState;
     }
@@ -180,6 +192,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     // ── World interaction ─────────────────────────────────────────────────
 
     case 'WORLD_INTERACT': {
+      if (!canPlayerAct(state)) return state;
       const { npcId, buildingId } = action;
       if (npcId !== 'none') {
         return {

@@ -11,6 +11,13 @@ import { INITIAL_NPCS, INITIAL_PERMITS, INITIAL_MINES, BUILDINGS } from '../../d
 import { getBuildingAccessPosition } from '../../utils/buildingAccess';
 import { DAY_NIGHT, ticksToHours } from '../../utils/dayNightCycle';
 import { EMPTY_WORLD_EFFECTS } from '../dialogue/worldEffects';
+import {
+  createIdleRescueMission,
+  createInitialEmergencyVehicles,
+  createInitialMedicalNpcs,
+  createInitialStaminaPowerUps,
+  createInitialStaminaState,
+} from '../staminaRescue';
 
 const cloneSerializable = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
 
@@ -38,6 +45,7 @@ export const buildHydratedBuildings = (
 
 /** Construct a fresh {@link GameState} for a new game session. */
 export const buildInitialGameState = (): GameState => {
+  const buildings = buildHydratedBuildings();
   const homePos = getBuildingAccessPosition(BUILDINGS.player_home);
 
   return {
@@ -46,6 +54,7 @@ export const buildInitialGameState = (): GameState => {
     evidence: 0,
     energy: 100,
     maxEnergy: 100,
+    stamina: createInitialStaminaState(),
     movementSpeed: 1,
     upgrades: [],
     dirtItems: [],
@@ -77,12 +86,20 @@ export const buildInitialGameState = (): GameState => {
     activeBuildingId: null,
     activeMiniGame: null,
     pendingPermitAction: null,
-    buildings: buildHydratedBuildings(),
+    buildings,
     day: 1,
     time: ticksToHours(DAY_NIGHT.INITIAL_TIME_OF_DAY),
     playerPos: homePos,
+    playerStatus: {
+      condition: 'ACTIVE',
+      phaseElapsed: 0,
+    },
     targetPos: null,
     path: [],
+    staminaPowerUps: createInitialStaminaPowerUps({ buildings }),
+    medicalNpcs: createInitialMedicalNpcs({ buildings }),
+    emergencyVehicles: createInitialEmergencyVehicles({ buildings }),
+    rescueMission: createIdleRescueMission(),
     feedbacks: [],
     dialogueCooldowns: {},
     worldEffects: EMPTY_WORLD_EFFECTS,
@@ -131,5 +148,11 @@ export const hydrateSavedState = (saved: GameState): GameState => {
     lastCityEventHour: saved.lastCityEventHour ?? -1,
     unlockedEndings: saved.unlockedEndings ?? [],
     activeEndingId: saved.activeEndingId ?? null,
+    stamina: { ...baseState.stamina, ...(saved.stamina ?? {}) },
+    playerStatus: saved.playerStatus ?? baseState.playerStatus,
+    staminaPowerUps: saved.staminaPowerUps ?? baseState.staminaPowerUps,
+    medicalNpcs: saved.medicalNpcs ?? baseState.medicalNpcs,
+    emergencyVehicles: saved.emergencyVehicles ?? baseState.emergencyVehicles,
+    rescueMission: saved.rescueMission ?? baseState.rescueMission,
   };
 };

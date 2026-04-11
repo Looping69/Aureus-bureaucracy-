@@ -87,7 +87,7 @@ export function getNotificationForAction(
       const daily = applyDailyEconomyTick(restedState);
       return daily.notification ?? {
         title: 'Rested',
-        msg: "A good night's sleep. You feel ready for more paperwork.",
+        msg: "A good night's sleep. Energy and stamina are both back online.",
       };
     }
 

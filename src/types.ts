@@ -106,6 +106,82 @@ export interface WorldPosition {
   y: number;
 }
 
+export type PlayerCondition = 'ACTIVE' | 'COLLAPSING' | 'DOWNED' | 'REVIVING' | 'RECOVERING';
+export type RescueNpcState = 'IDLE' | 'RESPONDING' | 'REVIVING' | 'ESCORTING' | 'RETURNING';
+export type RescueMissionPhase =
+  | 'IDLE'
+  | 'DISPATCHED'
+  | 'TEAM_STAGING'
+  | 'REVIVING'
+  | 'TRANSPORTING'
+  | 'RECOVERING';
+export type EmergencyVehicleState = 'IDLE' | 'RESPONDING' | 'STAGED' | 'TRANSPORTING' | 'RETURNING';
+export type EmergencyVehicleType = 'AMBULANCE';
+export type StaminaPowerUpKind = 'FIELD_RATION' | 'ADRENAL_CHARGE';
+
+export interface PlayerStaminaState {
+  current: number;
+  max: number;
+  regenPerSecond: number;
+  restRegenPerSecond: number;
+  movementDrainPerUnit: number;
+  analogDrainPerStep: number;
+}
+
+export interface StaminaPowerUp {
+  id: string;
+  kind: StaminaPowerUpKind;
+  label: string;
+  pos: WorldPosition;
+  restoreAmount: number;
+  color: string;
+  glowColor: string;
+  bobOffset: number;
+  spinSpeed: number;
+}
+
+export interface MedicalNpc {
+  id: string;
+  name: string;
+  role: 'MEDIC';
+  pos: WorldPosition;
+  homePos: WorldPosition;
+  state: RescueNpcState;
+  path: WorldPosition[];
+  pathIndex: number;
+  paletteKey: 'medic_alpha' | 'medic_bravo';
+  reviveSide: 'LEFT' | 'RIGHT';
+}
+
+export interface EmergencyVehicle {
+  id: string;
+  label: string;
+  type: EmergencyVehicleType;
+  pos: WorldPosition;
+  homePos: WorldPosition;
+  state: EmergencyVehicleState;
+  path: WorldPosition[];
+  pathIndex: number;
+  seats: number;
+}
+
+export interface RescueMission {
+  id: string | null;
+  phase: RescueMissionPhase;
+  targetPos: WorldPosition | null;
+  stagingPos: WorldPosition | null;
+  destinationPos: WorldPosition | null;
+  assignedMedicIds: string[];
+  vehicleId: string | null;
+  phaseElapsed: number;
+  playerAttachedToVehicle: boolean;
+}
+
+export interface PlayerStatus {
+  condition: PlayerCondition;
+  phaseElapsed: number;
+}
+
 export interface WorldHoverInfo {
   x: number;
   y: number;
@@ -183,6 +259,7 @@ export interface GameState {
   evidence: number;
   energy: number;
   maxEnergy: number;
+  stamina: PlayerStaminaState;
   movementSpeed: number;
   upgrades: string[];
   dirtItems: DirtItem[];
@@ -210,8 +287,13 @@ export interface GameState {
   day: number;
   time: number; // 0 to 2400 (military time representation or just 0-24 float)
   playerPos: WorldPosition;
+  playerStatus: PlayerStatus;
   targetPos: WorldPosition | null;
   path: WorldPosition[];
+  staminaPowerUps: StaminaPowerUp[];
+  medicalNpcs: Record<string, MedicalNpc>;
+  emergencyVehicles: Record<string, EmergencyVehicle>;
+  rescueMission: RescueMission;
   feedbacks: RelationshipFeedback[];
   dialogueCooldowns: Record<string, number>;
   worldEffects: WorldEffects;

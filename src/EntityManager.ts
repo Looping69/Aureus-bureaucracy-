@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { VoxelCharacter } from './VoxelCharacter';
 import { VoxelBuilding } from './VoxelBuilding';
-import { Building, NPC, WorldPosition } from './types';
+import { Building, EmergencyVehicle, MedicalNpc, NPC, StaminaPowerUp, WorldPosition } from './types';
 import { CONFIG, WORLD_HALF_SIZE } from './utils/voxelConstants';
 import { isNightTime } from './utils/dayNightCycle';
 import {
@@ -11,6 +11,8 @@ import {
   getStructureBaseHeight,
 } from './utils/worldNavigation';
 import { findPath } from './utils/pathfinding';
+import { VoxelVehicle } from './VoxelVehicle';
+import { VoxelPowerUp } from './VoxelPowerUp';
 
 // NPC colour palettes so each resident looks distinct
 const NPC_PALETTES: Record<string, { shirt: number; pants: number; hair: number; skin: number; shoes: number; belt: number }> = {
@@ -24,6 +26,8 @@ const NPC_PALETTES: Record<string, { shirt: number; pants: number; hair: number;
   resident_b: { shirt: 0x607d8b, pants: 0x37474f, hair: 0x8d6e63, skin: 0xffdbac, shoes: 0x1a1a1a, belt: 0x3e2723 },
   resident_c: { shirt: 0xef6c00, pants: 0x4e342e, hair: 0x111111, skin: 0xc69c6d, shoes: 0x3e2723, belt: 0x4a3728 },
   resident_d: { shirt: 0x558b2f, pants: 0x33691e, hair: 0x5d4037, skin: 0xf5cba7, shoes: 0x2c2c2c, belt: 0x5c3a1e },
+  medic_alpha: { shirt: 0xffffff, pants: 0x1d4ed8, hair: 0x0f172a, skin: 0xf5cba7, shoes: 0x111827, belt: 0xdc2626 },
+  medic_bravo: { shirt: 0xecfeff, pants: 0x0f766e, hair: 0x1f2937, skin: 0xd4a574, shoes: 0x111827, belt: 0xdc2626 },
 };
 
 interface NpcMovementState {
@@ -44,11 +48,15 @@ export class EntityManager {
   public player: VoxelCharacter;
   public buildings: Map<string, VoxelBuilding> = new Map();
   public npcs: Map<string, VoxelCharacter> = new Map();
+  public medicalNpcs: Map<string, VoxelCharacter> = new Map();
+  public emergencyVehicles: Map<string, VoxelVehicle> = new Map();
+  public staminaPowerUps: Map<string, VoxelPowerUp> = new Map();
   public entityGroup: THREE.Group;
   private lightPool: THREE.PointLight[] = [];
   private MAX_LIGHTS = 8;
   private npcMovement: Map<string, NpcMovementState> = new Map();
   private buildingsData: Record<string, Building> = {};
+  private elapsedSeconds = 0;
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
@@ -164,6 +172,90 @@ export class EntityManager {
     npc.group.userData.npcId = npcData.id;
     this.npcs.set(npcData.id, npc);
     this.entityGroup.add(npc.group);
+  }
+
+  public syncMedicalNpcs(medicalNpcs: Record<string, MedicalNpc>) {
+    const activeIds = new Set(Object.keys(medicalNpcs));
+
+    this.medicalNpcs.forEach((npc, id) => {
+      if (activeIds.has(id)) return;
+      this.entityGroup.remove(npc.group);
+      this.medicalNpcs.delete(id);
+    });
+
+    Object.values(medicalNpcs).forEach((medic) => {
+      let entity = this.medicalNpcs.get(medic.id);
+      if (!entity) {
+        entity = new VoxelCharacter(NPC_PALETTES[medic.paletteKey]);
+        this.medicalNpcs.set(medic.id, entity);
+        this.entityGroup.add(entity.group);
+      }
+
+      entity.group.position.set(
+        medic.pos.x - WORLD_HALF_SIZE,
+        CONFIG.FLOOR_Y + 0.5,
+        medic.pos.y - WORLD_HALF_SIZE,
+      );
+      entity.setDowned(false);
+      entity.setEscorted(medic.state === 'ESCORTING');
+      entity.setMoving(medic.state === 'RESPONDING' || medic.state === 'RETURNING');
+      entity.group.userData.npcId = medic.id;
+    });
+  }
+
+  public syncEmergencyVehicles(vehicles: Record<string, EmergencyVehicle>) {
+    const activeIds = new Set(Object.keys(vehicles));
+
+    this.emergencyVehicles.forEach((vehicle, id) => {
+      if (activeIds.has(id)) return;
+      this.entityGroup.remove(vehicle.group);
+      this.emergencyVehicles.delete(id);
+    });
+
+    Object.values(vehicles).forEach((vehicleState) => {
+      let vehicle = this.emergencyVehicles.get(vehicleState.id);
+      if (!vehicle) {
+        vehicle = new VoxelVehicle();
+        this.emergencyVehicles.set(vehicleState.id, vehicle);
+        this.entityGroup.add(vehicle.group);
+      }
+
+      vehicle.setPosition(
+        vehicleState.pos.x - WORLD_HALF_SIZE,
+        CONFIG.FLOOR_Y + 0.2,
+        vehicleState.pos.y - WORLD_HALF_SIZE,
+      );
+    });
+  }
+
+  public syncStaminaPowerUps(powerUps: StaminaPowerUp[]) {
+    const activeIds = new Set(powerUps.map((powerUp) => powerUp.id));
+
+    this.staminaPowerUps.forEach((powerUp, id) => {
+      if (activeIds.has(id)) return;
+      this.entityGroup.remove(powerUp.group);
+      this.staminaPowerUps.delete(id);
+    });
+
+    powerUps.forEach((powerUpState) => {
+      let powerUp = this.staminaPowerUps.get(powerUpState.id);
+      if (!powerUp) {
+        powerUp = new VoxelPowerUp(
+          powerUpState.color,
+          powerUpState.glowColor,
+          powerUpState.bobOffset,
+          powerUpState.spinSpeed,
+        );
+        this.staminaPowerUps.set(powerUpState.id, powerUp);
+        this.entityGroup.add(powerUp.group);
+      }
+
+      powerUp.setPosition(
+        powerUpState.pos.x - WORLD_HALF_SIZE,
+        CONFIG.FLOOR_Y + 1.2,
+        powerUpState.pos.y - WORLD_HALF_SIZE,
+      );
+    });
   }
 
   /** Set up commuting routes for NPCs that have separate home / work buildings. */
@@ -312,8 +404,12 @@ export class EntityManager {
   }
 
   public update(deltaTime: number, time: number) {
+    this.elapsedSeconds += deltaTime;
     this.player.update(deltaTime);
     this.npcs.forEach(npc => npc.update(deltaTime));
+    this.medicalNpcs.forEach((npc) => npc.update(deltaTime));
+    this.emergencyVehicles.forEach((vehicle) => vehicle.update(deltaTime, true));
+    this.staminaPowerUps.forEach((powerUp) => powerUp.update(this.elapsedSeconds));
 
     // Advance NPC commuting
     this.updateNpcCommute(time);
@@ -356,6 +452,9 @@ export class EntityManager {
     this.entityGroup.clear();
     this.buildings.clear();
     this.npcMovement.clear();
+    this.medicalNpcs.clear();
+    this.emergencyVehicles.clear();
+    this.staminaPowerUps.clear();
     this.lightPool.forEach(l => this.scene.remove(l));
     this.lightPool = [];
   }

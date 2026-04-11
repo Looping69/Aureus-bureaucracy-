@@ -12,6 +12,7 @@ import { WORLD_SIZE } from '../utils/voxelConstants';
 import { useContinuousAnalogMovement } from '../hooks/game/useContinuousAnalogMovement';
 import { BUREAU_BUILDING_ID, getFtueCopy, isFtueWorldFunnelPhase } from '../game/ftue';
 import { isNightTime } from '../utils/dayNightCycle';
+import { WorldStatusOverlay } from './WorldStatusOverlay';
 
 export const WorldScene = ({ 
   state, 
@@ -144,6 +145,9 @@ export const WorldScene = ({
     onMove({ x: target.x, y: target.y });
   }, [onMove]);
   const handleWorldSelect = React.useCallback((target: WorldHoverInfo) => {
+    if (state.playerStatus.condition !== 'ACTIVE') {
+      return;
+    }
     setPendingSelection(target);
 
     if (target.kind === 'GROUND') {
@@ -205,7 +209,7 @@ export const WorldScene = ({
 
       onMove(getBuildingAccessPosition(building));
     }
-  }, [bureauAccessPos, bureauBuilding?.npcId, confirmGroundMove, isBureauFunnelActive, onInteract, onMove, state.buildings, state.playerPos.x, state.playerPos.y]);
+  }, [bureauAccessPos, bureauBuilding?.npcId, confirmGroundMove, isBureauFunnelActive, onInteract, onMove, state.buildings, state.playerPos.x, state.playerPos.y, state.playerStatus.condition]);
   const flushHoverPosition = React.useCallback(() => {
     hoverRafRef.current = null;
     const pending = pendingHoverPosRef.current;
@@ -326,7 +330,13 @@ export const WorldScene = ({
         showLoadingOverlay={showInitialLoadingOverlay}
         onReady={onInitialSceneReady}
         onProgress={onInitialLoadingProgress}
+        playerDowned={state.playerStatus.condition !== 'ACTIVE'}
+        playerRescued={state.rescueMission.playerAttachedToVehicle}
+        staminaPowerUps={state.staminaPowerUps}
+        medicalNpcs={state.medicalNpcs}
+        emergencyVehicles={state.emergencyVehicles}
       />
+      <WorldStatusOverlay state={state} />
 
       {/* Coordinate Display (debug only) */}
       {showDebug && (

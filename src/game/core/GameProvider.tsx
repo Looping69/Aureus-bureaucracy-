@@ -48,6 +48,7 @@ import { usePermitProcessingLoop } from '../../hooks/game/usePermitProcessingLoo
 import { useTimeAndCurfewLoop } from '../../hooks/game/useTimeAndCurfewLoop';
 import { useTutorialProgression } from '../../hooks/game/useTutorialProgression';
 import { useCityEventLoop } from '../../hooks/game/useCityEventLoop';
+import { useRescueLoop } from '../../hooks/game/useRescueLoop';
 import { Building } from '../../types';
 import { WorldSurfaceMap } from '../../utils/worldSurface';
 
@@ -108,6 +109,7 @@ export function GameProvider({ initialState, children }: GameProviderProps) {
   useTimeAndCurfewLoop({ setState: setGameState, setNotification, homePos, enabled: true });
   usePermitProcessingLoop({ setState: setGameState, setNotification, enabled: true });
   useMovementLoop({ setState: setGameState, setNotification, homePos, enabled: true });
+  useRescueLoop({ setState: setGameState, setNotification, enabled: true });
   useTutorialProgression(gameState, setGameState, setNotification, true);
   useCityEventLoop({ setState: setGameState, setNotification, enabled: true });
 

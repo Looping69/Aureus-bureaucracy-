@@ -15,6 +15,8 @@ export enum CharacterState {
   WALKING,
   JUMPING,
   WORKING,
+  DOWNED,
+  ESCORTED,
 }
 
 /**
@@ -42,6 +44,8 @@ export class VoxelCharacter {
   private carriedBlocks: THREE.Mesh[] = [];
   private _carriedCount = 0;
   private _carriedType: 'ore' | 'wood' = 'ore';
+  private isDowned = false;
+  private isEscorted = false;
 
   /** Maximum blocks this character can carry */
   public static readonly MAX_CARRY = 6;
@@ -382,6 +386,7 @@ export class VoxelCharacter {
    * @param moving - Whether the character is currently moving.
    */
   public setMoving(moving: boolean) {
+    if (this.isDowned || this.isEscorted) return;
     if (moving && this.currentState !== CharacterState.WALKING) {
       this.setState(CharacterState.WALKING);
     } else if (!moving && this.currentState !== CharacterState.IDLE && this.currentState !== CharacterState.JUMPING) {
@@ -391,9 +396,30 @@ export class VoxelCharacter {
 
   /** Switch to the WORKING (mining) animation. Call setMoving(false) or setState(IDLE) to stop. */
   public setWorking(working: boolean) {
+    if (this.isDowned || this.isEscorted) return;
     if (working && this.currentState !== CharacterState.WORKING) {
       this.setState(CharacterState.WORKING);
     } else if (!working && this.currentState === CharacterState.WORKING) {
+      this.setState(CharacterState.IDLE);
+    }
+  }
+
+  public setDowned(downed: boolean) {
+    this.isDowned = downed;
+    if (downed) {
+      this.isEscorted = false;
+      this.setState(CharacterState.DOWNED);
+    } else if (this.currentState === CharacterState.DOWNED) {
+      this.setState(CharacterState.IDLE);
+    }
+  }
+
+  public setEscorted(escorted: boolean) {
+    this.isEscorted = escorted;
+    if (escorted) {
+      this.isDowned = false;
+      this.setState(CharacterState.ESCORTED);
+    } else if (this.currentState === CharacterState.ESCORTED) {
       this.setState(CharacterState.IDLE);
     }
   }
@@ -479,6 +505,7 @@ export class VoxelCharacter {
       this.leftArm.rotation.x = 0;
       this.rightArm.rotation.x = 0;
       this.innerGroup.position.y = 0;
+      this.innerGroup.rotation.z = 0;
     }
   }
 
@@ -549,6 +576,26 @@ export class VoxelCharacter {
         // Body bob on the down-stroke
         const strike = Math.max(0, Math.sin(phase));
         this.innerGroup.position.y = -strike * 0.04;
+        break;
+      }
+
+      case CharacterState.DOWNED: {
+        this.innerGroup.rotation.z = THREE.MathUtils.lerp(this.innerGroup.rotation.z, Math.PI / 2, 0.16);
+        this.innerGroup.position.y = -0.24;
+        this.leftArm.rotation.x = -1.05;
+        this.rightArm.rotation.x = -0.62;
+        this.leftLeg.rotation.x = 0.22;
+        this.rightLeg.rotation.x = -0.16;
+        break;
+      }
+
+      case CharacterState.ESCORTED: {
+        this.innerGroup.rotation.z = THREE.MathUtils.lerp(this.innerGroup.rotation.z, 0.08, 0.14);
+        this.innerGroup.position.y = -0.05 + Math.sin(this.animationTime * 3) * 0.02;
+        this.leftArm.rotation.x = -0.28;
+        this.rightArm.rotation.x = -0.24;
+        this.leftLeg.rotation.x = 0.08;
+        this.rightLeg.rotation.x = -0.08;
         break;
       }
     }

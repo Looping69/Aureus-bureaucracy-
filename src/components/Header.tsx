@@ -1,5 +1,5 @@
 import React from 'react';
-import { DollarSign, AlertTriangle, Megaphone, Database, Briefcase, Wrench } from 'lucide-react';
+import { DollarSign, AlertTriangle, Megaphone, Database, Briefcase, Wrench, HeartPulse } from 'lucide-react';
 import { GameState } from '../types';
 import { Meter } from './Meter';
 import { getActiveWorldEffects } from '../game/dialogue/worldEffects';
@@ -50,6 +50,19 @@ export const Header = ({
           <div className="flex items-center gap-1 font-mono text-sm font-bold" title="Energy">
             <AlertTriangle size={14} className={state.energy < 20 ? "text-red-600 animate-pulse" : isNight ? "text-blue-400" : "text-blue-600"} />
             {Math.floor(state.energy)}%
+          </div>
+          <div className="flex items-center gap-1 font-mono text-sm font-bold" title="Stamina">
+            <HeartPulse
+              size={14}
+              className={
+                state.playerStatus.condition !== 'ACTIVE'
+                  ? 'text-rose-600 animate-pulse'
+                  : state.stamina.current < 25
+                    ? 'text-amber-500 animate-pulse'
+                    : 'text-emerald-500'
+              }
+            />
+            {Math.floor(state.stamina.current)}%
           </div>
           <div className="flex items-center gap-1 font-mono text-sm font-bold" title="Ore">
             <Database size={14} className="text-amber-600" />
