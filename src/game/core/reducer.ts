@@ -281,11 +281,18 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     case 'CLOSE_TUTORIAL':
       return { ...state, tutorialStep: 99 };
 
-    case 'START_JOURNEY':
-      // Acknowledge the button press but keep tutorialStep at 0 — the
-      // auto-entry system in useBuildingDiscovery will advance it when the
-      // player actually reaches the Bureau.
-      return state;
+    case 'START_JOURNEY': {
+      // Navigate the player toward the Bureau so they don't get stuck.
+      // tutorialStep stays at 0 — useBuildingDiscovery will advance it
+      // once the player is close enough.
+      const bureau = state.buildings['licensing_office'];
+      if (!bureau) return state;
+      const bureauPos = getBuildingAccessPosition(bureau);
+      const journeyPath = findPath(state.playerPos, bureauPos, state.buildings);
+      return journeyPath.length > 0
+        ? { ...state, path: journeyPath, targetPos: bureauPos }
+        : state;
+    }
 
     // ── Endings ───────────────────────────────────────────────────────────
 

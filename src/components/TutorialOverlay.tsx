@@ -58,7 +58,7 @@ export const TutorialOverlay: React.FC<TutorialOverlayProps> = ({
               <div className="mt-3 flex gap-4 items-start">
                 <div className="flex-1">
                   <p className="text-xs font-bold leading-tight">
-                    {tutorialStep === 0 && "They won't process anything until you step inside. Head east."}
+                    {tutorialStep === 0 && "You need a mining permit before you can extract anything. The Bureau of Extraction is east — head over there."}
                     {tutorialStep === 1 && 'The Bureau is right there. Go.'}
                     {tutorialStep === 2 && 'Officer Vane controls the permits. Talk to him.'}
                     {tutorialStep === 3 && "Vane authorized Form 17-B. Open the 'Active Filings' list."}
