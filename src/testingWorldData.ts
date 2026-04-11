@@ -10,12 +10,19 @@ import { BuildingGenerator } from './utils/buildingGenerator';
 // ─── colour palette ──────────────────────────────────────────────────────────
 const TRUNK_BROWN  = '#5c3a1e';
 const TRUNK_DARK   = '#3e2712';
+const TRUNK_LIGHT  = '#7a5230'; // lighter bark highlight
+const BARK_DETAIL  = '#4a2f14'; // bark crevice shade
 const LEAF_GREEN   = '#2d8a4e';
 const LEAF_DARK    = '#1e6b38';
 const LEAF_LIGHT   = '#4ebd6e';
+const LEAF_YELLOW  = '#c4b23a'; // seasonal – autumn tint
+const LEAF_ORANGE  = '#d4842a'; // seasonal – autumn highlight
+const LEAF_SPRING  = '#78d661'; // spring new-growth
 const GRASS_GREEN  = '#4a7c3f';
 const GRASS_LIGHT  = '#5fa04f';
+const GRASS_DARK   = '#3a6830'; // shaded grass
 const DIRT_BROWN   = '#7c5c3c';
+const MOSS_GREEN   = '#5a7a3a'; // moss on roots / ground
 const PATH_GRAVEL  = '#b0a898';
 const BEACON_WOOD  = '#a0522d'; // sienna beacon colour
 const BEACON_WHITE = '#fef9c3';
@@ -23,49 +30,163 @@ const BEACON_WHITE = '#fef9c3';
 const LOG_BROWN_A  = '#8B4513'; // saddle brown
 const LOG_BROWN_B  = '#A0522D'; // sienna
 const LOG_DARK     = '#5C3317'; // dark end-grain
+// depot enhancement colours
+const STONE_GRAY   = '#8a8a8a';
+const STONE_DARK   = '#5f5f5f';
+const METAL_GRAY   = '#9e9e9e';
+const LANTERN_GLOW = '#ffdd44';
+const ROOF_BROWN   = '#6b3e26';
+const CRATE_WOOD   = '#a07040';
+const CRATE_DARK   = '#7a5530';
+const SMOKE_LIGHT  = '#d0d0d0';
+const SMOKE_MID    = '#b0b0b0';
 
-// ─── tree resource node (clump of harvestable trees) ─────────────────────────
+// ─── tree resource node (enhanced with varied geometry & seasonal detail) ────
 const genTree = new BuildingGenerator();
-// Ground patch
-genTree.addBox(-4, -4, 0, 4, 4, 0, GRASS_GREEN);
-// Trunk cluster
-genTree.addBox(-1, -1, 0, 0, 0, 4, TRUNK_BROWN);
-genTree.addBox( 1,  1, 0, 2, 2, 3, TRUNK_DARK);
-genTree.addBox(-2,  1, 0, -2, 1, 3, TRUNK_BROWN);
-// Canopy – main tree
-genTree.addBox(-3, -3, 5, 2, 2, 5, LEAF_GREEN);
-genTree.addBox(-2, -2, 6, 1, 1, 6, LEAF_DARK);
-genTree.addBox(-1, -1, 7, 0, 0, 7, LEAF_LIGHT);
-// Canopy – secondary tree
+
+// Ground patch with varied grass & moss
+genTree.addBox(-5, -5, 0, 5, 5, 0, GRASS_GREEN);
+genTree.addBox(-3, -3, 0, -1, -1, 0, GRASS_DARK);   // shaded area
+genTree.addBox( 2,  1, 0,  4,  3, 0, MOSS_GREEN);    // mossy ground patch
+genTree.addBox(-5, -5, 0, -4, -4, 0, DIRT_BROWN);    // exposed dirt
+genTree.addBox( 4,  4, 0,  5,  5, 0, DIRT_BROWN);    // exposed dirt corner
+
+// ── Main trunk (thick, textured bark) ──
+genTree.addBox(-1, -1, 0, 0, 0, 5, TRUNK_BROWN);
+genTree.addBox(-1, -1, 2, -1, -1, 4, BARK_DETAIL);   // bark crevice left
+genTree.addBox( 0,  0, 1,  0,  0, 3, TRUNK_LIGHT);   // bark highlight right
+genTree.addBox(-1,  0, 0, -1,  0, 1, TRUNK_DARK);    // base shadow
+
+// Root flares at base
+genTree.addBox(-2, -1, 0, -2, 0, 1, TRUNK_DARK);     // root extending left
+genTree.addBox( 1, -1, 0,  1, 0, 1, TRUNK_DARK);     // root extending right
+genTree.addBox(-1, -2, 0,  0, -2, 1, TRUNK_BROWN);   // root extending forward
+genTree.addBox(-1,  1, 0,  0,  1, 0, MOSS_GREEN);    // moss on root
+
+// ── Secondary trunk (slightly shorter, offset) ──
+genTree.addBox( 1,  1, 0, 2, 2, 4, TRUNK_DARK);
+genTree.addBox( 2,  1, 1, 2, 1, 3, BARK_DETAIL);     // bark detail
+genTree.addBox( 1,  2, 0, 1,  2, 1, TRUNK_LIGHT);    // highlight
+
+// ── Tertiary trunk (small understory tree) ──
+genTree.addBox(-3,  1, 0, -2, 1, 3, TRUNK_BROWN);
+genTree.addBox(-3,  1, 1, -3, 1, 2, BARK_DETAIL);
+
+// ── Branch stubs (visible between trunk and canopy) ──
+genTree.addBox(-2, -1, 4, -2, -1, 4, TRUNK_BROWN);   // branch left
+genTree.addBox( 1, -1, 4,  1, -1, 4, TRUNK_BROWN);   // branch right-fwd
+genTree.addBox( 0,  1, 5,  0,  1, 5, TRUNK_DARK);    // branch back
+
+// ── Main canopy – multi-layered with seasonal colour variation ──
+// Layer 1: broad base
+genTree.addBox(-4, -4, 5, 3, 3, 5, LEAF_GREEN);
+genTree.addBox(-3, -3, 5, -2, -2, 5, LEAF_DARK);     // shadow pocket
+genTree.addBox( 1,  1, 5,  2,  2, 5, LEAF_SPRING);   // spring new growth
+// Layer 2: middle
+genTree.addBox(-3, -3, 6, 2, 2, 6, LEAF_GREEN);
+genTree.addBox(-2, -1, 6, 1, 1, 6, LEAF_DARK);
+genTree.addBox( 1, -3, 6,  2, -2, 6, LEAF_YELLOW);   // autumn-tinted cluster
+// Layer 3: upper
+genTree.addBox(-2, -2, 7, 1, 1, 7, LEAF_GREEN);
+genTree.addBox(-1, -1, 7, 0, 0, 7, LEAF_LIGHT);      // sun-lit top
+genTree.addBox( 1,  0, 7,  1, 1, 7, LEAF_ORANGE);    // autumn highlight
+// Layer 4: crown tip
+genTree.addBox(-1, -1, 8, 0, 0, 8, LEAF_LIGHT);
+genTree.addBox( 0,  0, 8,  0, 0, 8, LEAF_SPRING);    // bright tip
+
+// ── Secondary canopy (shorter tree) ──
 genTree.addBox(-1, 0, 4, 3, 3, 4, LEAF_GREEN);
 genTree.addBox( 0, 0, 5, 3, 3, 5, LEAF_DARK);
-// Canopy – tertiary tree
-genTree.addBox(-4, -1, 4, -1, 2, 4, LEAF_GREEN);
-genTree.addBox(-3,  0, 5, -1, 2, 5, LEAF_DARK);
+genTree.addBox( 0, 1, 5, 2, 2, 5, LEAF_YELLOW);      // seasonal accent
+genTree.addBox( 1, 1, 6, 2, 2, 6, LEAF_GREEN);       // top tuft
+
+// ── Tertiary canopy (understory) ──
+genTree.addBox(-5, -1, 4, -2, 2, 4, LEAF_GREEN);
+genTree.addBox(-4,  0, 5, -2, 2, 5, LEAF_DARK);
+genTree.addBox(-4,  0, 5, -3, 1, 5, LEAF_SPRING);    // new growth patch
+
+// ── Undergrowth details (small bushes / shrubs at ground level) ──
+genTree.addBox( 3, -3, 1, 4, -2, 1, LEAF_DARK);      // shrub
+genTree.addBox( 3, -3, 2, 3, -2, 2, LEAF_GREEN);     // shrub top
+genTree.addBox(-4,  3, 1, -3, 4, 1, MOSS_GREEN);     // moss clump
+genTree.addBox(-4,  3, 2, -4, 3, 2, LEAF_DARK);      // tiny bush
+
 // Beacon pillar
-genTree.addBox(4, -4, 1, 4, -4, 8, BEACON_WOOD);
-genTree.addBox(4, -4, 9, 4, -4, 9, BEACON_WHITE);
-genTree.addBox(3, -4, 9, 3, -4, 9, BEACON_WOOD);
-genTree.addBox(4, -3, 9, 4, -3, 9, BEACON_WOOD);
+genTree.addBox(5, -5, 1, 5, -5, 8, BEACON_WOOD);
+genTree.addBox(5, -5, 9, 5, -5, 9, BEACON_WHITE);
+genTree.addBox(4, -5, 9, 4, -5, 9, BEACON_WOOD);
+genTree.addBox(5, -4, 9, 5, -4, 9, BEACON_WOOD);
 export const TREE_NODE_VOXELS = genTree.getVoxels();
 
-// ─── log depot (open drop-off frame + gravel pad) ────────────────────────────
+// ─── log depot (enhanced with storage shed, lighting, crates & smoke) ────────
 const genLogDepot = new BuildingGenerator();
-// Gravel floor pad
-genLogDepot.addBox(-5, -4, 0, 5, 4, 0, PATH_GRAVEL);
-// Two rear support posts
-genLogDepot.addBox(-5, 4, 1, -5, 4, 7, TRUNK_BROWN);
-genLogDepot.addBox( 5, 4, 1,  5, 4, 7, TRUNK_BROWN);
-// Top crossbeam between rear posts
-genLogDepot.addBox(-5, 4, 7, 5, 4, 8, TRUNK_DARK);
-// Low side rails (keep logs from rolling off)
-genLogDepot.addBox(-5, -4, 1, -5, 4, 2, TRUNK_DARK);
-genLogDepot.addBox( 5, -4, 1,  5, 4, 2, TRUNK_DARK);
-// Beacon pillar at front-left corner
-genLogDepot.addBox(-5, -4, 3, -5, -4, 10, BEACON_WOOD);
-genLogDepot.addBox(-5, -4, 11, -5, -4, 11, BEACON_WHITE);
-genLogDepot.addBox(-4, -4, 11, -4, -4, 11, BEACON_WOOD);
-genLogDepot.addBox(-5, -3, 11, -5, -3, 11, BEACON_WOOD);
+
+// ── Foundation & ground ──
+genLogDepot.addBox(-6, -5, 0, 6, 5, 0, PATH_GRAVEL);       // gravel floor pad
+genLogDepot.addBox(-7, -5, 0, -6, 5, 0, DIRT_BROWN);       // dirt border left
+genLogDepot.addBox( 6, -5, 0,  7, 5, 0, DIRT_BROWN);       // dirt border right
+genLogDepot.addBox(-6, -6, 0,  6, -5, 0, DIRT_BROWN);      // front dirt strip
+genLogDepot.addBox(-6,  5, 0,  6,  6, 0, GRASS_DARK);      // back grass strip
+
+// ── Stone foundation wall (low wall around three sides) ──
+genLogDepot.addBox(-6, -5, 1, -6, 5, 2, STONE_GRAY);       // left wall base
+genLogDepot.addBox( 6, -5, 1,  6, 5, 2, STONE_GRAY);       // right wall base
+genLogDepot.addBox(-6,  5, 1,  6, 5, 2, STONE_DARK);       // back wall base
+
+// ── Rear support posts (taller, thicker) ──
+genLogDepot.addBox(-6, 5, 1, -5, 5, 8, TRUNK_BROWN);
+genLogDepot.addBox( 5, 5, 1,  6, 5, 8, TRUNK_BROWN);
+genLogDepot.addBox(-6, 5, 3, -6, 5, 3, BARK_DETAIL);       // post texture
+genLogDepot.addBox( 6, 5, 3,  6, 5, 3, BARK_DETAIL);       // post texture
+
+// ── Front support posts ──
+genLogDepot.addBox(-6, -5, 1, -5, -5, 7, TRUNK_BROWN);
+genLogDepot.addBox( 5, -5, 1,  6, -5, 7, TRUNK_BROWN);
+genLogDepot.addBox(-6, -5, 4, -6, -5, 4, BARK_DETAIL);     // post texture
+genLogDepot.addBox( 6, -5, 4,  6, -5, 4, BARK_DETAIL);     // post texture
+
+// ── Top crossbeam & roof structure ──
+genLogDepot.addBox(-6, 5, 8, 6, 5, 8, TRUNK_DARK);         // rear beam
+genLogDepot.addBox(-6, -5, 7, 6, -5, 7, TRUNK_DARK);       // front beam
+genLogDepot.addBox(-6, -5, 8, 6, -3, 8, ROOF_BROWN);       // roof overhang front
+genLogDepot.addBox(-6, -5, 8, 6,  5, 8, ROOF_BROWN);       // main roof
+genLogDepot.addBox(-5, -4, 9, 5,  4, 9, ROOF_BROWN);       // raised roof center
+
+// ── Low side rails (keep logs from rolling off) ──
+genLogDepot.addBox(-6, -5, 1, -6, 5, 3, TRUNK_DARK);
+genLogDepot.addBox( 6, -5, 1,  6, 5, 3, TRUNK_DARK);
+
+// ── Lanterns (warm light on front posts) ──
+genLogDepot.addBox(-5, -5, 6, -5, -5, 6, METAL_GRAY);      // lantern bracket L
+genLogDepot.addBox(-5, -6, 5, -5, -6, 6, LANTERN_GLOW);    // lantern glow L
+genLogDepot.addBox( 5, -5, 6,  5, -5, 6, METAL_GRAY);      // lantern bracket R
+genLogDepot.addBox( 5, -6, 5,  5, -6, 6, LANTERN_GLOW);    // lantern glow R
+
+// ── Back wall lanterns ──
+genLogDepot.addBox(-3, 5, 6, -3, 5, 6, METAL_GRAY);
+genLogDepot.addBox(-3, 6, 5, -3, 6, 6, LANTERN_GLOW);
+genLogDepot.addBox( 3, 5, 6,  3, 5, 6, METAL_GRAY);
+genLogDepot.addBox( 3, 6, 5,  3, 6, 6, LANTERN_GLOW);
+
+// ── Wooden crates (interactive prop feel) ──
+// Left crate stack
+genLogDepot.addBox(-5, 2, 1, -4, 3, 2, CRATE_WOOD);
+genLogDepot.addBox(-5, 2, 1, -5, 3, 2, CRATE_DARK);        // crate shadow side
+genLogDepot.addBox(-5, 3, 3, -4, 3, 3, CRATE_WOOD);        // stacked crate on top
+// Right single crate
+genLogDepot.addBox( 4, 3, 1,  5, 4, 2, CRATE_WOOD);
+genLogDepot.addBox( 4, 3, 1,  4, 4, 2, CRATE_DARK);        // crate shadow side
+
+// ── Smoke / steam voxels (above roof – static visual hint) ──
+genLogDepot.addBox( 0, 2, 10,  0, 2, 10, SMOKE_LIGHT);
+genLogDepot.addBox( 0, 2, 11,  0, 2, 11, SMOKE_MID);
+genLogDepot.addBox( 1, 2, 12,  1, 2, 12, SMOKE_LIGHT);
+
+// ── Beacon pillar at front-left corner ──
+genLogDepot.addBox(-6, -5, 3, -6, -5, 10, BEACON_WOOD);
+genLogDepot.addBox(-6, -5, 11, -6, -5, 11, BEACON_WHITE);
+genLogDepot.addBox(-5, -5, 11, -5, -5, 11, BEACON_WOOD);
+genLogDepot.addBox(-6, -4, 11, -6, -4, 11, BEACON_WOOD);
 export const LOG_DEPOT_VOXELS = genLogDepot.getVoxels();
 
 // ─── log pile stage 1 (small – 1-14 logs deposited) ─────────────────────────
@@ -234,8 +355,8 @@ export const TREE_INITIAL_AMOUNT = 28;
 /** Proximity radius (grid tiles) to trigger gathering */
 export const TESTING_GATHER_RANGE = 5;
 
-/** Gather interval in milliseconds – slow enough to see each log appear on the back */
-export const TESTING_GATHER_INTERVAL_MS = 1200;
+/** Gather interval in milliseconds – longer for realistic pacing */
+export const TESTING_GATHER_INTERVAL_MS = 3000;
 
 /** Wood gained per gather tick */
 export const TESTING_YIELD_PER_TICK = 1;
@@ -246,8 +367,8 @@ export const LOG_DEPOT_ID = 'log_depot';
 /** Maximum number of logs the player can carry at once (visual blocks on back) */
 export const TESTING_CARRY_MAX = 6;
 
-/** Milliseconds between each block unloaded at the depot – slow enough to watch each log fly off */
-export const TESTING_UNLOAD_INTERVAL_MS = 1200;
+/** Milliseconds between each block unloaded at the depot – matches gathering interval for balanced cycles */
+export const TESTING_UNLOAD_INTERVAL_MS = 3000;
 
 /**
  * Log pile stages placed at the depot position.
