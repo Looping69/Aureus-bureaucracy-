@@ -360,7 +360,7 @@ export const INITIAL_PERMITS: Record<string, Permit> = {
     formNumber: '17-B',
     description: 'Preliminary declaration of intent to extract resources from the crust. Required for all mining operations.',
     cost: 50,
-    status: 'AVAILABLE',
+    status: 'LOCKED',
     unlocksFeature: 'prospecting'
   },
   'prospecting-license': {
@@ -669,7 +669,7 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
         {
           text: "I see. Initiative. [Insight]",
           action: (s) => ({
-            tutorialStep: 5, // Advance to 'Use Knowledge' step
+            ...(s.tutorialStep === 6 && { tutorialStep: 7 }),
             npcs: {
               ...s.npcs,
               'licensing': { 
@@ -690,7 +690,7 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
           text: "I heard the Director is looking for 'efficient' officers... [Use Vulnerability]",
           condition: (s) => s.npcs['licensing'].vulnerability.discovered,
           action: (s) => ({
-            tutorialStep: 7, // Complete tutorial
+            ...(s.tutorialStep === 7 && { tutorialStep: 8 }),
             worldEffects: extendWorldEffect(s, 'bureauPull', 10),
             permits: {
               ...s.permits,
@@ -713,7 +713,7 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
           condition: (s) => s.money >= 50,
           action: (s) => ({
             money: s.money - 50,
-            tutorialStep: 7, // Complete tutorial
+            ...(s.tutorialStep === 7 && { tutorialStep: 8 }),
             permits: {
               ...s.permits,
               'extraction-intent': { ...s.permits['extraction-intent'], status: 'APPROVED' }
