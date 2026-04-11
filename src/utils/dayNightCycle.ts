@@ -42,7 +42,7 @@ export interface CelestialPosition {
 // Conversion helpers (game-state hours ↔ ticks)
 // ---------------------------------------------------------------------------
 
-/** Convert a fractional-hour value (0–24) to ticks (0–24 000). */
+/** Convert a fractional-hour value in [0, 24) to ticks (0–24 000). */
 export function hoursToTicks(hours: number): number {
     return (hours / 24) * DAY_NIGHT.TICKS_PER_DAY;
 }
@@ -63,7 +63,7 @@ export function normalizeTimeOfDay(timeOfDay: number): number {
 
 export function isDaytime(timeOfDay: number): boolean {
     const normalized = normalizeTimeOfDay(timeOfDay);
-    return normalized >= DAY_NIGHT.SUNRISE_TICK && normalized <= DAY_NIGHT.SUNSET_TICK;
+    return normalized >= DAY_NIGHT.SUNRISE_TICK && normalized < DAY_NIGHT.SUNSET_TICK;
 }
 
 /**
