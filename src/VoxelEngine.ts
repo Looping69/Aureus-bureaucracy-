@@ -1754,13 +1754,22 @@ export class VoxelEngine {
     const deltaTime = this.lastTime ? (now - this.lastTime) / 1000 : 0.016;
     this.lastTime = now;
 
-    // Snap Y to target surface height immediately so character stays on terrain
-    this.currentPlayerPos.y = this.targetPlayerPos.y;
-
-    // Interpolate only X/Z at constant speed so movement is horizontal
+    // Interpolate X/Z and Y at constant speed so movement is smooth in all axes
     const dx = this.targetPlayerPos.x - this.currentPlayerPos.x;
     const dz = this.targetPlayerPos.z - this.currentPlayerPos.z;
     const distXZ = Math.sqrt(dx * dx + dz * dz);
+
+    // Smoothly interpolate Y (surface height) to avoid snapping on terrain steps
+    const dy = this.targetPlayerPos.y - this.currentPlayerPos.y;
+    const absdy = Math.abs(dy);
+    if (absdy > VoxelEngine.ANALOG_MOVE_CONVERGE_THRESHOLD) {
+      const stepY = VoxelEngine.PLAYER_MOVE_SPEED * deltaTime;
+      this.currentPlayerPos.y = stepY >= absdy
+        ? this.targetPlayerPos.y
+        : this.currentPlayerPos.y + Math.sign(dy) * stepY;
+    } else {
+      this.currentPlayerPos.y = this.targetPlayerPos.y;
+    }
     if (distXZ > VoxelEngine.ANALOG_MOVE_CONVERGE_THRESHOLD) {
       const step = VoxelEngine.PLAYER_MOVE_SPEED * deltaTime;
       if (step >= distXZ) {
