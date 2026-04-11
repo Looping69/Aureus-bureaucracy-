@@ -5,7 +5,15 @@ import { Meter } from './Meter';
 import { getActiveWorldEffects } from '../game/dialogue/worldEffects';
 import { getRunCycleSummary } from '../game/runCycle';
 
-export const Header = ({ state, onOpenUtilities }: { state: GameState; onOpenUtilities: () => void }) => {
+export const Header = ({
+  state,
+  onOpenUtilities,
+  compactFtueHud = false
+}: {
+  state: GameState;
+  onOpenUtilities: () => void;
+  compactFtueHud?: boolean;
+}) => {
   const formatTime = (t: number) => {
     const hours = Math.floor(t);
     const minutes = Math.floor((t % 1) * 60);
@@ -42,14 +50,18 @@ export const Header = ({ state, onOpenUtilities }: { state: GameState; onOpenUti
             <AlertTriangle size={14} className={state.energy < 20 ? "text-red-600 animate-pulse" : isNight ? "text-blue-400" : "text-blue-600"} />
             {Math.floor(state.energy)}%
           </div>
-          <div className="flex items-center gap-1 font-mono text-sm font-bold" title="Incriminating Evidence">
-            <Megaphone size={14} className="text-red-600" />
-            {state.evidence}
-          </div>
           <div className="flex items-center gap-1 font-mono text-sm font-bold" title="Ore">
             <Database size={14} className="text-amber-600" />
             {state.ore}
           </div>
+          {!compactFtueHud && (
+            <>
+              <div className="flex items-center gap-1 font-mono text-sm font-bold" title="Incriminating Evidence">
+                <Megaphone size={14} className="text-red-600" />
+                {state.evidence}
+              </div>
+            </>
+          )}
           <button
             onClick={onOpenUtilities}
             className={`w-9 h-9 rounded-full flex items-center justify-center border transition-colors ${
@@ -63,12 +75,14 @@ export const Header = ({ state, onOpenUtilities }: { state: GameState; onOpenUti
           </button>
         </div>
       </div>
-      <div className="grid grid-cols-3 gap-4">
-        <Meter label="Trust" value={state.meters.trust} color="bg-blue-500" />
-        <Meter label="Influence" value={state.meters.influence} color="bg-purple-500" />
-        <Meter label="Exposure" value={state.meters.exposure} color="bg-red-500" />
-      </div>
-      {activeEffects.length > 0 && (
+      {!compactFtueHud && (
+        <div className="grid grid-cols-3 gap-4">
+          <Meter label="Trust" value={state.meters.trust} color="bg-blue-500" />
+          <Meter label="Influence" value={state.meters.influence} color="bg-purple-500" />
+          <Meter label="Exposure" value={state.meters.exposure} color="bg-red-500" />
+        </div>
+      )}
+      {!compactFtueHud && activeEffects.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {activeEffects.map(effect => (
             <div

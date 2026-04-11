@@ -20,6 +20,7 @@ interface VoxelWorldProps {
   onCountChange: (count: number) => void;
   onHoverPosition?: (pos: WorldHoverInfo | null) => void;
   onSelect?: (target: WorldHoverInfo, tapCount: number) => void;
+  objectiveTarget?: WorldHoverInfo | null;
   showLoadingOverlay?: boolean;
   onReady?: () => void;
   onProgress?: (progress: number, phase: string) => void;
@@ -43,6 +44,7 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
   onCountChange,
   onHoverPosition,
   onSelect,
+  objectiveTarget,
   showLoadingOverlay = true,
   onReady,
   onProgress,
@@ -217,6 +219,12 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
       );
     }
   }, [playerPos, playerSurfaceY, isMoving, targetPos, path]);
+
+  useEffect(() => {
+    if (engineRef.current) {
+      engineRef.current.setObjectiveTarget(objectiveTarget ?? null);
+    }
+  }, [objectiveTarget]);
 
   useEffect(() => {
     if (engineRef.current) {

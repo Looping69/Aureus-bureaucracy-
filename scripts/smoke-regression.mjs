@@ -30,6 +30,19 @@ const continueSavedRun = async (page) => {
   await page.waitForTimeout(800);
 };
 
+const startJourney = async (page) => {
+  await page.waitForTimeout(250);
+  await page.getByRole('button', { name: /Start Journey/i }).waitFor({ state: 'visible', timeout: 30000 });
+  await page.evaluate(() => {
+    const startButton = [...document.querySelectorAll('button')].find((el) =>
+      el.textContent?.includes('Start Journey')
+    );
+    if (!(startButton instanceof HTMLElement)) throw new Error('Start Journey button not found.');
+    startButton.click();
+  });
+  await page.waitForTimeout(600);
+};
+
 const run = async () => {
   let viteServer;
   let browser;
@@ -46,7 +59,12 @@ const run = async () => {
     await viteServer.listen();
 
     browser = await chromium.launch({ headless: true });
-    const context = await browser.newContext();
+    const context = await browser.newContext({
+      viewport: {
+        width: MOBILE_VIEWPORT_WIDTH,
+        height: 932
+      }
+    });
     const page = await context.newPage();
     page.setDefaultTimeout(30000);
 
@@ -59,10 +77,7 @@ const run = async () => {
     assert(outOfBoundsLabelCount === 0, 'Expected world HUD to stop showing the misleading "Out of bounds" label on load.');
 
     await page.getByRole('button', { name: /New Game/i }).click();
-    const startJourneyButton = page.getByRole('button', { name: /Start Journey/i });
-    await startJourneyButton.waitFor({ state: 'visible', timeout: 30000 });
-    await startJourneyButton.click({ force: true });
-    await page.waitForTimeout(500);
+    await startJourney(page);
     const startJourneyStillVisible = await page.getByRole('button', { name: /Start Journey/i }).count();
     assert(startJourneyStillVisible === 0, 'Expected the tutorial CTA to dismiss after starting the journey.');
 

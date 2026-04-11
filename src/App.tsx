@@ -41,6 +41,11 @@ import { usePermitProcessingLoop } from './hooks/game/usePermitProcessingLoop';
 import { useTimeAndCurfewLoop } from './hooks/game/useTimeAndCurfewLoop';
 import { useTutorialProgression } from './hooks/game/useTutorialProgression';
 import { useCityEventLoop } from './hooks/game/useCityEventLoop';
+import {
+  BUREAU_PERMIT_ID,
+  deriveFtuePhaseFromTutorialStep,
+  getLegacyTutorialStepForFtuePhase
+} from './game/ftue';
 import { getUnlockedEnding } from './game/endings';
 import { EMPTY_WORLD_EFFECTS } from './game/dialogue/worldEffects';
 import { applyOperationAction } from './game/runCycle';
@@ -99,7 +104,7 @@ const buildInitialGameState = (): GameState => {
     npcs: cloneSerializable(INITIAL_NPCS),
     knownNpcIds: ['journalist'],
     objectives: [
-      { id: 'start', text: 'Find the Bureau of Extraction (East).', isCompleted: false, type: 'DISCOVER', targetId: 'licensing_office' }
+      { id: 'start', text: 'Get to the Bureau of Extraction. No permit means no mine.', isCompleted: false, type: 'DISCOVER', targetId: 'licensing_office' }
     ],
     mines: cloneSerializable(INITIAL_MINES),
     activeMineId: null,
@@ -122,6 +127,7 @@ const buildInitialGameState = (): GameState => {
     lastCityEventHour: -1,
     unlockedEndings: [],
     activeEndingId: null,
+    ftuePhase: 'intro',
     tutorialStep: 0,
     tutorialMinimized: false,
     camera: {
@@ -336,7 +342,7 @@ export default function App() {
   useTimeAndCurfewLoop({ setState, setNotification, homePos: HOME_POS, enabled: gameStarted });
   usePermitProcessingLoop({ setState, setNotification, enabled: gameStarted });
   useMovementLoop({ setState, setNotification, homePos: HOME_POS, enabled: gameStarted });
-  useTutorialProgression(state, setState, gameStarted);
+  useTutorialProgression(state, setState, setNotification, gameStarted);
   useCityEventLoop({ setState, setNotification, enabled: gameStarted });
 
   const hydrateSavedState = React.useCallback((saved: GameState): GameState => {
@@ -350,6 +356,7 @@ export default function App() {
     return {
       ...baseState,
       ...saved,
+      ftuePhase: saved.ftuePhase ?? deriveFtuePhaseFromTutorialStep(saved.tutorialStep),
       buildings: hydrateBuildings(saved.buildings),
       playerPos: shouldResetWorldSpawn ? HOME_POS : (saved.playerPos ?? baseState.playerPos),
       targetPos: shouldResetWorldSpawn ? null : (saved.targetPos ?? baseState.targetPos),
@@ -361,7 +368,10 @@ export default function App() {
       storyFlags: saved.storyFlags ?? [],
       lastCityEventHour: saved.lastCityEventHour ?? -1,
       unlockedEndings: saved.unlockedEndings ?? [],
-      activeEndingId: saved.activeEndingId ?? null
+      activeEndingId: saved.activeEndingId ?? null,
+      tutorialStep: saved.tutorialStep === 99
+        ? 99
+        : (saved.tutorialStep ?? getLegacyTutorialStepForFtuePhase(saved.ftuePhase ?? deriveFtuePhaseFromTutorialStep(saved.tutorialStep)))
     };
   }, [HOME_POS, hydrateBuildings]);
 
@@ -690,6 +700,15 @@ export default function App() {
     };
   }, [state]);
 
+  const isCompactFtueHud = useMemo(
+    () =>
+      state.tutorialStep !== 99 &&
+      state.ftuePhase !== 'ftue_complete' &&
+      state.activePermitId !== BUREAU_PERMIT_ID &&
+      state.pendingPermitAction === null,
+    [state.activePermitId, state.ftuePhase, state.pendingPermitAction, state.tutorialStep]
+  );
+
   if (!gameStarted) {
     return (
       <StartScreen
@@ -785,7 +804,11 @@ export default function App() {
 
   return (
     <div className="h-[100dvh] flex flex-col max-w-md mx-auto bg-bureau-bg shadow-2xl relative overflow-hidden">
-      <Header state={state} onOpenUtilities={() => setShowUtilityDrawer(true)} />
+      <Header
+        state={state}
+        onOpenUtilities={() => setShowUtilityDrawer(true)}
+        compactFtueHud={isCompactFtueHud}
+      />
 
       <GameSceneRouter
         state={state}
@@ -850,11 +873,16 @@ export default function App() {
       <LightLoadingOverlay visible={showSceneTransitionLoading} />
 
       <TutorialOverlay
+        ftuePhase={state.ftuePhase}
         tutorialStep={state.tutorialStep}
         tutorialMinimized={state.tutorialMinimized}
         onToggleMinimized={() => setState(s => ({ ...s, tutorialMinimized: !s.tutorialMinimized }))}
         onClose={() => setState(s => ({ ...s, tutorialStep: 99 }))}
-        onStartJourney={() => setState(s => ({ ...s, tutorialStep: 1 }))}
+        onStartJourney={() => setState(s => ({
+          ...s,
+          ftuePhase: 'reach_bureau',
+          tutorialStep: getLegacyTutorialStepForFtuePhase('reach_bureau')
+        }))}
       />
 
       <SideNavPanel

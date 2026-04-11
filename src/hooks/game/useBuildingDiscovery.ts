@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import React from 'react';
 import { GameState } from '../../types';
 import { completeObjective, isObjectiveComplete, upsertObjective } from '../../game/objectives';
+import { BUREAU_BUILDING_ID, getLegacyTutorialStepForFtuePhase } from '../../game/ftue';
 
 interface UseBuildingDiscoveryArgs {
   state: GameState;
@@ -18,6 +19,7 @@ export const useBuildingDiscovery = ({ state, setState, setNotification, enabled
       const newKnownNpcIds = [...prev.knownNpcIds];
       let newObjectives = [...prev.objectives];
       let newTutorialStep = prev.tutorialStep;
+      let newFtuePhase = prev.ftuePhase;
 
       const newBuildings = { ...prev.buildings };
       Object.values(newBuildings).forEach(b => {
@@ -30,19 +32,20 @@ export const useBuildingDiscovery = ({ state, setState, setNotification, enabled
               newKnownNpcIds.push(b.npcId);
               setNotification({ title: 'New Contact', msg: `You discovered the location of ${prev.npcs[b.npcId].name}.` });
 
-              if (b.id === 'licensing_office' && prev.tutorialStep === 0) {
-                newTutorialStep = 1;
+              if (b.id === BUREAU_BUILDING_ID && (prev.ftuePhase === 'reach_bureau' || prev.ftuePhase === 'intro')) {
+                newFtuePhase = 'enter_bureau';
+                newTutorialStep = getLegacyTutorialStepForFtuePhase('enter_bureau');
                 if (!isObjectiveComplete(newObjectives, 'start')) {
                   newObjectives = completeObjective(newObjectives, 'start');
                 }
                 newObjectives = upsertObjective(newObjectives, {
                   id: 'enter-bureau',
-                  text: 'Enter the Bureau of Extraction.',
+                  text: 'Get inside the Bureau of Extraction now.',
                   isCompleted: false,
                   type: 'DISCOVER',
-                  targetId: 'licensing_office'
+                  targetId: BUREAU_BUILDING_ID
                 });
-                setNotification({ title: 'Objective Complete', msg: 'You found the Bureau. Now head inside.' });
+                setNotification({ title: 'Bureau Found', msg: 'Good. No wandering now. Get inside the Bureau.' });
               }
             }
           }
@@ -50,7 +53,14 @@ export const useBuildingDiscovery = ({ state, setState, setNotification, enabled
       });
 
       if (!changed) return prev;
-      return { ...prev, buildings: newBuildings, knownNpcIds: newKnownNpcIds, objectives: newObjectives, tutorialStep: newTutorialStep };
+      return {
+        ...prev,
+        buildings: newBuildings,
+        knownNpcIds: newKnownNpcIds,
+        objectives: newObjectives,
+        ftuePhase: newFtuePhase,
+        tutorialStep: newTutorialStep
+      };
     });
   }, [enabled, state.playerPos, state.activeNPCId, state.permits, state.buildings, setNotification, setState]);
 };

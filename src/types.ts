@@ -143,6 +143,15 @@ export interface Objective {
   targetId?: string;
 }
 
+export type FtuePhase =
+  | 'intro'
+  | 'reach_bureau'
+  | 'enter_bureau'
+  | 'talk_vane'
+  | 'open_form_17b'
+  | 'submit_form_17b'
+  | 'ftue_complete';
+
 export interface OfficeItem {
   id: string;
   name: string;
@@ -195,6 +204,7 @@ export interface GameState {
   lastCityEventHour: number;
   unlockedEndings: string[];
   activeEndingId: string | null;
+  ftuePhase: FtuePhase;
   tutorialStep: number;
   tutorialMinimized: boolean;
   camera: {

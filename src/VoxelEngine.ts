@@ -55,6 +55,7 @@ export class VoxelEngine {
   private ghostVoxel: THREE.Mesh;
   private ghostSymmetryVoxel: THREE.Mesh;
   private hoverSelector: THREE.Mesh;
+  private objectiveSelector: THREE.Mesh;
   
   private voxels: SimulationVoxel[] = [];
   private currentVoxelData: VoxelData[] = [];
@@ -269,6 +270,19 @@ export class VoxelEngine {
     this.hoverSelector.visible = false;
     this.scene.add(this.hoverSelector);
 
+    const objectiveSelectorGeometry = new THREE.RingGeometry(0.8, 1.25, 40);
+    const objectiveSelectorMaterial = new THREE.MeshBasicMaterial({
+      color: 0xf59e0b,
+      transparent: true,
+      opacity: 0.75,
+      side: THREE.DoubleSide,
+      depthWrite: false
+    });
+    this.objectiveSelector = new THREE.Mesh(objectiveSelectorGeometry, objectiveSelectorMaterial);
+    this.objectiveSelector.rotation.x = -Math.PI / 2;
+    this.objectiveSelector.visible = false;
+    this.scene.add(this.objectiveSelector);
+
     // Entities (Player, Buildings, etc)
     this.entities = new EntityManager(this.scene);
 
@@ -478,6 +492,16 @@ export class VoxelEngine {
     this.camera.position.copy(this.currentCameraFocus).add(WORLD_CAMERA_OFFSET);
     this.enforceCameraBounds();
     this.controls.update();
+  }
+
+  public setObjectiveTarget(target: WorldHoverInfo | null) {
+    if (!target) {
+      this.objectiveSelector.visible = false;
+      return;
+    }
+
+    this.objectiveSelector.position.set(target.x - WORLD_HALF_SIZE, target.z + 0.06, target.y - WORLD_HALF_SIZE);
+    this.objectiveSelector.visible = true;
   }
 
   private updateCameraFollow(deltaTime: number) {
@@ -1630,6 +1654,14 @@ export class VoxelEngine {
     if (this.targetIndicator.visible) {
       this.targetIndicator.scale.setScalar(1 + Math.sin(Date.now() * 0.01) * 0.1);
       this.targetIndicator.rotation.z += deltaTime;
+    }
+
+    if (this.objectiveSelector.visible) {
+      const pulse = 1 + Math.sin(now * 0.008) * 0.18;
+      this.objectiveSelector.scale.setScalar(pulse);
+      const material = this.objectiveSelector.material as THREE.MeshBasicMaterial;
+      material.opacity = 0.5 + Math.sin(now * 0.008) * 0.2;
+      this.objectiveSelector.rotation.z -= deltaTime * 0.8;
     }
 
     this.draw();

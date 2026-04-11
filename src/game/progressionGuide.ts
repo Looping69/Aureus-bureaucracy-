@@ -1,4 +1,5 @@
 import { GameState, Permit } from '../types';
+import { getFtueCopy, isFtueActive } from './ftue';
 
 export interface ProgressGuidance {
   title: string;
@@ -25,35 +26,20 @@ const withMoneyBlocker = (state: GameState, permit: Permit | undefined, fallback
 };
 
 export const getProgressGuidance = (state: GameState): ProgressGuidance => {
+  if (isFtueActive(state)) {
+    const ftueCopy = getFtueCopy(state.ftuePhase);
+    return {
+      title: ftueCopy.title,
+      detail: ftueCopy.body,
+      tone: 'INFO'
+    };
+  }
+
   const extractionIntent = state.permits['extraction-intent'];
   const prospecting = state.permits['prospecting-license'];
   const miningIron = state.permits['mining-permit-iron'];
   const exportLicense = state.permits['export-license'];
   const ironMine = state.mines.find(m => m.id === 'iron-vein');
-
-  if (state.tutorialStep === 0) {
-    return {
-      title: 'Start Your Journey',
-      detail: 'Use the onboarding panel to begin; then head to the Bureau of Extraction.',
-      tone: 'INFO'
-    };
-  }
-
-  if (state.tutorialStep === 1 && state.currentScene !== 'OFFICE') {
-    return {
-      title: 'Go To The Bureau',
-      detail: 'Enter an office and find Officer Vane to unlock your first permit path.',
-      tone: 'INFO'
-    };
-  }
-
-  if (state.tutorialStep === 2 && state.activeNPCId !== 'licensing') {
-    return {
-      title: 'Talk To Officer Vane',
-      detail: 'Open dialogue with the licensing officer and ask about mining permits.',
-      tone: 'INFO'
-    };
-  }
 
   if (extractionIntent && extractionIntent.status !== 'APPROVED') {
     if (extractionIntent.status === 'PENDING') {
