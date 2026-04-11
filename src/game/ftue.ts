@@ -95,8 +95,8 @@ export const getFtueCopy = (phase: FtuePhase) => {
     case 'enter_bureau':
       return {
         title: 'Inside. Now.',
-        body: 'You found the Bureau. Tap it and get inside before you lose momentum.',
-        hint: 'When you are close enough, entry should happen immediately.'
+        body: 'You found the Bureau. Stay on line. The approach is automatic and entry happens the moment you reach the door.',
+        hint: 'Do not peel off. The funnel is now forcing the final approach.'
       };
     case 'talk_vane':
       return {

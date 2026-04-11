@@ -17,10 +17,7 @@ export const WorldScene = ({
   onMove, 
   onDirectMove,
   onInteract,
-  onEnterHome,
-  onEnterMine,
   onRecenter,
-  onTravel,
   showDebug = false,
   showInitialLoadingOverlay = true,
   onInitialSceneReady,
@@ -30,24 +27,22 @@ export const WorldScene = ({
   onMove: (pos: WorldPosition, options?: { ignoreDrag?: boolean }) => void,
   onDirectMove: (pos: WorldPosition) => void,
   onInteract: (npcId: string, buildingId: string) => void,
-  onEnterHome: () => void,
-  onEnterMine: () => void,
   onRecenter: () => void,
-  onTravel: (mineId: string) => void,
   showDebug?: boolean,
   showInitialLoadingOverlay?: boolean,
   onInitialSceneReady?: () => void,
   onInitialLoadingProgress?: (progress: number, phase: string) => void
 }) => {
-  const [showTravelMenu, setShowTravelMenu] = React.useState(false);
   const [hoverInfo, setHoverInfo] = React.useState<WorldHoverInfo | null>(null);
   const [pendingSelection, setPendingSelection] = React.useState<WorldHoverInfo | null>(null);
   const [buildingPromptId, setBuildingPromptId] = React.useState<string | null>(null);
   const [recenterTrigger, setRecenterTrigger] = React.useState(0);
   const [analogInput, setAnalogInput] = React.useState<AnalogStickVector>({ x: 0, y: 0, magnitude: 0, active: false });
+  const [showBureauDiscoveryFeedback, setShowBureauDiscoveryFeedback] = React.useState(false);
   const pendingHoverPosRef = React.useRef<WorldHoverInfo | null>(null);
   const hoverRafRef = React.useRef<number | null>(null);
   const bureauAutoEnterRef = React.useRef(false);
+  const lastFtuePhaseRef = React.useRef(state.ftuePhase);
   const isNight = state.time >= 20 || state.time < 6;
   const ftueCopy = React.useMemo(() => getFtueCopy(state.ftuePhase), [state.ftuePhase]);
   const isBureauFunnelActive = isFtueWorldFunnelPhase(state.ftuePhase);
@@ -151,6 +146,10 @@ export const WorldScene = ({
     setPendingSelection(target);
 
     if (target.kind === 'GROUND') {
+      if (state.ftuePhase === 'enter_bureau' && bureauAccessPos) {
+        onMove(bureauAccessPos, { ignoreDrag: true });
+        return;
+      }
       confirmGroundMove(target);
       return;
     }
@@ -269,6 +268,31 @@ export const WorldScene = ({
       }
     };
   }, []);
+
+  React.useEffect(() => {
+    const justDiscoveredBureau = lastFtuePhaseRef.current !== 'enter_bureau' && state.ftuePhase === 'enter_bureau';
+    lastFtuePhaseRef.current = state.ftuePhase;
+
+    if (!justDiscoveredBureau) return;
+
+    setShowBureauDiscoveryFeedback(true);
+    const timer = window.setTimeout(() => setShowBureauDiscoveryFeedback(false), 1800);
+    return () => window.clearTimeout(timer);
+  }, [state.ftuePhase]);
+
+  React.useEffect(() => {
+    if (
+      state.currentScene !== 'WORLD' ||
+      state.ftuePhase !== 'enter_bureau' ||
+      !bureauAccessPos ||
+      isPlayerNearBureau ||
+      state.targetPos
+    ) {
+      return;
+    }
+
+    onMove(bureauAccessPos, { ignoreDrag: true });
+  }, [bureauAccessPos, isPlayerNearBureau, onMove, state.currentScene, state.ftuePhase, state.targetPos]);
 
   React.useEffect(() => {
     if (!isBureauFunnelActive || !bureauBuilding || !isPlayerNearBureau) {
@@ -430,6 +454,23 @@ export const WorldScene = ({
 
       {isBureauFunnelActive && bureauBuilding && (
         <>
+          <AnimatePresence>
+            {showBureauDiscoveryFeedback && state.ftuePhase === 'enter_bureau' && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.92, y: 12 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 1.04, y: -8 }}
+                className="absolute inset-x-6 top-24 z-40 rounded-3xl border-2 border-amber-300 bg-amber-50/95 px-5 py-4 shadow-2xl backdrop-blur-sm"
+              >
+                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-amber-700">Objective Located</p>
+                <p className="mt-1 text-lg font-black text-amber-950">Bureau of Extraction</p>
+                <p className="mt-1 text-xs font-semibold text-amber-900/85">
+                  Target acquired. Hold your line. We are pulling you straight to the door.
+                </p>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           <div className="absolute left-4 right-16 top-4 z-30 rounded-2xl border border-amber-300 bg-amber-100/95 px-4 py-3 shadow-xl backdrop-blur-sm">
             <p className="text-[10px] font-black uppercase tracking-[0.22em] text-amber-800">Primary Target</p>
             <div className="mt-1 flex items-center justify-between gap-3">
@@ -445,9 +486,11 @@ export const WorldScene = ({
 
           <div className="absolute left-4 right-4 bottom-28 z-30 flex justify-center pointer-events-none">
             <div className="rounded-full bg-black/80 px-4 py-2 text-center text-[10px] font-black uppercase tracking-[0.22em] text-white shadow-xl">
-              {hoverInfo?.id === BUREAU_BUILDING_ID
-                ? (isPlayerNearBureau ? 'Release Hesitation. Entry is happening.' : 'Tap the Bureau. We will move you in.')
-                : 'Crosshair matters now. Put it on the Bureau and tap.'}
+              {state.ftuePhase === 'enter_bureau'
+                ? (isPlayerNearBureau ? 'No pause. Entry is happening.' : 'Stay on the Bureau line. Drift gets overridden.')
+                : hoverInfo?.id === BUREAU_BUILDING_ID
+                  ? 'Tap the Bureau. We will move you in.'
+                  : 'Crosshair matters now. Put it on the Bureau and tap.'}
             </div>
           </div>
         </>
@@ -467,13 +510,7 @@ export const WorldScene = ({
         </button>
       </div>
       
-      {/* Travel Menu Overlay (simplified for now) */}
       <AnimatePresence>
-        {showTravelMenu && (
-          <div className="absolute inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-6" onClick={() => setShowTravelMenu(false)}>
-            <div className="bg-white p-4 rounded-2xl">Travel Menu</div>
-          </div>
-        )}
         {promptedBuilding && !isBureauFunnelActive && (
           <motion.div
             key="building-entry-prompt"

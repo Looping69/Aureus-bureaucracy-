@@ -35,9 +35,7 @@ interface GameSceneRouterProps {
   onMine: (tileId: string) => void;
   onMineAction: (action: string) => void;
   onOpenMine: () => void;
-  onRest: () => void;
   onRecenter: () => void;
-  onTravel: (mineId: string) => void;
   onSelectMine: (mineId: string) => void;
   onCloseMinePicker: () => void;
   onWorldInteract: (npcId: string, buildingId: string) => void;
@@ -91,9 +89,7 @@ export const GameSceneRouter: React.FC<GameSceneRouterProps> = ({
   onMine,
   onMineAction,
   onOpenMine,
-  onRest,
   onRecenter,
-  onTravel,
   onSelectMine,
   onCloseMinePicker,
   onWorldInteract,
@@ -188,10 +184,7 @@ export const GameSceneRouter: React.FC<GameSceneRouterProps> = ({
                 onMove={onMove}
                 onDirectMove={onDirectMove}
                 onInteract={onWorldInteract}
-                onEnterHome={onRest}
-                onEnterMine={onOpenMine}
                 onRecenter={onRecenter}
-                onTravel={onTravel}
                 showDebug={showDebug}
                 showInitialLoadingOverlay={showInitialWorldLoadingOverlay}
                 onInitialSceneReady={onInitialWorldReady}

@@ -823,9 +823,7 @@ export default function App() {
         onMine={handleMine}
         onMineAction={handleMineAction}
         onOpenMine={openMineScene}
-        onRest={handleRest}
         onRecenter={handleRecenter}
-        onTravel={handleTravel}
         onSelectMine={handleTravel}
         onCloseMinePicker={() => setShowMinePicker(false)}
         onWorldInteract={handleWorldInteract}

@@ -44,6 +44,23 @@ export const useTutorialProgression = (
 
       if (
         prev.ftuePhase === 'talk_vane' &&
+        prev.currentScene === 'OFFICE' &&
+        prev.activeBuildingId === BUREAU_BUILDING_ID &&
+        prev.activeNPCId === null &&
+        prev.activePermitId === null
+      ) {
+        setNotification({ title: 'Officer Vane', msg: 'No dead air. Vane is up. Start the permit conversation.' });
+        return {
+          ...prev,
+          activeNPCId: BUREAU_NPC_ID,
+          ftuePhase: nextFtuePhase,
+          tutorialStep: nextTutorialStep,
+          objectives: nextObjectives
+        };
+      }
+
+      if (
+        prev.ftuePhase === 'talk_vane' &&
         prev.activeNPCId === BUREAU_NPC_ID &&
         !isObjectiveComplete(nextObjectives, 'talk-vane')
       ) {
