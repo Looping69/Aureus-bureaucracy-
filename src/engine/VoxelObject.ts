@@ -1,6 +1,7 @@
 import * as THREE from 'three';
-import { VoxelData } from '../types';
+import { SubVoxelGrid, VoxelData } from '../types';
 import { GreedyMesher } from '../utils/GreedyMesher';
+import { expandVoxelToSubVoxels, migrateVoxelToSubGrid, SUB_CELL_SIZE, SUB_DIVISIONS } from '../utils/subVoxel';
 
 export class VoxelObject {
   public group: THREE.Group;
@@ -34,6 +35,57 @@ export class VoxelObject {
         metalness: 0.1
     });
     
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    mesh.frustumCulled = true;
+    this.group.add(mesh);
+  }
+
+  /**
+   * Create mesh geometry from voxels expanded through their sub-voxel grids.
+   * Each parent voxel is split into up to 4 half-size children placed at the
+   * correct offsets.  If no SubVoxelGrid map is supplied the parent colour
+   * fills all 4 quadrants (migration default).
+   */
+  protected createFromSubVoxels(
+    voxels: VoxelData[],
+    subGrids?: Map<string, SubVoxelGrid>,
+  ) {
+    if (voxels.length === 0) return;
+
+    // Expand every parent voxel into sub-voxel children
+    const expanded: VoxelData[] = [];
+    for (const v of voxels) {
+      const key = `${v.x},${v.y},${v.z}`;
+      const grid = subGrids?.get(key) ?? migrateVoxelToSubGrid(v);
+      const children = expandVoxelToSubVoxels(v, grid);
+      expanded.push(...children);
+    }
+
+    if (expanded.length === 0) return;
+
+    const meshData = GreedyMesher.mesh(expanded);
+    const geometry = new THREE.BufferGeometry();
+
+    // Each child voxel lives in the double-resolution grid; scale back so the
+    // combined mesh occupies the same world footprint as before.
+    const scale = this.subVoxelSize * SUB_CELL_SIZE;
+    const scaledPositions = meshData.positions.map(p => p * scale);
+
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(scaledPositions, 3));
+    geometry.setAttribute('normal', new THREE.Float32BufferAttribute(meshData.normals, 3));
+    geometry.setAttribute('color', new THREE.Float32BufferAttribute(meshData.colors, 3));
+    geometry.setIndex(meshData.indices);
+    geometry.computeBoundingSphere();
+    geometry.computeBoundingBox();
+
+    const material = new THREE.MeshStandardMaterial({
+      vertexColors: true,
+      roughness: 0.8,
+      metalness: 0.1,
+    });
+
     const mesh = new THREE.Mesh(geometry, material);
     mesh.castShadow = true;
     mesh.receiveShadow = true;

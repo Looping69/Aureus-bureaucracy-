@@ -25,6 +25,7 @@ import { CONFIG, COLORS, WORLD_HALF_SIZE, WORLD_SIZE } from '../utils/voxelConst
 import { EntityManager } from './EntityManager';
 import { GreedyMesher } from '../utils/GreedyMesher';
 import { BuildingFootprint } from '../utils/worldNavigation';
+import { resolveSubCell } from '../utils/subVoxel';
 import {
   DAY_NIGHT,
   hoursToTicks,
@@ -958,13 +959,26 @@ export class VoxelEngine {
     const normal = intersect.face?.normal?.clone() ?? new THREE.Vector3(0, 1, 0);
     pos.copy(intersect.point).add(normal.multiplyScalar(0.5));
 
+    const worldX = pos.x + WORLD_HALF_SIZE;
+    const worldY = pos.z + WORLD_HALF_SIZE;
+
+    const snappedX = Math.round(worldX);
+    const snappedY = Math.round(worldY);
+
+    // Fractional position within the parent voxel cell (0..1)
+    const fracX = worldX - Math.floor(worldX);
+    const fracY = worldY - Math.floor(worldY);
+    const sub = resolveSubCell(fracX, fracY);
+
     return {
-      x: Math.round(pos.x + WORLD_HALF_SIZE),
-      y: Math.round(pos.z + WORLD_HALF_SIZE),
+      x: snappedX,
+      y: snappedY,
       z: Math.round(pos.y),
       renderX: Math.round(pos.x),
       renderZ: Math.round(pos.z),
       renderY: Math.round(pos.y),
+      subX: sub.subX,
+      subY: sub.subY,
     };
   }
 
@@ -988,6 +1002,8 @@ export class VoxelEngine {
               kind: 'NPC',
               id,
               label: id,
+              subX: snapped.subX,
+              subY: snapped.subY,
             };
           }
         }
@@ -1015,6 +1031,8 @@ export class VoxelEngine {
             kind: 'BUILDING',
             id,
             label: entity.name,
+            subX: snapped.subX,
+            subY: snapped.subY,
           };
         }
       }
@@ -1056,6 +1074,8 @@ export class VoxelEngine {
         z: snapped.z,
         kind: 'GROUND' as const,
         label: 'Ground',
+        subX: snapped.subX,
+        subY: snapped.subY,
       };
     }
 

@@ -52,3 +52,18 @@ export {
   getZoneStats,
 } from './zoning';
 export type { ZoneType, ZoneGrid } from './zoning';
+export {
+  SUB_DIVISIONS,
+  SUB_CELL_COUNT,
+  SUB_CELL_SIZE,
+  subCellIndex,
+  subCellCoords,
+  createFilledSubGrid,
+  createEmptySubGrid,
+  migrateVoxelToSubGrid,
+  getSubVoxel,
+  setSubVoxel,
+  subCellWorldOffset,
+  resolveSubCell,
+  expandVoxelToSubVoxels,
+} from './subVoxel';

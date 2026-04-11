@@ -221,7 +221,9 @@ export const WorldScene = ({
         pending.y === prev.y &&
         pending.z === prev.z &&
         pending.kind === prev.kind &&
-        pending.id === prev.id
+        pending.id === prev.id &&
+        pending.subX === prev.subX &&
+        pending.subY === prev.subY
       ) return prev;
       return pending;
     });

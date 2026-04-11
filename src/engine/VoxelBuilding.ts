@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { VoxelData } from '../types';
+import { SubVoxelGrid, VoxelData } from '../types';
 import { VoxelObject } from './VoxelObject';
 
 export class VoxelBuilding extends VoxelObject {
@@ -11,7 +11,10 @@ export class VoxelBuilding extends VoxelObject {
     name: string,
     voxels: { id: number, x: number, y: number, z: number, c: string }[],
     variation?: number | string,
-    applyVariation: boolean = true
+    applyVariation: boolean = true,
+    /** Optional per-voxel sub-grids. When supplied the building renders at
+     *  2× resolution using the sub-voxel system. */
+    subGrids?: Map<string, SubVoxelGrid>,
   ) {
     // Convert building voxels to VoxelData format
     // Generator uses Z for height, but engine uses Y
@@ -28,6 +31,15 @@ export class VoxelBuilding extends VoxelObject {
 
     // Buildings use standard 1x1x1 voxels, not sub-voxels
     super(convertedVoxels, 1.0);
+
+    // If sub-grids were provided, add a second mesh with the sub-voxel detail.
+    // This renders the finer 2×2 children on top of (or instead of) the base
+    // mesh.  For now we layer it additively; call sites that want pure
+    // sub-voxel rendering can clear the base mesh first.
+    if (subGrids && subGrids.size > 0) {
+      this.createFromSubVoxels(convertedVoxels, subGrids);
+    }
+
     this.id = id;
     this.name = name;
   }

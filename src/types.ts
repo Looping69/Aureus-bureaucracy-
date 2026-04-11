@@ -189,6 +189,10 @@ export interface WorldHoverInfo {
   kind: 'GROUND' | 'BUILDING' | 'NPC';
   id?: string;
   label?: string;
+  /** Sub-cell column within the hovered parent voxel (0 or 1). */
+  subX?: 0 | 1;
+  /** Sub-cell row within the hovered parent voxel (0 or 1). */
+  subY?: 0 | 1;
 }
 
 export interface Building {
@@ -316,6 +320,46 @@ export interface VoxelData {
   y: number;
   z: number;
   color: number;
+}
+
+// ── Sub-Voxel System ────────────────────────────────────────────────────────
+// Each parent voxel cell can hold a 2×2 grid of smaller child blocks.
+// subX and subY are each 0 or 1, addressing one of the 4 quadrants.
+
+/** A single child block inside a parent voxel's 2×2 sub-grid. */
+export interface SubVoxel {
+  /** Sub-cell column within the parent voxel (0 or 1). */
+  subX: 0 | 1;
+  /** Sub-cell row within the parent voxel (0 or 1). */
+  subY: 0 | 1;
+  /** Packed 0xRRGGBB colour for this child block. */
+  color: number;
+}
+
+/**
+ * 2×2 sub-grid attached to a parent voxel.
+ *
+ * `cells` is a fixed-length array of exactly 4 entries (or null for empty
+ * sub-cells), indexed as `[subY * 2 + subX]`:
+ *   index 0 → (0,0)  index 1 → (1,0)
+ *   index 2 → (0,1)  index 3 → (1,1)
+ */
+export interface SubVoxelGrid {
+  cells: (SubVoxel | null)[];
+}
+
+/** Address that uniquely identifies one child block in the world. */
+export interface SubVoxelAddress {
+  /** Parent voxel world-grid X. */
+  x: number;
+  /** Parent voxel world-grid Y. */
+  y: number;
+  /** Parent voxel height. */
+  z: number;
+  /** Sub-cell column (0 or 1). */
+  subX: 0 | 1;
+  /** Sub-cell row (0 or 1). */
+  subY: 0 | 1;
 }
 
 export interface SimulationVoxel {
