@@ -354,7 +354,7 @@ export interface SubVoxelAddress {
   x: number;
   /** Parent voxel world-grid Y. */
   y: number;
-  /** Parent voxel height. */
+  /** Parent voxel height (rendering Y axis). */
   z: number;
   /** Sub-cell column (0 or 1). */
   subX: 0 | 1;

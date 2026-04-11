@@ -29,7 +29,8 @@ export class VoxelBuilding extends VoxelObject {
         convertedVoxels = VoxelBuilding.applyVariation(convertedVoxels, variation);
     }
 
-    // Buildings use standard 1x1x1 voxels, not sub-voxels
+    // Buildings default to standard 1x1x1 voxels; when sub-grids are
+    // provided the constructor adds a second mesh at 2× resolution.
     super(convertedVoxels, 1.0);
 
     // If sub-grids were provided, add a second mesh with the sub-voxel detail.
