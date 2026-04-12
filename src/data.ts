@@ -1,6 +1,7 @@
 import { NPC, Permit, Tile, Building, Mine, DialogueNode, OfficeItem, WorldPosition } from './types';
 import { extendWorldEffect } from './game/dialogue/worldEffects';
 import { addStoryFlag, addStoryFlags, hasStoryFlag } from './game/dialogue/storyFlags';
+import { approvePermit } from './game/permitProgression';
 import { PLAYER_HOUSE_VOXELS } from './voxelData';
 import {
   ASSET_BUILDING_A_VOXELS,
@@ -577,41 +578,43 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
         {
           text: "I heard the Director is looking for 'efficient' officers... [Use Vulnerability]",
           condition: (s) => s.npcs['licensing'].vulnerability.discovered,
-          action: (s) => ({
-            tutorialStep: 7, // Complete tutorial
-            worldEffects: extendWorldEffect(s, 'bureauPull', 10),
-            permits: {
-              ...s.permits,
-              'extraction-intent': { ...s.permits['extraction-intent'], status: 'APPROVED' }
-            },
-            npcs: {
-              ...s.npcs,
-              'licensing': { ...s.npcs['licensing'], trustLevel: s.npcs['licensing'].trustLevel + 20 }
-            },
-            meters: {
-              ...s.meters,
-              influence: s.meters.influence + 5,
-              trust: s.meters.trust + 10
-            }
-          }),
+          action: (s) => {
+            const approval = approvePermit('extraction-intent', s.permits, s.mines);
+            return {
+              tutorialStep: 7, // Complete tutorial
+              worldEffects: extendWorldEffect(s, 'bureauPull', 10),
+              permits: approval.permits,
+              mines: approval.mines,
+              npcs: {
+                ...s.npcs,
+                'licensing': { ...s.npcs['licensing'], trustLevel: s.npcs['licensing'].trustLevel + 20 }
+              },
+              meters: {
+                ...s.meters,
+                influence: s.meters.influence + 5,
+                trust: s.meters.trust + 10
+              }
+            };
+          },
           nextNodeId: 'tutorial_success'
         },
         {
           text: "Maybe I can offer a 'processing fee'? ($50)",
           condition: (s) => s.money >= 50,
-          action: (s) => ({
-            money: s.money - 50,
-            tutorialStep: 7, // Complete tutorial
-            permits: {
-              ...s.permits,
-              'extraction-intent': { ...s.permits['extraction-intent'], status: 'APPROVED' }
-            },
-            meters: {
-              ...s.meters,
-              exposure: s.meters.exposure + 5,
-              trust: Math.max(0, s.meters.trust - 5)
-            }
-          }),
+          action: (s) => {
+            const approval = approvePermit('extraction-intent', s.permits, s.mines);
+            return {
+              money: s.money - 50,
+              tutorialStep: 7, // Complete tutorial
+              permits: approval.permits,
+              mines: approval.mines,
+              meters: {
+                ...s.meters,
+                exposure: s.meters.exposure + 5,
+                trust: Math.max(0, s.meters.trust - 5)
+              }
+            };
+          },
           nextNodeId: 'tutorial_success'
         }
       ]

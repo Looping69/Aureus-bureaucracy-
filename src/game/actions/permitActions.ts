@@ -1,5 +1,5 @@
 import { GameState } from '../../types';
-import { applyPermitApproval } from '../permitProgression';
+import { approvePermit } from '../permitProgression';
 import { GameNotification } from './mineActions';
 
 export const applyPermitOverlayAction = (
@@ -139,12 +139,12 @@ export const applyMiniGameCompletion = (
   const notifications: GameNotification[] = [];
 
   if (approveImmediately) {
-    const progression = applyPermitApproval(prev.activePermitId, newPermits, newMines);
+    const progression = approvePermit(prev.activePermitId, newPermits, newMines);
     Object.assign(newPermits, progression.permits);
     newMines = progression.mines;
-    if (progression.notifications.length > 0) {
-      notifications.push({ title: 'New Location Discovered', msg: progression.notifications[0] });
-    }
+    notifications.push(
+      ...progression.notifications.map((msg) => ({ title: 'New Location Discovered', msg }))
+    );
   }
 
   notifications.push({
@@ -174,4 +174,3 @@ export const applyMiniGameCompletion = (
     notifications
   };
 };
-

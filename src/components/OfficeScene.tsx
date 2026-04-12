@@ -6,7 +6,7 @@ import { PoliticalPositionPanel } from './PoliticalPositionPanel';
 import { ProgressGuide } from './ProgressGuide';
 import { RunCyclePanel } from './RunCyclePanel';
 import { OperationActionId } from '../game/runCycle';
-import { shouldHighlightForm17B, shouldHighlightVane, shouldLockBureauDirectory } from '../game/ftue';
+import { deriveOfficeViewModel } from '../game/officeViewModel';
 
 export const OfficeScene = ({ 
   state, 
@@ -31,37 +31,36 @@ export const OfficeScene = ({
   onBackToDirectory: () => void,
   onOperationAction: (actionId: OperationActionId) => void
 }) => {
-  const highlightVane = shouldHighlightVane(state);
-  const highlightForm17B = shouldHighlightForm17B(state);
-  const lockDirectory = shouldLockBureauDirectory(state) && state.activeBuildingId === 'licensing_office';
-  const showMetaPanels = state.ftuePhase === 'ftue_complete' || state.tutorialStep === 99;
+  const view = React.useMemo(() => deriveOfficeViewModel(state), [state]);
+  const renderMetaPanels = () => (
+    <>
+      <ProgressGuide state={state} />
+      {view.showMetaPanels && <RunCyclePanel state={state} onOperationAction={onOperationAction} />}
+      {view.showMetaPanels && <PoliticalPositionPanel state={state} />}
+    </>
+  );
 
-  // If we are in a specific building, show that building's view
-  if (state.activeBuildingId) {
-    const building = state.buildings[state.activeBuildingId];
+  if (view.mode === 'EXPLORATION') {
+    return (
+      <OfficeExploration 
+        state={state} 
+        onFoundItem={onFoundItem} 
+        onTakePhoto={onTakePhoto}
+        onComplete={onExplorationComplete} 
+      />
+    );
+  }
+
+  if (view.mode === 'BUILDING') {
+    const building = view.building;
     if (!building) return null;
-    
-    // If exploration is active, show exploration view
-    if (state.explorationActive) {
-      return (
-        <OfficeExploration 
-          state={state} 
-          onFoundItem={onFoundItem} 
-          onTakePhoto={onTakePhoto}
-          onComplete={onExplorationComplete} 
-        />
-      );
-    }
 
-    // Otherwise show Building Dashboard (NPCs, Actions)
       return (
         <div className="flex-1 overflow-auto p-4 flex flex-col gap-6 bg-slate-50">
-          <ProgressGuide state={state} />
-          {showMetaPanels && <RunCyclePanel state={state} onOperationAction={onOperationAction} />}
-          {showMetaPanels && <PoliticalPositionPanel state={state} />}
+          {renderMetaPanels()}
 
         <div className="flex items-center justify-between mb-2">
-          {lockDirectory ? (
+          {view.lockDirectory ? (
             <div className="text-xs font-bold uppercase tracking-widest text-blue-700 flex items-center gap-1">
               Hold The Line
             </div>
@@ -84,10 +83,10 @@ export const OfficeScene = ({
             <button 
               onClick={() => onSelectNPC(building.npcId)}
               className={`w-full flex items-center gap-3 p-3 bg-white border rounded-xl shadow-sm hover:shadow-md transition-all text-left group relative overflow-hidden
-                ${highlightVane && building.npcId === 'licensing' ? 'border-blue-500 ring-4 ring-blue-500/20 z-10' : 'border-black/5'}
+                ${view.highlightVane && building.npcId === 'licensing' ? 'border-blue-500 ring-4 ring-blue-500/20 z-10' : 'border-black/5'}
               `}
             >
-              {highlightVane && building.npcId === 'licensing' && (
+              {view.highlightVane && building.npcId === 'licensing' && (
                 <div className="absolute right-4 top-1/2 -translate-y-1/2 text-blue-600 animate-bounce font-black text-xs uppercase tracking-widest">
                   Vane. Now.
                 </div>
@@ -110,7 +109,7 @@ export const OfficeScene = ({
         </section>
 
         {/* Suggest Inspection */}
-        {building.explorationItems && building.explorationItems.length > 0 && (
+        {view.canInspectBuilding && (
           <section>
             <h2 className="text-[10px] uppercase tracking-[0.2em] font-black mb-3 opacity-40">Actions</h2>
             <button
@@ -126,21 +125,21 @@ export const OfficeScene = ({
         )}
 
         {/* Only show filings if in Licensing Office */}
-        {state.activeBuildingId === 'licensing_office' && (
+        {building.id === 'licensing_office' && (
           <section>
             <h2 className="text-[10px] uppercase tracking-[0.2em] font-black mb-3 opacity-40">Active Filings</h2>
             <div className="grid grid-cols-1 gap-2">
-              {Object.values(state.permits).filter(p => p.status !== 'LOCKED').map(permit => (
+              {view.buildingPermits.map(permit => (
                 <button 
                   key={permit.id}
                   onClick={() => onSelectPermit(permit.id)}
                   title={`Open ${permit.formNumber}. Fee: $${permit.status === 'REJECTED' ? 100 : permit.cost}.`}
                   className={`flex items-center gap-3 p-3 border rounded-xl shadow-sm hover:shadow-md transition-all text-left relative overflow-hidden
                     ${permit.status === 'APPROVED' ? 'bg-emerald-50 border-emerald-100' : 'bg-white border-black/5'}
-                    ${highlightForm17B && permit.id === 'extraction-intent' ? 'border-blue-500 ring-4 ring-blue-500/20 z-10' : ''}
+                    ${view.highlightForm17B && permit.id === 'extraction-intent' ? 'border-blue-500 ring-4 ring-blue-500/20 z-10' : ''}
                   `}
                 >
-                  {highlightForm17B && permit.id === 'extraction-intent' && (
+                  {view.highlightForm17B && permit.id === 'extraction-intent' && (
                     <div className="absolute right-12 top-1/2 -translate-y-1/2 text-blue-600 animate-bounce font-black text-xs uppercase tracking-widest">
                       Open 17-B
                     </div>
@@ -170,22 +169,14 @@ export const OfficeScene = ({
     );
   }
 
-  // Directory View (Default when no active building)
-  const discoveredBuildings = Object.values(state.buildings).filter(b => 
-    b.isDiscovered && 
-    (b.npcId !== 'none' || (b.explorationItems && b.explorationItems.length > 0) || b.type === 'MINE_ENTRANCE' || b.type === 'HOME' || b.id === 'central_park')
-  );
-
   return (
     <div className="flex-1 overflow-auto p-4 flex flex-col gap-6 bg-slate-100">
-      <ProgressGuide state={state} />
-      {showMetaPanels && <RunCyclePanel state={state} onOperationAction={onOperationAction} />}
-      {showMetaPanels && <PoliticalPositionPanel state={state} />}
+      {renderMetaPanels()}
 
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-black italic font-serif">Directory</h2>
         <div className="text-[10px] font-mono uppercase opacity-40">
-          {discoveredBuildings.length} Locations Found
+          {view.discoveredBuildings.length} Locations Found
         </div>
       </div>
 
@@ -196,9 +187,7 @@ export const OfficeScene = ({
             <Stamp size={14} className="text-emerald-600" /> Active Permits
           </h3>
           <div className="space-y-2">
-            {Object.values(state.permits)
-              .filter(p => p.status !== 'LOCKED' && p.status !== 'REJECTED')
-              .map(permit => (
+            {view.activePermits.map(permit => (
                 <button
                   key={permit.id}
                   onClick={() => onSelectPermit(permit.id)}
@@ -223,7 +212,7 @@ export const OfficeScene = ({
                   </div>
                 </button>
               ))}
-              {Object.values(state.permits).filter(p => p.status !== 'LOCKED' && p.status !== 'REJECTED').length === 0 && (
+              {view.activePermits.length === 0 && (
                 <div className="text-center py-4 text-[10px] text-slate-400 italic">
                   No active permits. Visit the Licensing Office.
                 </div>
@@ -231,7 +220,7 @@ export const OfficeScene = ({
           </div>
         </div>
 
-        {discoveredBuildings.map(building => (
+        {view.discoveredBuildings.map(building => (
           <div 
             key={building.id}
             className="bg-white p-4 rounded-2xl shadow-sm border border-black/5 flex flex-col gap-3"
@@ -270,7 +259,7 @@ export const OfficeScene = ({
           </div>
         ))}
 
-        {discoveredBuildings.length === 0 && (
+        {view.discoveredBuildings.length === 0 && (
           <div className="p-8 text-center opacity-40">
             <p className="text-xs italic">Explore the world to find locations.</p>
           </div>

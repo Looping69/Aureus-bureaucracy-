@@ -1,9 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { 
-  ShieldAlert,
-  X
-} from 'lucide-react';
 import { GameState, WorldPosition, RelationshipFeedback, Building } from './types';
 import { INITIAL_NPCS, INITIAL_PERMITS, INITIAL_MINES, BUILDINGS } from './data';
 
@@ -23,6 +19,7 @@ import { EndingOverlay } from './components/EndingOverlay';
 import { MarketOverlay } from './components/MarketOverlay';
 import { UtilityDrawer } from './components/UtilityDrawer';
 import { SideNavPanel } from './components/SideNavPanel';
+import { NotificationOverlay } from './components/NotificationOverlay';
 import { getBuildingAccessPosition } from './utils/buildingAccess';
 import { findPath } from './utils/pathfinding';
 import { buildWorldSurfaceMap, getWorldSurfaceTile } from './utils/worldSurface';
@@ -49,9 +46,32 @@ import {
 import { getUnlockedEnding } from './game/endings';
 import { EMPTY_WORLD_EFFECTS } from './game/dialogue/worldEffects';
 import { applyOperationAction } from './game/runCycle';
+import {
+  applyPlannerBuildings,
+  closeOfficeExploration,
+  enterMineWorldScene,
+  enterOfficeBuilding,
+  enterOfficeDirectory,
+  enterOfficeNpc,
+  openOfficeExploration,
+  returnOfficeToDirectory,
+  returnToWorldScene,
+} from './game/sceneTransitions';
+import {
+  addOreToInventory,
+  closeEnding,
+  closeMiniGame,
+  closeNpc,
+  closePermit,
+  dismissTutorial,
+  openPlannerScene,
+  selectNpc,
+  selectPermit,
+  startTutorialJourney,
+  toggleTutorialMinimized,
+} from './game/uiTransitions';
 // --- Main App ---
 
-const NOTIFICATION_AUTO_DISMISS_MS = 2800;
 const STARTUP_OVERLAY_HIDE_MS = 180;
 
 type StartupLoadingState = {
@@ -59,6 +79,11 @@ type StartupLoadingState = {
   progress: number;
   phase: string;
   awaitingWorldBoot: boolean;
+};
+
+type NotificationMessage = {
+  title: string;
+  msg: string;
 };
 
 const buildHydratedBuildings = (savedBuildings?: GameState['buildings']): GameState['buildings'] => {
@@ -129,25 +154,22 @@ const buildInitialGameState = (): GameState => {
     activeEndingId: null,
     ftuePhase: 'intro',
     tutorialStep: 0,
-    tutorialMinimized: false,
-    camera: {
-      x: 0,
-      y: 0,
-      zoom: 1
-    }
+    tutorialMinimized: false
   };
 };
 
 export default function App() {
   const HOME_POS = getBuildingAccessPosition(BUILDINGS.player_home);
   const hydrateBuildings = React.useCallback(buildHydratedBuildings, []);
+  const plannerEnabled = import.meta.env.DEV;
 
   const [state, setState] = useState<GameState>(() => buildInitialGameState());
   const [gameStarted, setGameStarted] = useState(false);
   const [hasSave, setHasSave] = useState(false);
   const [savePreview, setSavePreview] = useState<GameState | null>(null);
 
-  const [notification, setNotification] = useState<{title: string, msg: string} | null>(null);
+  const [notification, setNotification] = useState<NotificationMessage | null>(null);
+  const [notificationQueue, setNotificationQueue] = useState<NotificationMessage[]>([]);
   const [showMinePicker, setShowMinePicker] = useState(false);
   const [showMarket, setShowMarket] = useState(false);
   const [actionLog, setActionLog] = useState<ActionLogEntry[]>([]);
@@ -174,10 +196,46 @@ export default function App() {
   const previousSceneRef = useRef<GameState['currentScene'] | null>(null);
   const startupDismissTimerRef = useRef<number | null>(null);
   const cachedSurfaceMapRef = useRef<{ buildings: Record<string, Building>; map: ReturnType<typeof buildWorldSurfaceMap> } | null>(null);
-  const pushNotification = (n: { title: string; msg: string } | null) => {
-    if (!n) return;
-    setNotification(n);
-  };
+  const pushNotification = React.useCallback((next: NotificationMessage | null) => {
+    if (!next) return;
+    setNotification((current) => {
+      if (!current) return next;
+      setNotificationQueue((queued) => [...queued, next]);
+      return current;
+    });
+  }, []);
+
+  const pushNotifications = React.useCallback((items: NotificationMessage[]) => {
+    items.forEach((item) => pushNotification(item));
+  }, [pushNotification]);
+
+  const queueNotification: React.Dispatch<React.SetStateAction<NotificationMessage | null>> = React.useCallback((next) => {
+    if (typeof next === 'function') {
+      setNotification((current) => {
+        const resolved = next(current);
+        if (resolved) {
+          setNotificationQueue((queued) => [...queued, resolved]);
+        }
+        return current;
+      });
+      return;
+    }
+
+    pushNotification(next);
+  }, [pushNotification]);
+
+  const dismissNotification = React.useCallback(() => {
+    setNotificationQueue((queued) => {
+      if (queued.length === 0) {
+        setNotification(null);
+        return queued;
+      }
+
+      const [next, ...rest] = queued;
+      setNotification(next);
+      return rest;
+    });
+  }, []);
 
   const clearStartupDismissTimer = React.useCallback(() => {
     if (startupDismissTimerRef.current !== null) {
@@ -296,19 +354,6 @@ export default function App() {
   }, [notification]);
 
   useEffect(() => {
-    if (!notification) return;
-    const timeout = window.setTimeout(() => {
-      setNotification(current => {
-        if (!current) return null;
-        if (current.title !== notification.title || current.msg !== notification.msg) return current;
-        return null;
-      });
-    }, NOTIFICATION_AUTO_DISMISS_MS);
-
-    return () => window.clearTimeout(timeout);
-  }, [notification]);
-
-  useEffect(() => {
     setStateUpdateCount(c => c + 1);
     if (!pendingActionRef.current) return;
     const elapsed = performance.now() - pendingActionRef.current.startedAt;
@@ -327,8 +372,8 @@ export default function App() {
       unlockedEndings: [...prev.unlockedEndings, unlocked.id],
       activeEndingId: unlocked.id
     }));
-    setNotification({ title: 'Ending Unlocked', msg: unlocked.title });
-  }, [state]);
+    pushNotification({ title: 'Ending Unlocked', msg: unlocked.title });
+  }, [pushNotification, state]);
 
   const beginTrackedAction = (name: string) => {
     pendingActionRef.current = {
@@ -337,13 +382,13 @@ export default function App() {
     };
   };
 
-  useBuildingDiscovery({ state, setState, setNotification, enabled: gameStarted });
+  useBuildingDiscovery({ state, setState, setNotification: queueNotification, enabled: gameStarted });
   useFeedbackCleanup(setState, gameStarted);
-  useTimeAndCurfewLoop({ setState, setNotification, homePos: HOME_POS, enabled: gameStarted });
-  usePermitProcessingLoop({ setState, setNotification, enabled: gameStarted });
-  useMovementLoop({ setState, setNotification, homePos: HOME_POS, enabled: gameStarted });
-  useTutorialProgression(state, setState, setNotification, gameStarted);
-  useCityEventLoop({ setState, setNotification, enabled: gameStarted });
+  useTimeAndCurfewLoop({ setState, setNotification: queueNotification, homePos: HOME_POS, enabled: gameStarted });
+  usePermitProcessingLoop({ setState, setNotification: queueNotification, enabled: gameStarted });
+  useMovementLoop({ setState, setNotification: queueNotification, homePos: HOME_POS, enabled: gameStarted });
+  useTutorialProgression(state, setState, queueNotification, gameStarted);
+  useCityEventLoop({ setState, setNotification: queueNotification, enabled: gameStarted });
 
   const hydrateSavedState = React.useCallback((saved: GameState): GameState => {
     const baseState = buildInitialGameState();
@@ -356,6 +401,7 @@ export default function App() {
     return {
       ...baseState,
       ...saved,
+      currentScene: saved.currentScene === 'CITY_PLANNER' && !plannerEnabled ? 'WORLD' : saved.currentScene,
       ftuePhase: saved.ftuePhase ?? deriveFtuePhaseFromTutorialStep(saved.tutorialStep),
       buildings: hydrateBuildings(saved.buildings),
       playerPos: shouldResetWorldSpawn ? HOME_POS : (saved.playerPos ?? baseState.playerPos),
@@ -381,6 +427,7 @@ export default function App() {
     setState(buildInitialGameState());
     setHasCompletedInitialWorldBoot(false);
     setNotification(null);
+    setNotificationQueue([]);
     setActionLog([]);
     setShowActionLog(false);
     setShowDebugPanel(false);
@@ -400,7 +447,7 @@ export default function App() {
     try {
       saved = loadSavedGameState();
     } catch {
-      setNotification({ title: 'Load Failed', msg: 'Save data is corrupted. Starting fresh.' });
+      pushNotification({ title: 'Load Failed', msg: 'Save data is corrupted. Starting fresh.' });
       return;
     }
     if (!saved) return;
@@ -411,8 +458,8 @@ export default function App() {
     setSavePreview(saved);
     setHasSave(true);
     setGameStarted(true);
-    setNotification({ title: 'Save Loaded', msg: 'Resumed your previous session.' });
-  }, [beginStartupLoading, hydrateSavedState]);
+    pushNotification({ title: 'Save Loaded', msg: 'Resumed your previous session.' });
+  }, [beginStartupLoading, hydrateSavedState, pushNotification]);
 
   const handleInitialSceneMounted = React.useCallback((scene: GameState['currentScene']) => {
     if (!startupLoading.visible) return;
@@ -532,9 +579,9 @@ export default function App() {
       };
       const daily = applyDailyEconomyTick(restedState);
       if (daily.notification) {
-        setNotification(daily.notification);
+        pushNotification(daily.notification);
       } else {
-        setNotification({ title: 'Rested', msg: "A good night's sleep. You feel ready for more paperwork." });
+        pushNotification({ title: 'Rested', msg: "A good night's sleep. You feel ready for more paperwork." });
       }
       return daily.nextState;
     });
@@ -544,7 +591,7 @@ export default function App() {
     beginTrackedAction(`mine_tile:${tileId}`);
     setState(prev => {
       const { nextState, notifications } = applyMineTileInteraction(prev, tileId);
-      pushNotification(notifications[0] ?? null);
+      pushNotifications(notifications);
       return nextState;
     });
   };
@@ -553,7 +600,7 @@ export default function App() {
     beginTrackedAction(`mine_action:${action}`);
     setState(prev => {
       const { nextState, notifications } = applyMineSceneAction(prev, action);
-      pushNotification(notifications[0] ?? null);
+      pushNotifications(notifications);
       return nextState;
     });
   };
@@ -563,7 +610,7 @@ export default function App() {
     if (!mine) return;
 
     if (!mine.discovered) {
-      setNotification({ title: "Unknown Location", msg: "You haven't discovered this location yet." });
+      pushNotification({ title: "Unknown Location", msg: "You haven't discovered this location yet." });
       return;
     }
 
@@ -571,7 +618,7 @@ export default function App() {
     setState(prev => {
       const energyCost = mine.travelTime * 5;
       if (prev.energy <= energyCost) {
-        setNotification({ title: "Too Exhausted", msg: `Traveling to ${mine.name} requires more than ${energyCost} energy.` });
+        pushNotification({ title: "Too Exhausted", msg: `Traveling to ${mine.name} requires more than ${energyCost} energy.` });
         return prev;
       }
       if (prev.energy - energyCost <= 0) {
@@ -580,10 +627,10 @@ export default function App() {
           energy: prev.energy - energyCost,
           time: (prev.time + mine.travelTime) % 24
         });
-        setNotification(collapsed.notification);
+        pushNotification(collapsed.notification);
         return collapsed.nextState;
       }
-      setNotification({ title: "Travel Complete", msg: `You arrived at ${mine.name} after ${mine.travelTime} hours.` });
+      pushNotification({ title: "Travel Complete", msg: `You arrived at ${mine.name} after ${mine.travelTime} hours.` });
       return {
         ...prev,
         currentScene: 'MINE' as const,
@@ -607,7 +654,7 @@ export default function App() {
     }
 
     if (discoveredMines.length === 0) {
-      setNotification({ title: "No Mine Available", msg: "Discover a mine entrance first." });
+      pushNotification({ title: "No Mine Available", msg: "Discover a mine entrance first." });
       return;
     }
 
@@ -638,7 +685,7 @@ export default function App() {
     beginTrackedAction(`permit:${id}:${action}`);
     setState(prev => {
       const { nextState, notifications } = applyPermitOverlayAction(prev, id, action);
-      pushNotification(notifications[0] ?? null);
+      pushNotifications(notifications);
       return nextState;
     });
   };
@@ -647,7 +694,7 @@ export default function App() {
     beginTrackedAction('mini_game_complete');
     setState(prev => {
       const { nextState, notifications } = applyMiniGameCompletion(prev, results);
-      pushNotification(notifications[0] ?? null);
+      pushNotifications(notifications);
       return nextState;
     });
   };
@@ -656,16 +703,16 @@ export default function App() {
     beginTrackedAction(`operation:${actionId}`);
     setState((prev) => {
       const result = applyOperationAction(prev, actionId);
-      setNotification(result.notification);
+      pushNotification(result.notification);
       return result.nextState;
     });
-  }, []);
+  }, [pushNotification]);
 
   const handleTakePhoto = (itemId: string) => {
     beginTrackedAction(`take_photo:${itemId}`);
     setState(prev => {
       const { nextState, notifications } = applyTakePhoto(prev, itemId);
-      pushNotification(notifications[0] ?? null);
+      pushNotifications(notifications);
       return nextState;
     });
   };
@@ -674,7 +721,7 @@ export default function App() {
     beginTrackedAction(`found_item:${itemId}`);
     setState(prev => {
       const { nextState, notifications } = applyFoundItem(prev, itemId);
-      pushNotification(notifications[0] ?? null);
+      pushNotifications(notifications);
       return nextState;
     });
   };
@@ -721,56 +768,28 @@ export default function App() {
   }
 
   const handleTravelTo = (buildingId: string) => {
-    const building = state.buildings[buildingId];
-    if (!building) return;
-    const accessPos = getBuildingAccessPosition(building);
-
-    setState(prev => ({
-      ...prev,
-      activeBuildingId: buildingId,
-      currentScene: 'OFFICE',
-      playerPos: accessPos,
-      // Ensure exploration is active if it has items and hasn't been fully explored?
-      // Or just default to exploration view
-      explorationActive: building.explorationItems && building.explorationItems.length > 0
-    }));
+    setState(prev => enterOfficeBuilding(prev, buildingId));
   };
 
   const handleOpenWorldScene = () => {
     beginTrackedAction('open_world');
-    setState(s => ({
-      ...s,
-      currentScene: 'WORLD',
-      playerPos: s.activeBuildingId && s.buildings[s.activeBuildingId]
-        ? getBuildingAccessPosition(s.buildings[s.activeBuildingId])
-        : s.playerPos
-    }));
+    setState(returnToWorldScene);
   };
 
   const handleOpenMineWorld = () => {
     const mineEntrance = state.buildings.mine_entrance;
     if (!mineEntrance) {
-      setNotification({ title: 'Unavailable', msg: 'No mine entrance found.' });
+      pushNotification({ title: 'Unavailable', msg: 'No mine entrance found.' });
       return;
     }
     beginTrackedAction('enter_mine_world:mine_entrance');
-    setState(s => ({
-      ...s,
-      activeBuildingId: 'mine_entrance',
-      currentScene: 'MINE_WORLD' as const
-    }));
+    setState(s => enterMineWorldScene(s, 'mine_entrance'));
   };
 
   const handleWorldInteract = (npcId: string, bId: string) => {
     if (npcId !== 'none') {
       beginTrackedAction(`world_interact_npc:${npcId}`);
-      setState(s => ({
-        ...s,
-        activeNPCId: npcId,
-        activeBuildingId: null,
-        explorationActive: false,
-        currentScene: 'OFFICE'
-      }));
+      setState(s => enterOfficeNpc(s, npcId));
       return;
     }
 
@@ -780,26 +799,12 @@ export default function App() {
     // Mine entrance → open the 3-D mine world scene
     if (building.type === 'MINE_ENTRANCE') {
       beginTrackedAction(`enter_mine_world:${bId}`);
-      setState(s => ({
-        ...s,
-        activeBuildingId: bId,
-        currentScene: 'MINE_WORLD' as const
-      }));
+      setState(s => enterMineWorldScene(s, bId));
       return;
     }
 
-    const interactableTypes = ['OFFICE', 'HOME', 'PUB', 'HOTLINE'];
-    if (!interactableTypes.includes(building.type)) return;
-
-    const hasExploration = !!building.explorationItems && building.explorationItems.length > 0;
     beginTrackedAction(`world_interact_building:${bId}`);
-    setState(s => ({
-      ...s,
-      activeNPCId: null,
-      activeBuildingId: bId,
-      explorationActive: hasExploration,
-      currentScene: 'OFFICE'
-    }));
+    setState(s => enterOfficeBuilding(s, bId));
   };
 
   return (
@@ -814,6 +819,7 @@ export default function App() {
         state={state}
         showMinePicker={showMinePicker}
         showDebug={showDebugPanel}
+        plannerEnabled={plannerEnabled}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
@@ -825,37 +831,35 @@ export default function App() {
         onOpenMine={openMineScene}
         onRest={handleRest}
         onRecenter={handleRecenter}
-        onTravel={handleTravel}
         onSelectMine={handleTravel}
         onCloseMinePicker={() => setShowMinePicker(false)}
         onWorldInteract={handleWorldInteract}
-        onOpenPlanner={() => setState(s => ({ ...s, currentScene: 'CITY_PLANNER' }))}
-        onUpdateBuildings={(newBuildings) => setState(s => ({ ...s, buildings: newBuildings, currentScene: 'WORLD' }))}
-        onClosePlanner={() => setState(s => ({ ...s, currentScene: 'WORLD' }))}
-        onReturnMineToWorld={() => setState(s => ({ ...s, currentScene: 'WORLD' }))}
+        onUpdateBuildings={(newBuildings) => setState(s => applyPlannerBuildings(s, newBuildings))}
+        onClosePlanner={() => setState(returnToWorldScene)}
+        onReturnMineToWorld={() => setState(returnToWorldScene)}
         onCollectMineResource={(amount) => {
           beginTrackedAction('mine_world_collect');
-          setState(s => ({ ...s, ore: s.ore + amount }));
+          setState(s => addOreToInventory(s, amount));
         }}
-        onSelectNPC={(id) => setState(s => ({ ...s, activeNPCId: id }))}
+        onSelectNPC={(id) => setState(s => selectNpc(s, id))}
         onSelectPermit={(id) => {
           beginTrackedAction(`select_permit:${id}`);
-          setState(s => ({ ...s, activePermitId: id }));
+          setState(s => selectPermit(s, id));
         }}
         onFoundItem={handleFoundItem}
         onTakePhoto={handleTakePhoto}
         onExplorationComplete={() => {
           beginTrackedAction('exploration_complete');
-          setState(s => ({ ...s, explorationActive: false }));
+          setState(closeOfficeExploration);
         }}
         onStartExploration={() => {
           beginTrackedAction('exploration_start');
-          setState(s => ({ ...s, explorationActive: true }));
+          setState(openOfficeExploration);
         }}
         onTravelTo={handleTravelTo}
         onBackToDirectory={() => {
           beginTrackedAction('back_to_directory');
-          setState(s => ({ ...s, activeBuildingId: null }));
+          setState(returnOfficeToDirectory);
         }}
         onOperationAction={handleOperationAction}
         suppressInitialWorldFallback={!hasCompletedInitialWorldBoot}
@@ -876,13 +880,9 @@ export default function App() {
         ftuePhase={state.ftuePhase}
         tutorialStep={state.tutorialStep}
         tutorialMinimized={state.tutorialMinimized}
-        onToggleMinimized={() => setState(s => ({ ...s, tutorialMinimized: !s.tutorialMinimized }))}
-        onClose={() => setState(s => ({ ...s, tutorialStep: 99 }))}
-        onStartJourney={() => setState(s => ({
-          ...s,
-          ftuePhase: 'reach_bureau',
-          tutorialStep: getLegacyTutorialStepForFtuePhase('reach_bureau')
-        }))}
+        onToggleMinimized={() => setState(toggleTutorialMinimized)}
+        onClose={() => setState(dismissTutorial)}
+        onStartJourney={() => setState(s => startTutorialJourney(s, 'reach_bureau'))}
       />
 
       <SideNavPanel
@@ -894,7 +894,7 @@ export default function App() {
         onOpenWorld={handleOpenWorldScene}
         onOpenOffice={() => {
           beginTrackedAction('open_office');
-          setState(s => ({ ...s, currentScene: 'OFFICE' }));
+          setState(enterOfficeDirectory);
         }}
         onExport={() => {
           setShowMarket(true);
@@ -932,9 +932,10 @@ export default function App() {
           setShowUtilityDrawer(false);
         }}
         onOpenPlanner={() => {
-          setState(s => ({ ...s, currentScene: 'CITY_PLANNER' }));
+          setState(openPlannerScene);
           setShowUtilityDrawer(false);
         }}
+        showPlanner={plannerEnabled}
       />
 
       {/* Overlays */}
@@ -944,7 +945,7 @@ export default function App() {
             key="dialogue-overlay"
             npc={activeNPC} 
             state={state}
-            onClose={() => setState(s => ({ ...s, activeNPCId: null }))} 
+            onClose={() => setState(closeNpc)} 
             onAction={handleDialogueAction}
             triggerFeedback={triggerFeedback}
           />
@@ -954,7 +955,7 @@ export default function App() {
             key="permit-overlay"
             permit={activePermit} 
             onAction={handlePermitAction}
-            onClose={() => setState(s => ({ ...s, activePermitId: null }))} 
+            onClose={() => setState(closePermit)} 
             tutorialStep={state.tutorialStep}
           />
         )}
@@ -962,13 +963,13 @@ export default function App() {
           <FormMiniGame 
             key="form-minigame"
             onComplete={handleMiniGameComplete}
-            onCancel={() => setState(s => ({ ...s, activeMiniGame: null }))}
+            onCancel={() => setState(closeMiniGame)}
           />
         )}
         {state.activeEndingId && (
           <EndingOverlay
             endingId={state.activeEndingId}
-            onClose={() => setState(s => ({ ...s, activeEndingId: null }))}
+            onClose={() => setState(closeEnding)}
           />
         )}
         {showMarket && (
@@ -986,7 +987,7 @@ export default function App() {
               setState(s => {
                 const exported = applyOreExport(s, s.ore, strategy);
                 if (exported.notification) {
-                  setNotification(exported.notification);
+                  pushNotification(exported.notification);
                 }
                 return exported.nextState;
               });
@@ -994,23 +995,9 @@ export default function App() {
             }}
           />
         )}
-        {notification && (
-          <motion.div 
-            key="notification-overlay"
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="fixed top-4 left-4 right-4 z-[100] bg-black text-white p-4 rounded-xl shadow-2xl flex gap-3 items-start"
-          >
-            <ShieldAlert className="text-amber-400 shrink-0" size={20} />
-            <div className="flex-1">
-              <h4 className="font-bold text-sm">{notification.title}</h4>
-              <p className="text-xs opacity-80">{notification.msg}</p>
-            </div>
-            <button onClick={() => setNotification(null)}><X size={16}/></button>
-          </motion.div>
-        )}
       </AnimatePresence>
+
+      <NotificationOverlay notification={notification} onClose={dismissNotification} />
 
       {/* Background Ambience */}
       <div className="fixed inset-0 -z-10 opacity-5 pointer-events-none">

@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import React from 'react';
 import { GameState, Permit } from '../../types';
 import { REJECTION_REASONS } from '../../data';
-import { applyPermitApproval } from '../../game/permitProgression';
+import { approvePermit } from '../../game/permitProgression';
 import { isWorldEffectActive } from '../../game/dialogue/worldEffects';
 import { hasStoryFlag } from '../../game/dialogue/storyFlags';
 
@@ -53,12 +53,12 @@ export const usePermitProcessingLoop = ({ setState, setNotification, enabled = t
             changed = true;
 
             if (approved) {
-              const progression = applyPermitApproval(p.id, newPermits, newMines);
+              const progression = approvePermit(p.id, newPermits, newMines);
               Object.assign(newPermits, progression.permits);
               newMines = progression.mines;
-              if (progression.notifications.length > 0) {
-                setNotification({ title: 'New Location Discovered', msg: progression.notifications[0] });
-              }
+              progression.notifications.forEach((msg) => {
+                setNotification({ title: 'New Location Discovered', msg });
+              });
             }
           }
         });

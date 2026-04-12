@@ -52,3 +52,44 @@ export const applyPermitApproval = (
   return { permits: nextPermits, mines: nextMines, notifications };
 };
 
+export const approvePermit = (
+  permitId: string,
+  permits: Record<string, Permit>,
+  mines: Mine[],
+): { permits: Record<string, Permit>; mines: Mine[]; notifications: string[] } => {
+  const permit = permits[permitId];
+  if (!permit || permit.status === 'APPROVED') {
+    return { permits, mines, notifications: [] };
+  }
+
+  const nextPermits = {
+    ...permits,
+    [permitId]: {
+      ...permit,
+      status: 'APPROVED' as const,
+      rejectionReason: undefined,
+    },
+  };
+
+  return applyPermitApproval(permitId, nextPermits, mines);
+};
+
+export const approvePendingPermits = (
+  permits: Record<string, Permit>,
+  mines: Mine[],
+): { permits: Record<string, Permit>; mines: Mine[]; notifications: string[] } => {
+  let nextPermits = permits;
+  let nextMines = mines;
+  const notifications: string[] = [];
+
+  Object.values(permits)
+    .filter((permit) => permit.status === 'PENDING')
+    .forEach((permit) => {
+      const result = approvePermit(permit.id, nextPermits, nextMines);
+      nextPermits = result.permits;
+      nextMines = result.mines;
+      notifications.push(...result.notifications);
+    });
+
+  return { permits: nextPermits, mines: nextMines, notifications };
+};

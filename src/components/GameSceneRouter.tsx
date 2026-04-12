@@ -18,14 +18,17 @@ const MineWorldScene = React.lazy(() =>
 const OfficeScene = React.lazy(() =>
   import('./OfficeScene').then((module) => ({ default: module.OfficeScene }))
 );
-const CityPlanner = React.lazy(() =>
-  import('./CityPlanner').then((module) => ({ default: module.CityPlanner }))
-);
+const CityPlanner = import.meta.env.DEV
+  ? React.lazy(() =>
+      import('./CityPlanner').then((module) => ({ default: module.CityPlanner }))
+    )
+  : null;
 
 interface GameSceneRouterProps {
   state: GameState;
   showMinePicker: boolean;
   showDebug?: boolean;
+  plannerEnabled?: boolean;
   onPointerDown: (e: React.PointerEvent) => void;
   onPointerMove: (e: React.PointerEvent) => void;
   onPointerUp: (e: React.PointerEvent) => void;
@@ -37,11 +40,9 @@ interface GameSceneRouterProps {
   onOpenMine: () => void;
   onRest: () => void;
   onRecenter: () => void;
-  onTravel: (mineId: string) => void;
   onSelectMine: (mineId: string) => void;
   onCloseMinePicker: () => void;
   onWorldInteract: (npcId: string, buildingId: string) => void;
-  onOpenPlanner: () => void;
   onUpdateBuildings: (newBuildings: GameState['buildings']) => void;
   onClosePlanner: () => void;
   onReturnMineToWorld: () => void;
@@ -82,6 +83,7 @@ export const GameSceneRouter: React.FC<GameSceneRouterProps> = ({
   state,
   showMinePicker,
   showDebug,
+  plannerEnabled = false,
   onPointerDown,
   onPointerMove,
   onPointerUp,
@@ -93,11 +95,9 @@ export const GameSceneRouter: React.FC<GameSceneRouterProps> = ({
   onOpenMine,
   onRest,
   onRecenter,
-  onTravel,
   onSelectMine,
   onCloseMinePicker,
   onWorldInteract,
-  onOpenPlanner,
   onUpdateBuildings,
   onClosePlanner,
   onReturnMineToWorld,
@@ -188,10 +188,7 @@ export const GameSceneRouter: React.FC<GameSceneRouterProps> = ({
                 onMove={onMove}
                 onDirectMove={onDirectMove}
                 onInteract={onWorldInteract}
-                onEnterHome={onRest}
-                onEnterMine={onOpenMine}
                 onRecenter={onRecenter}
-                onTravel={onTravel}
                 showDebug={showDebug}
                 showInitialLoadingOverlay={showInitialWorldLoadingOverlay}
                 onInitialSceneReady={onInitialWorldReady}
@@ -199,7 +196,7 @@ export const GameSceneRouter: React.FC<GameSceneRouterProps> = ({
               />
             </React.Suspense>
           </motion.div>
-        ) : state.currentScene === 'CITY_PLANNER' ? (
+        ) : plannerEnabled && CityPlanner && state.currentScene === 'CITY_PLANNER' ? (
           <motion.div
             key="planner"
             initial={{ opacity: 0 }}

@@ -7,7 +7,8 @@ interface UtilityDrawerProps {
   onClose: () => void;
   onOpenActionLog: () => void;
   onOpenDebug: () => void;
-  onOpenPlanner: () => void;
+  onOpenPlanner?: () => void;
+  showPlanner?: boolean;
 }
 
 export const UtilityDrawer: React.FC<UtilityDrawerProps> = ({
@@ -15,7 +16,8 @@ export const UtilityDrawer: React.FC<UtilityDrawerProps> = ({
   onClose,
   onOpenActionLog,
   onOpenDebug,
-  onOpenPlanner
+  onOpenPlanner,
+  showPlanner = false
 }) => {
   return (
     <AnimatePresence>
@@ -75,16 +77,18 @@ export const UtilityDrawer: React.FC<UtilityDrawerProps> = ({
                 </div>
               </button>
 
-              <button
-                onClick={onOpenPlanner}
-                className="flex items-center gap-3 rounded-2xl bg-white/5 hover:bg-white/10 px-4 py-3 text-left"
-              >
-                <Map size={16} className="text-amber-300" />
-                <div>
-                  <div className="text-sm font-black uppercase tracking-wider">City Builder</div>
-                  <div className="text-[11px] opacity-65">Open the city planner without floating world buttons.</div>
-                </div>
-              </button>
+              {showPlanner && onOpenPlanner && (
+                <button
+                  onClick={onOpenPlanner}
+                  className="flex items-center gap-3 rounded-2xl bg-white/5 hover:bg-white/10 px-4 py-3 text-left"
+                >
+                  <Map size={16} className="text-amber-300" />
+                  <div>
+                    <div className="text-sm font-black uppercase tracking-wider">City Builder</div>
+                    <div className="text-[11px] opacity-65">Dev-only world editing. Not part of the live game.</div>
+                  </div>
+                </button>
+              )}
             </div>
           </motion.div>
         </>

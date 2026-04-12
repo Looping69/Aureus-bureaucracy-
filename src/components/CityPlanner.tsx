@@ -73,6 +73,8 @@ const BUILDING_TEMPLATES: Partial<Building>[] = [
 
 const WORLD_SCALE = 10;
 const GRID_SIZE = WORLD_SIZE / WORLD_SCALE;
+const CUSTOM_BUILDING_PREFIX = 'custom_';
+const PROTECTED_BUILDING_IDS = new Set(['player_home', 'mine_entrance', 'licensing_office']);
 
 const GridPlane = ({ onHover, onClick, onLeave, onRightClick, isPainting, setIsPainting, isErasing, setIsErasing, hasTemplate }: any) => {
   return (
@@ -132,6 +134,10 @@ export const CityPlanner: React.FC<CityPlannerProps> = ({ state, onUpdateBuildin
   const [hoverPos, setHoverPos] = useState<{x: number, y: number} | null>(null);
   const [isPainting, setIsPainting] = useState(false);
   const [isErasing, setIsErasing] = useState(false);
+
+  const isProtectedBuilding = React.useCallback((building: Building) => {
+    return PROTECTED_BUILDING_IDS.has(building.id) || building.npcId !== 'none';
+  }, []);
 
   const getPlacementFootprint = (building: Building): BuildingFootprint | null => {
     if (!building.voxels || building.voxels.length === 0) {
@@ -229,20 +235,26 @@ export const CityPlanner: React.FC<CityPlannerProps> = ({ state, onUpdateBuildin
       const next = { ...prev };
       const idToRemove = Object.keys(next).find(id => {
         const b = next[id];
-      const footprint = getPlacementFootprint(b);
-      if (!footprint) return false;
-      const worldX = pos.x * WORLD_SCALE + 5;
-      const worldY = pos.y * WORLD_SCALE + 5;
-      return worldX >= footprint.minX && worldX <= footprint.maxX && worldY >= footprint.minY && worldY <= footprint.maxY;
+        const footprint = getPlacementFootprint(b);
+        if (!footprint) return false;
+        const worldX = pos.x * WORLD_SCALE + 5;
+        const worldY = pos.y * WORLD_SCALE + 5;
+        return worldX >= footprint.minX && worldX <= footprint.maxX && worldY >= footprint.minY && worldY <= footprint.maxY;
       });
-      if (idToRemove) {
+      if (idToRemove && idToRemove.startsWith(CUSTOM_BUILDING_PREFIX)) {
         delete next[idToRemove];
       }
       return next;
     });
   };
 
+  const missingProtectedBuildings = React.useMemo(
+    () => Object.values(state.buildings).filter((building) => isProtectedBuilding(building) && !tempBuildings[building.id]),
+    [isProtectedBuilding, state.buildings, tempBuildings]
+  );
+
   const handleSave = () => {
+    if (missingProtectedBuildings.length > 0) return;
     onUpdateBuildings(tempBuildings);
     onClose();
   };
@@ -263,7 +275,12 @@ export const CityPlanner: React.FC<CityPlannerProps> = ({ state, onUpdateBuildin
         <div className="flex items-center gap-3">
           <button 
             onClick={handleSave}
-            className="bg-blue-600 hover:bg-blue-500 px-5 py-2 rounded-xl font-bold flex items-center gap-2 transition-all shadow-lg shadow-blue-900/20 active:scale-95"
+            disabled={missingProtectedBuildings.length > 0}
+            className={`px-5 py-2 rounded-xl font-bold flex items-center gap-2 transition-all shadow-lg shadow-blue-900/20 active:scale-95 ${
+              missingProtectedBuildings.length > 0
+                ? 'bg-slate-700 text-slate-400 cursor-not-allowed'
+                : 'bg-blue-600 hover:bg-blue-500'
+            }`}
           >
             <Save size={18} /> Save Blueprint
           </button>
@@ -319,10 +336,17 @@ export const CityPlanner: React.FC<CityPlannerProps> = ({ state, onUpdateBuildin
             <ul className="space-y-2">
               <li className="flex gap-2"><span className="text-blue-400 font-bold">•</span> Select an asset from the catalog</li>
               <li className="flex gap-2"><span className="text-blue-400 font-bold">•</span> Deploy to the isometric grid</li>
-              <li className="flex gap-2"><span className="text-blue-400 font-bold">•</span> Right-click to decommission</li>
-              <li className="flex gap-2"><span className="text-blue-400 font-bold">•</span> All placements must be within Bureau bounds</li>
+              <li className="flex gap-2"><span className="text-blue-400 font-bold">•</span> Right-click only removes custom buildings</li>
+              <li className="flex gap-2"><span className="text-blue-400 font-bold">•</span> Core buildings and NPC locations are protected</li>
+              <li className="flex gap-2"><span className="text-blue-400 font-bold">•</span> All placements must stay inside Bureau bounds</li>
             </ul>
           </div>
+
+          {missingProtectedBuildings.length > 0 && (
+            <div className="mt-4 rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-xs text-red-100">
+              Save is blocked. Protected world buildings are missing from the plan.
+            </div>
+          )}
         </div>
 
         {/* Main Map Area */}

@@ -1,6 +1,7 @@
 import { DirtItem, DirtType, GameState, NPC } from '../../types';
 import { extendWorldEffect, WORLD_EFFECTS } from './worldEffects';
 import { addStoryFlag, addStoryFlags, hasStoryFlag } from './storyFlags';
+import { approvePendingPermits, approvePermit } from '../permitProgression';
 
 type TriggerFeedback = (npcId: string, amount: number, type: 'TRUST' | 'LEVERAGE') => void;
 
@@ -176,15 +177,13 @@ export const buildSpecialDialogueOptions = ({
         const roll = Math.random() * 100;
 
         if (roll < successRate) {
+          const approval = approvePendingPermits(s.permits, s.mines);
           triggerFeedback(npc.id, 10, 'TRUST');
           return {
             dialogueCooldowns: withCooldown(s, key, 8),
             worldEffects: extendWorldEffect(s, 'bureauPull', 10),
-            permits: Object.fromEntries(
-              Object.entries(s.permits).map(([id, p]) =>
-                p.status === 'PENDING' ? [id, { ...p, status: 'APPROVED' as const }] : [id, p]
-              )
-            )
+            permits: approval.permits,
+            mines: approval.mines,
           };
         }
 
@@ -218,12 +217,11 @@ export const buildSpecialDialogueOptions = ({
       action: (s: GameState) => {
         const pendingPermit = Object.values(s.permits).find(p => p.status === 'PENDING');
         if (!pendingPermit) return {};
+        const approval = approvePermit(pendingPermit.id, s.permits, s.mines);
         return {
           dialogueCooldowns: withCooldown(s, key, 14),
-          permits: {
-            ...s.permits,
-            [pendingPermit.id]: { ...pendingPermit, status: 'APPROVED' as const }
-          },
+          permits: approval.permits,
+          mines: approval.mines,
           meters: {
             ...s.meters,
             exposure: Math.min(100, s.meters.exposure + 8)
@@ -481,15 +479,13 @@ export const buildSpecialDialogueOptions = ({
       condition: (s: GameState) => !isCoolingDown(s, key),
       action: (s: GameState) => {
         const freshNpc = s.npcs[npc.id];
+        const approval = approvePendingPermits(s.permits, s.mines);
         triggerFeedback(npc.id, -20, 'LEVERAGE');
         return {
           dialogueCooldowns: withCooldown(s, key, 12),
           npcs: { ...s.npcs, [npc.id]: { ...freshNpc, leverage: Math.max(0, freshNpc.leverage - 20) } },
-          permits: Object.fromEntries(
-            Object.entries(s.permits).map(([id, p]) =>
-              p.status === 'PENDING' ? [id, { ...p, status: 'APPROVED' as const }] : [id, p]
-            )
-          )
+          permits: approval.permits,
+          mines: approval.mines,
         };
       }
     });

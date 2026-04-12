@@ -185,7 +185,7 @@ export interface GameState {
   objectives: Objective[];
   mines: Mine[];
   activeMineId: string | null;
-  currentScene: 'MINE' | 'MINE_WORLD' | 'OFFICE' | 'WORLD' | 'MENU' | 'CITY_PLANNER';
+  currentScene: 'MINE' | 'MINE_WORLD' | 'OFFICE' | 'WORLD' | 'CITY_PLANNER';
   activeNPCId: string | null;
   activePermitId: string | null;
   activeBuildingId: string | null;
@@ -207,11 +207,6 @@ export interface GameState {
   ftuePhase: FtuePhase;
   tutorialStep: number;
   tutorialMinimized: boolean;
-  camera: {
-    x: number;
-    y: number;
-    zoom: number;
-  };
 }
 
 export interface VoxelData {
