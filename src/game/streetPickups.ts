@@ -121,12 +121,8 @@ export const buildStreetPickupVoxels = (
     const z = pickup.pos.y - WORLD_HALF_SIZE;
     const baseY = tile.height + 1;
 
-    voxels.push(
-      { x, y: baseY, z, color: COLORS.GOLD },
-      { x: x - 0.5, y: baseY, z, color: 0xe0a840 },
-      { x: x + 0.5, y: baseY, z, color: 0xffe58a },
-      { x, y: baseY + 1, z, color: 0xfff4b0 },
-    );
+    // Keep pickups visually tiny: one gold voxel, roughly arm-sized relative to the player.
+    voxels.push({ x, y: baseY, z, color: COLORS.GOLD });
   });
 
   return voxels;
