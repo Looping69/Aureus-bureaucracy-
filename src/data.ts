@@ -2,6 +2,7 @@ import { NPC, Permit, Tile, Building, Mine, DialogueNode, OfficeItem, WorldPosit
 import { extendWorldEffect } from './game/dialogue/worldEffects';
 import { addStoryFlag, addStoryFlags, hasStoryFlag } from './game/dialogue/storyFlags';
 import { approvePermit } from './game/permitProgression';
+import { adjustMeters, adjustNpcLeverage, adjustNpcTrust, beginDialoguePermitMiniGame, patchNpc, unlockPermit } from './game/dialogue/dialogueState';
 import { PLAYER_HOUSE_VOXELS } from './voxelData';
 import {
   ASSET_BUILDING_A_VOXELS,
@@ -489,10 +490,7 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
           condition: (s) => s.tutorialStep === 2,
           action: (s) => ({
             tutorialStep: 3,
-            permits: {
-              ...s.permits,
-              'extraction-intent': { ...s.permits['extraction-intent'], status: 'AVAILABLE' }
-            }
+            permits: unlockPermit(s, 'extraction-intent')
           }),
           nextNodeId: 'tutorial_intro'
         },
@@ -509,10 +507,7 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
         {
           text: "Your filing system is remarkably efficient, Officer.",
           action: (s) => ({
-            npcs: {
-              ...s.npcs,
-              'licensing': { ...s.npcs['licensing'], trustLevel: Math.min(100, s.npcs['licensing'].trustLevel + 5) }
-            }
+            npcs: adjustNpcTrust(s, 'licensing', 5)
           }),
           nextNodeId: 'flattery'
         },
@@ -559,13 +554,9 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
           text: "I see. Initiative. [Insight]",
           action: (s) => ({
             tutorialStep: 5, // Advance to 'Use Knowledge' step
-            npcs: {
-              ...s.npcs,
-              'licensing': { 
-                ...s.npcs['licensing'], 
-                vulnerability: { ...s.npcs['licensing'].vulnerability, discovered: true } 
-              }
-            }
+            npcs: patchNpc(s, 'licensing', {
+              vulnerability: { ...s.npcs.licensing.vulnerability, discovered: true }
+            })
           }),
           nextNodeId: 'negotiation_phase'
         }
@@ -585,15 +576,11 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
               worldEffects: extendWorldEffect(s, 'bureauPull', 10),
               permits: approval.permits,
               mines: approval.mines,
-              npcs: {
-                ...s.npcs,
-                'licensing': { ...s.npcs['licensing'], trustLevel: s.npcs['licensing'].trustLevel + 20 }
-              },
-              meters: {
-                ...s.meters,
+              npcs: adjustNpcTrust(s, 'licensing', 20),
+              meters: adjustMeters(s, {
                 influence: s.meters.influence + 5,
                 trust: s.meters.trust + 10
-              }
+              })
             };
           },
           nextNodeId: 'tutorial_success'
@@ -608,11 +595,10 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
               tutorialStep: 7, // Complete tutorial
               permits: approval.permits,
               mines: approval.mines,
-              meters: {
-                ...s.meters,
+              meters: adjustMeters(s, {
                 exposure: s.meters.exposure + 5,
                 trust: Math.max(0, s.meters.trust - 5)
-              }
+              })
             };
           },
           nextNodeId: 'tutorial_success'
@@ -633,13 +619,7 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
         {
           text: "Here is the $50. [Pay]",
           condition: (s) => s.money >= 50,
-          action: (s) => ({
-            money: s.money - 50,
-            activeMiniGame: 'FORM_PROCESSING',
-            activePermitId: 'prospecting-license',
-            pendingPermitAction: 'DIALOGUE',
-            activeNPCId: null
-          }),
+          action: (s) => beginDialoguePermitMiniGame(s, 'prospecting-license', 50),
           nextNodeId: 'approved'
         },
         { text: "I'll come back later.", nextNodeId: 'root' }
@@ -661,14 +641,10 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
           action: (s) => ({
             storyFlags: addStoryFlag(s, 'vane_backchannel'),
             worldEffects: extendWorldEffect(s, 'bureauPull', 18),
-            npcs: {
-              ...s.npcs,
-              licensing: { ...s.npcs.licensing, trustLevel: Math.min(100, s.npcs.licensing.trustLevel + 10), leverage: Math.min(100, s.npcs.licensing.leverage + 15) }
-            },
-            meters: {
-              ...s.meters,
+            npcs: adjustNpcLeverage({ ...s, npcs: adjustNpcTrust(s, 'licensing', 10) }, 'licensing', 15),
+            meters: adjustMeters(s, {
               exposure: Math.min(100, s.meters.exposure + 6)
-            }
+            })
           }),
           nextNodeId: 'backchannel_opened'
         },
@@ -677,16 +653,12 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
           action: (s) => ({
             storyFlags: addStoryFlags(s, 'vane_exposed', 'public_scandal'),
             worldEffects: extendWorldEffect(s, 'mediaHeat', 24),
-            meters: {
-              ...s.meters,
+            meters: adjustMeters(s, {
               influence: Math.min(100, s.meters.influence + 10),
               trust: Math.min(100, s.meters.trust + 4),
               exposure: Math.min(100, s.meters.exposure + 10)
-            },
-            npcs: {
-              ...s.npcs,
-              licensing: { ...s.npcs.licensing, trustLevel: Math.max(0, s.npcs.licensing.trustLevel - 35) }
-            }
+            }),
+            npcs: adjustNpcTrust(s, 'licensing', -35)
           }),
           nextNodeId: 'vane_burned'
         }
@@ -732,10 +704,7 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
           action: (s) => ({
             storyFlags: addStoryFlag(s, 'community_pact'),
             worldEffects: extendWorldEffect(s, 'communityBacking', 24),
-            npcs: {
-              ...s.npcs,
-              chief: { ...s.npcs.chief, trustLevel: Math.min(100, s.npcs.chief.trustLevel + 10) }
-            }
+            npcs: adjustNpcTrust(s, 'chief', 10)
           }),
           nextNodeId: 'community_pact'
         },
@@ -749,10 +718,7 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
           condition: (s) => s.upgrades.includes('meds'),
           action: (s) => ({
             worldEffects: extendWorldEffect(s, 'communityBacking', 18),
-            npcs: {
-              ...s.npcs,
-              'chief': { ...s.npcs['chief'], trustLevel: Math.min(100, s.npcs['chief'].trustLevel + 25) }
-            }
+            npcs: adjustNpcTrust(s, 'chief', 25)
           }),
           nextNodeId: 'meds_given'
         }
@@ -835,10 +801,7 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
           text: "I'll talk to Chief Okon. [Gain Trust with Union]",
           action: (s) => ({
             worldEffects: extendWorldEffect(s, 'communityBacking', 12),
-            npcs: {
-              ...s.npcs,
-              'union': { ...s.npcs['union'], trustLevel: Math.min(100, s.npcs['union']!.trustLevel + 10) }
-            }
+            npcs: adjustNpcTrust(s, 'union', 10)
           }),
           nextNodeId: 'root'
         }

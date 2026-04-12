@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { GameState, WorldPosition, RelationshipFeedback, Building } from './types';
+import { Building, GameScene, GameState, GameWorldState, RelationshipFeedback, WorldPosition } from './types';
 import { INITIAL_NPCS, INITIAL_PERMITS, INITIAL_MINES, BUILDINGS } from './data';
 
 // Components
@@ -29,7 +29,6 @@ import { applyMiniGameCompletion, applyPermitOverlayAction } from './game/action
 import { applyFoundItem, applyTakePhoto } from './game/actions/evidenceActions';
 import { applyDialogueSocialConsequences, queueFeedback } from './game/actions/dialogueActions';
 import { applyDailyEconomyTick, applyOreExport, getExportExposureIncrease, getExportOptions, getOreUnitPrice, hasExportLicense } from './game/economy';
-import { applyExhaustionCollapse } from './game/exhaustion';
 import { clearSavedGameState, hasSavedGameState, loadSavedGameState, saveGameState } from './game/save';
 import { useBuildingDiscovery } from './hooks/game/useBuildingDiscovery';
 import { useFeedbackCleanup } from './hooks/game/useFeedbackCleanup';
@@ -70,6 +69,12 @@ import {
   startTutorialJourney,
   toggleTutorialMinimized,
 } from './game/uiTransitions';
+import {
+  applyDirectWorldMove,
+  applyMineTravel,
+  applyPlannedWorldMove,
+  applyRestAction,
+} from './game/navigationActions';
 // --- Main App ---
 
 const STARTUP_OVERLAY_HIDE_MS = 180;
@@ -86,7 +91,9 @@ type NotificationMessage = {
   msg: string;
 };
 
-const buildHydratedBuildings = (savedBuildings?: GameState['buildings']): GameState['buildings'] => {
+const buildHydratedBuildings = (
+  savedBuildings?: GameWorldState['buildings'],
+): GameWorldState['buildings'] => {
   if (savedBuildings && Object.keys(savedBuildings).length > 0) {
     // Prioritize saved buildings for persistence of exact world layout, including deletions and additions.
     return savedBuildings;
@@ -99,11 +106,11 @@ const buildHydratedBuildings = (savedBuildings?: GameState['buildings']): GameSt
         isDiscovered: building.isDiscovered
       }
     ])
-  ) as GameState['buildings'];
+  ) as GameWorldState['buildings'];
 };
 
 const cloneSerializable = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
-const getWorldMapBuildings = (buildings: GameState['buildings']) => buildings;
+const getWorldMapBuildings = (buildings: GameWorldState['buildings']) => buildings;
 
 const buildInitialGameState = (): GameState => {
   const homePos = getBuildingAccessPosition(BUILDINGS.player_home);
@@ -193,7 +200,7 @@ export default function App() {
   const dragDistanceRef = useRef(0);
   const lastPointerPosRef = useRef({ x: 0, y: 0 });
   const pendingActionRef = useRef<{ name: string; startedAt: number } | null>(null);
-  const previousSceneRef = useRef<GameState['currentScene'] | null>(null);
+  const previousSceneRef = useRef<GameScene | null>(null);
   const startupDismissTimerRef = useRef<number | null>(null);
   const cachedSurfaceMapRef = useRef<{ buildings: Record<string, Building>; map: ReturnType<typeof buildWorldSurfaceMap> } | null>(null);
   const pushNotification = React.useCallback((next: NotificationMessage | null) => {
@@ -513,24 +520,13 @@ export default function App() {
   const handleMove = (pos: WorldPosition, options?: { ignoreDrag?: boolean }) => {
     if (!options?.ignoreDrag && dragDistanceRef.current > 10) return;
     setState(prev => {
-      if (prev.playerPos.x === pos.x && prev.playerPos.y === pos.y) return prev;
-      
       const path = findPath(prev.playerPos, pos, getWorldMapBuildings(prev.buildings));
-      if (path.length > 0) {
-        return { ...prev, path, targetPos: pos };
-      }
-
-      return prev; // No path found
+      return applyPlannedWorldMove(prev, pos, path);
     });
   };
 
   const handleDirectMove = (pos: WorldPosition) => {
     setState(prev => {
-      const sameTile = prev.playerPos.x === pos.x && prev.playerPos.y === pos.y;
-      const shouldClearPath = prev.path.length > 0 || prev.targetPos !== null;
-
-      if (sameTile && !shouldClearPath) return prev;
-
       // Reuse cached surface map when buildings haven't changed
       const cached = cachedSurfaceMapRef.current;
       const surfaceMap = cached && cached.buildings === prev.buildings
@@ -540,26 +536,7 @@ export default function App() {
         cachedSurfaceMapRef.current = { buildings: prev.buildings, map: surfaceMap };
       }
 
-      const tile = getWorldSurfaceTile(surfaceMap, pos.x, pos.y);
-      if (!tile || !tile.walkable) {
-        if (!shouldClearPath) return prev;
-        return {
-          ...prev,
-          path: [],
-          targetPos: null,
-        };
-      }
-
-      const energyCost = sameTile ? 0 : 0.35;
-      if (energyCost > 0 && prev.energy <= energyCost) return prev;
-
-      return {
-        ...prev,
-        playerPos: pos,
-        path: [],
-        targetPos: null,
-        energy: prev.energy - energyCost
-      };
+      return applyDirectWorldMove(prev, pos, surfaceMap);
     });
   };
 
@@ -570,13 +547,7 @@ export default function App() {
   const handleRest = () => {
     beginTrackedAction('rest');
     setState(prev => {
-      const restedState: GameState = {
-        ...prev,
-        energy: prev.maxEnergy,
-        day: prev.day + 1,
-        time: 6,
-        playerPos: HOME_POS
-      };
+      const restedState = applyRestAction(prev, HOME_POS);
       const daily = applyDailyEconomyTick(restedState);
       if (daily.notification) {
         pushNotification(daily.notification);
@@ -606,39 +577,16 @@ export default function App() {
   };
 
   const handleTravel = (mineId: string) => {
-    const mine = state.mines.find(m => m.id === mineId);
-    if (!mine) return;
-
-    if (!mine.discovered) {
-      pushNotification({ title: "Unknown Location", msg: "You haven't discovered this location yet." });
+    const result = applyMineTravel(state, mineId);
+    if (result.kind === 'invalid') return;
+    if (result.kind === 'undiscovered' || result.kind === 'too_tired') {
+      pushNotification(result.notification);
       return;
     }
 
     beginTrackedAction(`travel:${mineId}`);
-    setState(prev => {
-      const energyCost = mine.travelTime * 5;
-      if (prev.energy <= energyCost) {
-        pushNotification({ title: "Too Exhausted", msg: `Traveling to ${mine.name} requires more than ${energyCost} energy.` });
-        return prev;
-      }
-      if (prev.energy - energyCost <= 0) {
-        const collapsed = applyExhaustionCollapse({
-          ...prev,
-          energy: prev.energy - energyCost,
-          time: (prev.time + mine.travelTime) % 24
-        });
-        pushNotification(collapsed.notification);
-        return collapsed.nextState;
-      }
-      pushNotification({ title: "Travel Complete", msg: `You arrived at ${mine.name} after ${mine.travelTime} hours.` });
-      return {
-        ...prev,
-        currentScene: 'MINE' as const,
-        activeMineId: mineId,
-        energy: prev.energy - energyCost,
-        time: (prev.time + mine.travelTime) % 24
-      };
-    });
+    pushNotification(result.notification);
+    setState(result.nextState);
     setShowMinePicker(false);
   };
 

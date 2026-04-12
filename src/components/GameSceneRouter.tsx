@@ -1,6 +1,6 @@
 import React from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { GameState, WorldPosition } from '../types';
+import { GameScene, GameState, GameWorldState, WorldPosition } from '../types';
 import { MinePickerModal } from './MinePickerModal';
 import { MineSceneFallback } from './MineSceneFallback';
 import { LightLoadingOverlay } from './LightLoadingOverlay';
@@ -43,7 +43,7 @@ interface GameSceneRouterProps {
   onSelectMine: (mineId: string) => void;
   onCloseMinePicker: () => void;
   onWorldInteract: (npcId: string, buildingId: string) => void;
-  onUpdateBuildings: (newBuildings: GameState['buildings']) => void;
+  onUpdateBuildings: (newBuildings: GameWorldState['buildings']) => void;
   onClosePlanner: () => void;
   onReturnMineToWorld: () => void;
   onCollectMineResource: (amount: number) => void;
@@ -60,15 +60,15 @@ interface GameSceneRouterProps {
   showInitialWorldLoadingOverlay?: boolean;
   onInitialWorldReady?: () => void;
   onInitialWorldLoadingProgress?: (progress: number, phase: string) => void;
-  onInitialSceneMounted?: (scene: GameState['currentScene']) => void;
+  onInitialSceneMounted?: (scene: GameScene) => void;
 }
 
 const SceneMountSignal = ({
   scene,
   onMounted
 }: {
-  scene: GameState['currentScene'];
-  onMounted?: (scene: GameState['currentScene']) => void;
+  scene: GameScene;
+  onMounted?: (scene: GameScene) => void;
 }) => {
   React.useEffect(() => {
     onMounted?.(scene);

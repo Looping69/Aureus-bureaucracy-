@@ -1,4 +1,12 @@
-import { GameState, Building, Permit } from '../types';
+import {
+  Building,
+  GameFtueState,
+  GameOfficeState,
+  GameProgressionState,
+  GameInteractionState,
+  GameWorldState,
+  Permit,
+} from '../types';
 import { shouldHighlightForm17B, shouldHighlightVane, shouldLockBureauDirectory } from './ftue';
 
 export type OfficeSceneMode = 'DIRECTORY' | 'BUILDING' | 'EXPLORATION';
@@ -16,6 +24,13 @@ export interface OfficeViewModel {
   canInspectBuilding: boolean;
 }
 
+type OfficeSceneState =
+  GameOfficeState &
+  GameFtueState &
+  Pick<GameProgressionState, 'permits'> &
+  Pick<GameInteractionState, 'activeBuildingId'> &
+  Pick<GameWorldState, 'buildings'>;
+
 const isDirectoryVisibleBuilding = (building: Building) =>
   building.isDiscovered &&
   (
@@ -26,7 +41,7 @@ const isDirectoryVisibleBuilding = (building: Building) =>
     building.id === 'central_park'
   );
 
-export const deriveOfficeViewModel = (state: GameState): OfficeViewModel => {
+export const deriveOfficeViewModel = (state: OfficeSceneState): OfficeViewModel => {
   const building = state.activeBuildingId ? state.buildings[state.activeBuildingId] ?? null : null;
   const activePermits = Object.values(state.permits).filter(
     (permit) => permit.status !== 'LOCKED' && permit.status !== 'REJECTED'

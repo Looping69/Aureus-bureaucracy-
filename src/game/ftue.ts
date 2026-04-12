@@ -1,4 +1,4 @@
-import { FtuePhase, GameState } from '../types';
+import { FtuePhase, GameFtueState, GameInteractionState } from '../types';
 
 export const BUREAU_BUILDING_ID = 'licensing_office';
 export const BUREAU_NPC_ID = 'licensing';
@@ -50,26 +50,29 @@ export const getLegacyTutorialStepForFtuePhase = (phase: FtuePhase): number => {
   }
 };
 
-export const isFtueActive = (state: Pick<GameState, 'ftuePhase' | 'tutorialStep'>) =>
+export const isFtueActive = (state: Pick<GameFtueState, 'ftuePhase' | 'tutorialStep'>) =>
   state.tutorialStep !== 99 && state.ftuePhase !== 'ftue_complete';
 
 export const isFtueWorldFunnelPhase = (phase: FtuePhase) =>
   phase === 'reach_bureau' || phase === 'enter_bureau';
 
-export const isFtueHudCompact = (state: Pick<GameState, 'ftuePhase' | 'activePermitId' | 'pendingPermitAction' | 'tutorialStep'>) =>
+export const isFtueHudCompact = (
+  state: Pick<GameFtueState, 'ftuePhase' | 'tutorialStep'> &
+    Pick<GameInteractionState, 'activePermitId' | 'pendingPermitAction'>,
+) =>
   state.tutorialStep !== 99 &&
   state.ftuePhase !== 'ftue_complete' &&
   state.activePermitId !== BUREAU_PERMIT_ID &&
   state.pendingPermitAction === null;
 
-export const shouldHighlightVane = (state: Pick<GameState, 'ftuePhase' | 'tutorialStep'>) =>
+export const shouldHighlightVane = (state: Pick<GameFtueState, 'ftuePhase' | 'tutorialStep'>) =>
   state.tutorialStep !== 99 && state.ftuePhase === 'talk_vane';
 
-export const shouldHighlightForm17B = (state: Pick<GameState, 'ftuePhase' | 'tutorialStep'>) =>
+export const shouldHighlightForm17B = (state: Pick<GameFtueState, 'ftuePhase' | 'tutorialStep'>) =>
   state.tutorialStep !== 99 &&
   (state.ftuePhase === 'open_form_17b' || state.ftuePhase === 'submit_form_17b');
 
-export const shouldLockBureauDirectory = (state: Pick<GameState, 'ftuePhase' | 'tutorialStep'>) =>
+export const shouldLockBureauDirectory = (state: Pick<GameFtueState, 'ftuePhase' | 'tutorialStep'>) =>
   state.tutorialStep !== 99 &&
   (state.ftuePhase === 'talk_vane' || state.ftuePhase === 'open_form_17b' || state.ftuePhase === 'submit_form_17b');
 

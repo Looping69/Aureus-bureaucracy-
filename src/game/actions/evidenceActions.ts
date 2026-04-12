@@ -1,12 +1,29 @@
 import { OFFICE_ITEMS } from '../../data';
-import { DirtItem, DirtType, GameState } from '../../types';
+import {
+  DirtItem,
+  DirtType,
+  GameInteractionState,
+  GameMeterState,
+  GameOfficeState,
+  GameProgressionState,
+  GameResourceState,
+  GameWorldState,
+} from '../../types';
 import { GameNotification } from './mineActions';
 import { applyExhaustionCollapse } from '../exhaustion';
 
+type EvidenceActionState =
+  Pick<GameResourceState, 'money' | 'energy' | 'maxEnergy' | 'dirtItems'> &
+  Pick<GameMeterState, 'meters'> &
+  Pick<GameInteractionState, 'currentScene' | 'activeNPCId' | 'activePermitId' | 'activeBuildingId' | 'activeMiniGame'> &
+  Pick<GameOfficeState, 'foundOfficeItemIds' | 'explorationActive'> &
+  Pick<GameProgressionState, 'activeMineId'> &
+  Pick<GameWorldState, 'buildings' | 'playerPos' | 'targetPos' | 'path' | 'day' | 'time'>;
+
 export const applyTakePhoto = (
-  prev: GameState,
+  prev: EvidenceActionState,
   itemId: string
-): { nextState: GameState; notifications: GameNotification[] } => {
+): { nextState: EvidenceActionState; notifications: GameNotification[] } => {
   const item = OFFICE_ITEMS[itemId];
   if (!item) return { nextState: prev, notifications: [] };
 
@@ -61,14 +78,14 @@ export const applyTakePhoto = (
 };
 
 export const applyFoundItem = (
-  prev: GameState,
+  prev: EvidenceActionState,
   itemId: string
-): { nextState: GameState; notifications: GameNotification[] } => {
+): { nextState: EvidenceActionState; notifications: GameNotification[] } => {
   const item = OFFICE_ITEMS[itemId];
   if (!item) return { nextState: prev, notifications: [] };
   if (prev.foundOfficeItemIds.includes(itemId)) return { nextState: prev, notifications: [] };
 
-  let nextState: GameState = {
+  let nextState: EvidenceActionState = {
     ...prev,
     foundOfficeItemIds: [...prev.foundOfficeItemIds, itemId]
   };

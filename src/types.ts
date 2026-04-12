@@ -152,6 +152,10 @@ export type FtuePhase =
   | 'submit_form_17b'
   | 'ftue_complete';
 
+export type GameScene = 'MINE' | 'MINE_WORLD' | 'OFFICE' | 'WORLD' | 'CITY_PLANNER';
+export type ActiveMiniGame = 'FORM_PROCESSING' | null;
+export type PendingPermitAction = 'SUBMIT' | 'FAST_TRACK' | 'DIALOGUE' | null;
+
 export interface OfficeItem {
   id: string;
   name: string;
@@ -162,7 +166,7 @@ export interface OfficeItem {
   onInteract?: (state: GameState) => Partial<GameState>;
 }
 
-export interface GameState {
+export interface GameResourceState {
   money: number;
   ore: number;
   evidence: number;
@@ -172,41 +176,73 @@ export interface GameState {
   upgrades: string[];
   dirtItems: DirtItem[];
   leverage: string[];
+}
+
+export interface GameOfficeState {
   foundOfficeItemIds: string[];
   explorationActive: boolean;
+}
+
+export interface GameMeterState {
   meters: {
     trust: number;
     influence: number;
     exposure: number;
   };
+}
+
+export interface GameProgressionState {
   permits: Record<string, Permit>;
   npcs: Record<string, NPC>;
   knownNpcIds: string[];
   objectives: Objective[];
   mines: Mine[];
   activeMineId: string | null;
-  currentScene: 'MINE' | 'MINE_WORLD' | 'OFFICE' | 'WORLD' | 'CITY_PLANNER';
+  unlockedEndings: string[];
+}
+
+export interface GameInteractionState {
+  currentScene: GameScene;
   activeNPCId: string | null;
   activePermitId: string | null;
   activeBuildingId: string | null;
-  activeMiniGame: 'FORM_PROCESSING' | null;
-  pendingPermitAction: 'SUBMIT' | 'FAST_TRACK' | 'DIALOGUE' | null;
+  activeMiniGame: ActiveMiniGame;
+  pendingPermitAction: PendingPermitAction;
+  activeEndingId: string | null;
+}
+
+export interface GameWorldState {
   buildings: Record<string, Building>;
   day: number;
   time: number; // 0 to 2400 (military time representation or just 0-24 float)
   playerPos: WorldPosition;
   targetPos: WorldPosition | null;
   path: WorldPosition[];
+}
+
+export interface GameNarrativeState {
   feedbacks: RelationshipFeedback[];
   dialogueCooldowns: Record<string, number>;
   worldEffects: WorldEffects;
   storyFlags: StoryFlag[];
   lastCityEventHour: number;
-  unlockedEndings: string[];
-  activeEndingId: string | null;
+}
+
+export interface GameFtueState {
   ftuePhase: FtuePhase;
   tutorialStep: number;
   tutorialMinimized: boolean;
+}
+
+export interface GameState extends
+  GameResourceState,
+  GameOfficeState,
+  GameMeterState,
+  GameProgressionState,
+  GameInteractionState,
+  GameWorldState,
+  GameNarrativeState,
+  GameFtueState {
 }
 
 export interface VoxelData {
