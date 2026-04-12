@@ -2,79 +2,75 @@ import {
   GameFtueState,
   GameInteractionState,
   GameResourceState,
+  GameState,
+  FtuePhase,
 } from '../types';
-import { FtuePhase, getLegacyTutorialStepForFtuePhase } from './ftue';
+import { getLegacyTutorialStepForFtuePhase } from './ftue';
 
-type PlannerSceneState = Pick<GameInteractionState, 'currentScene'>;
-type NpcSelectionState = Pick<GameInteractionState, 'activeNPCId'>;
-type PermitSelectionState = Pick<GameInteractionState, 'activePermitId'>;
-type MiniGameState = Pick<GameInteractionState, 'activeMiniGame'>;
-type EndingState = Pick<GameInteractionState, 'activeEndingId'>;
-
-export const openPlannerScene = (state: PlannerSceneState): PlannerSceneState => ({
+export const openPlannerScene = (state: GameState): GameState => ({
   ...state,
   currentScene: 'CITY_PLANNER',
 });
 
-export const selectNpc = (state: NpcSelectionState, npcId: string): NpcSelectionState => ({
+export const selectNpc = (state: GameState, npcId: string): GameState => ({
   ...state,
   activeNPCId: npcId,
 });
 
-export const closeNpc = (state: NpcSelectionState): NpcSelectionState => ({
+export const closeNpc = (state: GameState): GameState => ({
   ...state,
   activeNPCId: null,
 });
 
 export const selectPermit = (
-  state: PermitSelectionState,
+  state: GameState,
   permitId: string,
-): PermitSelectionState => ({
+): GameState => ({
   ...state,
   activePermitId: permitId,
 });
 
-export const closePermit = (state: PermitSelectionState): PermitSelectionState => ({
+export const closePermit = (state: GameState): GameState => ({
   ...state,
   activePermitId: null,
 });
 
 export const addOreToInventory = (
-  state: Pick<GameResourceState, 'ore'>,
+  state: GameState,
   amount: number,
-): Pick<GameResourceState, 'ore'> => ({
+): GameState => ({
   ...state,
   ore: state.ore + amount,
 });
 
-export const closeMiniGame = (state: MiniGameState): MiniGameState => ({
+export const closeMiniGame = (state: GameState): GameState => ({
   ...state,
   activeMiniGame: null,
 });
 
-export const closeEnding = (state: EndingState): EndingState => ({
+export const closeEnding = (state: GameState): GameState => ({
   ...state,
   activeEndingId: null,
 });
 
 export const toggleTutorialMinimized = (
-  state: Pick<GameFtueState, 'tutorialMinimized'>,
-): Pick<GameFtueState, 'tutorialMinimized'> => ({
+  state: GameState,
+): GameState => ({
   ...state,
   tutorialMinimized: !state.tutorialMinimized,
 });
 
 export const dismissTutorial = (
-  state: Pick<GameFtueState, 'tutorialStep'>,
-): Pick<GameFtueState, 'tutorialStep'> => ({
+  state: GameState,
+): GameState => ({
   ...state,
   tutorialStep: 99,
 });
 
 export const startTutorialJourney = (
-  state: Pick<GameFtueState, 'ftuePhase' | 'tutorialStep'>,
+  state: GameState,
   nextPhase: FtuePhase = 'reach_bureau',
-): Pick<GameFtueState, 'ftuePhase' | 'tutorialStep'> => ({
+): GameState => ({
   ...state,
   ftuePhase: nextPhase,
   tutorialStep: getLegacyTutorialStepForFtuePhase(nextPhase),

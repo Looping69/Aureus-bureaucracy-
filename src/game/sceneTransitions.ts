@@ -1,13 +1,9 @@
-import { Building, GameInteractionState, GameOfficeState, GameWorldState } from '../types';
+import { Building, GameState, GameWorldState } from '../types';
 import { getBuildingAccessPosition } from '../utils/buildingAccess';
 
 const OFFICE_INTERACTION_TYPES = new Set<Building['type']>(['OFFICE', 'HOME', 'PUB', 'HOTLINE']);
 
-type OfficeDirectoryState = GameInteractionState & GameOfficeState;
-type OfficeBuildingState = OfficeDirectoryState & Pick<GameWorldState, 'buildings' | 'playerPos'>;
-type MineWorldTransitionState = GameInteractionState & Pick<GameWorldState, 'buildings' | 'playerPos'>;
-
-export const enterOfficeDirectory = (state: OfficeDirectoryState): OfficeDirectoryState => ({
+export const enterOfficeDirectory = (state: GameState): GameState => ({
   ...state,
   currentScene: 'OFFICE',
   activeBuildingId: null,
@@ -15,9 +11,9 @@ export const enterOfficeDirectory = (state: OfficeDirectoryState): OfficeDirecto
 });
 
 export const enterOfficeNpc = (
-  state: OfficeDirectoryState,
+  state: GameState,
   npcId: string,
-): OfficeDirectoryState => ({
+): GameState => ({
   ...state,
   activeNPCId: npcId,
   activeBuildingId: null,
@@ -26,9 +22,9 @@ export const enterOfficeNpc = (
 });
 
 export const enterOfficeBuilding = (
-  state: OfficeBuildingState,
+  state: GameState,
   buildingId: string,
-): OfficeBuildingState => {
+): GameState => {
   const building = state.buildings[buildingId];
   if (!building || !OFFICE_INTERACTION_TYPES.has(building.type)) {
     return state;
@@ -44,36 +40,36 @@ export const enterOfficeBuilding = (
   };
 };
 
-export const openOfficeExploration = (state: GameOfficeState): GameOfficeState => ({
+export const openOfficeExploration = (state: GameState): GameState => ({
   ...state,
   explorationActive: true,
 });
 
-export const closeOfficeExploration = (state: GameOfficeState): GameOfficeState => ({
+export const closeOfficeExploration = (state: GameState): GameState => ({
   ...state,
   explorationActive: false,
 });
 
 export const returnOfficeToDirectory = (
-  state: OfficeDirectoryState,
-): OfficeDirectoryState => ({
+  state: GameState,
+): GameState => ({
   ...state,
   activeBuildingId: null,
   explorationActive: false,
 });
 
 export const enterMineWorldScene = (
-  state: MineWorldTransitionState,
+  state: GameState,
   buildingId: string,
-): MineWorldTransitionState => ({
+): GameState => ({
   ...state,
   activeBuildingId: buildingId,
   currentScene: 'MINE_WORLD',
 });
 
 export const returnToWorldScene = (
-  state: MineWorldTransitionState,
-): MineWorldTransitionState => ({
+  state: GameState,
+): GameState => ({
   ...state,
   currentScene: 'WORLD',
   playerPos: state.activeBuildingId && state.buildings[state.activeBuildingId]
@@ -82,9 +78,9 @@ export const returnToWorldScene = (
 });
 
 export const applyPlannerBuildings = (
-  state: Pick<GameWorldState, 'buildings'> & Pick<GameInteractionState, 'currentScene'>,
+  state: GameState,
   buildings: GameWorldState['buildings'],
-): Pick<GameWorldState, 'buildings'> & Pick<GameInteractionState, 'currentScene'> => ({
+): GameState => ({
   ...state,
   buildings,
   currentScene: 'WORLD',

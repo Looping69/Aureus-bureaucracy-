@@ -1,7 +1,5 @@
 import {
-  GameResourceState,
   GameState,
-  GameWorldState,
   WorldPosition,
 } from '../types';
 import { getWorldSurfaceTile } from '../utils/worldSurface';
@@ -10,10 +8,10 @@ import { applyExhaustionCollapse } from './exhaustion';
 export type NavigationNotification = { title: string; msg: string };
 
 export const applyPlannedWorldMove = (
-  state: GameWorldState,
+  state: GameState,
   destination: WorldPosition,
   path: WorldPosition[],
-): GameWorldState => {
+): GameState => {
   if (state.playerPos.x === destination.x && state.playerPos.y === destination.y) {
     return state;
   }
@@ -28,10 +26,10 @@ export const applyPlannedWorldMove = (
 };
 
 export const applyDirectWorldMove = (
-  state: GameWorldState & Pick<GameResourceState, 'energy'>,
+  state: GameState,
   destination: WorldPosition,
   surfaceMap: ReturnType<typeof import('../utils/worldSurface').buildWorldSurfaceMap>,
-): GameWorldState & Pick<GameResourceState, 'energy'> => {
+): GameState => {
   const sameTile = state.playerPos.x === destination.x && state.playerPos.y === destination.y;
   const shouldClearPath = state.path.length > 0 || state.targetPos !== null;
 
@@ -60,9 +58,9 @@ export const applyDirectWorldMove = (
 };
 
 export const applyRestAction = (
-  state: GameWorldState & Pick<GameResourceState, 'maxEnergy'>,
+  state: GameState,
   homePos: WorldPosition,
-): GameWorldState & Pick<GameResourceState, 'energy' | 'maxEnergy'> => ({
+): GameState => ({
   ...state,
   energy: state.maxEnergy,
   day: state.day + 1,

@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Building, DialogueCommand, GameScene, GameState, GameWorldState, RelationshipFeedback, WorldPosition } from './types';
-import { INITIAL_NPCS, INITIAL_PERMITS, INITIAL_MINES, BUILDINGS } from './data';
+import { BUILDINGS } from './data';
 
 // Components
 import { Header } from './components/Header';
@@ -13,7 +13,7 @@ import { LightLoadingOverlay } from './components/LightLoadingOverlay';
 import { LoadingScreen } from './components/LoadingScreen';
 import { TutorialOverlay } from './components/TutorialOverlay';
 import { GameSceneRouter } from './components/GameSceneRouter';
-import { ActionLogEntry, ActionLogPanel } from './components/ActionLogPanel';
+import { ActionLogPanel } from './components/ActionLogPanel';
 import { DebugPanel } from './components/DebugPanel';
 import { EndingOverlay } from './components/EndingOverlay';
 import { MarketOverlay } from './components/MarketOverlay';
@@ -29,7 +29,6 @@ import { applyMiniGameCompletion, applyPermitOverlayAction } from './game/action
 import { applyFoundItem, applyTakePhoto } from './game/actions/evidenceActions';
 import { applyDialogueSocialConsequences } from './game/actions/dialogueActions';
 import { applyDailyEconomyTick, applyOreExport, getExportExposureIncrease, getExportOptions, getOreUnitPrice, hasExportLicense } from './game/economy';
-import { clearSavedGameState, hasSavedGameState, loadSavedGameState, saveGameState } from './game/save';
 import { useBuildingDiscovery } from './hooks/game/useBuildingDiscovery';
 import { useFeedbackCleanup } from './hooks/game/useFeedbackCleanup';
 import { useMovementLoop } from './hooks/game/useMovementLoop';
@@ -37,15 +36,11 @@ import { usePermitProcessingLoop } from './hooks/game/usePermitProcessingLoop';
 import { useTimeAndCurfewLoop } from './hooks/game/useTimeAndCurfewLoop';
 import { useTutorialProgression } from './hooks/game/useTutorialProgression';
 import { useCityEventLoop } from './hooks/game/useCityEventLoop';
-import {
-  BUREAU_PERMIT_ID,
-  deriveFtuePhaseFromTutorialStep,
-  getLegacyTutorialStepForFtuePhase
-} from './game/ftue';
+import { BUREAU_PERMIT_ID } from './game/ftue';
 import { getUnlockedEnding } from './game/endings';
-import { EMPTY_WORLD_EFFECTS } from './game/dialogue/worldEffects';
 import { applyDialogueCommands } from './game/dialogue/dialogueCommands';
 import { applyOperationAction } from './game/runCycle';
+import { buildHydratedBuildings, buildInitialGameState } from './game/session';
 import {
   applyPlannerBuildings,
   closeOfficeExploration,
@@ -76,95 +71,13 @@ import {
   applyPlannedWorldMove,
   applyRestAction,
 } from './game/navigationActions';
+import { useAppChrome } from './hooks/app/useAppChrome';
+import { useGameSession } from './hooks/app/useGameSession';
+import { useNotificationCenter } from './hooks/app/useNotificationCenter';
+
 // --- Main App ---
 
-const STARTUP_OVERLAY_HIDE_MS = 180;
-
-type StartupLoadingState = {
-  visible: boolean;
-  progress: number;
-  phase: string;
-  awaitingWorldBoot: boolean;
-};
-
-type NotificationMessage = {
-  title: string;
-  msg: string;
-};
-
-const buildHydratedBuildings = (
-  savedBuildings?: GameWorldState['buildings'],
-): GameWorldState['buildings'] => {
-  if (savedBuildings && Object.keys(savedBuildings).length > 0) {
-    // Prioritize saved buildings for persistence of exact world layout, including deletions and additions.
-    return savedBuildings;
-  }
-  return Object.fromEntries(
-    Object.entries(BUILDINGS).map(([id, building]) => [
-      id,
-      {
-        ...building,
-        isDiscovered: building.isDiscovered
-      }
-    ])
-  ) as GameWorldState['buildings'];
-};
-
-const cloneSerializable = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
 const getWorldMapBuildings = (buildings: GameWorldState['buildings']) => buildings;
-
-const buildInitialGameState = (): GameState => {
-  const homePos = getBuildingAccessPosition(BUILDINGS.player_home);
-
-  return {
-    money: 1000,
-    ore: 0,
-    evidence: 0,
-    energy: 100,
-    maxEnergy: 100,
-    movementSpeed: 1,
-    upgrades: [],
-    dirtItems: [],
-    leverage: [],
-    foundOfficeItemIds: [],
-    explorationActive: false,
-    meters: {
-      trust: 50,
-      influence: 10,
-      exposure: 0
-    },
-    permits: cloneSerializable(INITIAL_PERMITS),
-    npcs: cloneSerializable(INITIAL_NPCS),
-    knownNpcIds: ['journalist'],
-    objectives: [
-      { id: 'start', text: 'Get to the Bureau of Extraction. No permit means no mine.', isCompleted: false, type: 'DISCOVER', targetId: 'licensing_office' }
-    ],
-    mines: cloneSerializable(INITIAL_MINES),
-    activeMineId: null,
-    currentScene: 'WORLD',
-    activeNPCId: null,
-    activePermitId: null,
-    activeBuildingId: null,
-    activeMiniGame: null,
-    pendingPermitAction: null,
-    buildings: buildHydratedBuildings(),
-    day: 1,
-    time: 8,
-    playerPos: homePos,
-    targetPos: null,
-    path: [],
-    feedbacks: [],
-    dialogueCooldowns: {},
-    worldEffects: EMPTY_WORLD_EFFECTS,
-    storyFlags: [],
-    lastCityEventHour: -1,
-    unlockedEndings: [],
-    activeEndingId: null,
-    ftuePhase: 'intro',
-    tutorialStep: 0,
-    tutorialMinimized: false
-  };
-};
 
 export default function App() {
   const HOME_POS = getBuildingAccessPosition(BUILDINGS.player_home);
@@ -172,144 +85,71 @@ export default function App() {
   const plannerEnabled = import.meta.env.DEV;
 
   const [state, setState] = useState<GameState>(() => buildInitialGameState());
-  const [gameStarted, setGameStarted] = useState(false);
-  const [hasSave, setHasSave] = useState(false);
-  const [savePreview, setSavePreview] = useState<GameState | null>(null);
-
-  const [notification, setNotification] = useState<NotificationMessage | null>(null);
-  const [notificationQueue, setNotificationQueue] = useState<NotificationMessage[]>([]);
-  const [showMinePicker, setShowMinePicker] = useState(false);
-  const [showMarket, setShowMarket] = useState(false);
-  const [actionLog, setActionLog] = useState<ActionLogEntry[]>([]);
-  const [showActionLog, setShowActionLog] = useState(false);
-  const [showDebugPanel, setShowDebugPanel] = useState(false);
-  const [showUtilityDrawer, setShowUtilityDrawer] = useState(false);
-  const [showNavigationPanel, setShowNavigationPanel] = useState(false);
+  const {
+    notification,
+    pushNotification,
+    pushNotifications,
+    queueNotification,
+    dismissNotification,
+    actionLog,
+    setActionLog,
+    resetNotifications,
+  } = useNotificationCenter();
+  const {
+    showMinePicker,
+    setShowMinePicker,
+    showMarket,
+    setShowMarket,
+    showActionLog,
+    setShowActionLog,
+    showDebugPanel,
+    setShowDebugPanel,
+    showUtilityDrawer,
+    setShowUtilityDrawer,
+    showNavigationPanel,
+    setShowNavigationPanel,
+    resetChrome,
+  } = useAppChrome();
   const [stateUpdateCount, setStateUpdateCount] = useState(0);
   const [lastActionName, setLastActionName] = useState('none');
   const [lastActionMs, setLastActionMs] = useState(0);
-  const [hasCompletedInitialWorldBoot, setHasCompletedInitialWorldBoot] = useState(false);
   const [showSceneTransitionLoading, setShowSceneTransitionLoading] = useState(false);
-  const [startupLoading, setStartupLoading] = useState<StartupLoadingState>({
-    visible: false,
-    progress: 0,
-    phase: 'Opening archive file...',
-    awaitingWorldBoot: false
-  });
   const queuedFeedbackRef = useRef<RelationshipFeedback[]>([]);
   const isDraggingRef = useRef(false);
   const dragDistanceRef = useRef(0);
   const lastPointerPosRef = useRef({ x: 0, y: 0 });
   const pendingActionRef = useRef<{ name: string; startedAt: number } | null>(null);
   const previousSceneRef = useRef<GameScene | null>(null);
-  const startupDismissTimerRef = useRef<number | null>(null);
   const cachedSurfaceMapRef = useRef<{ buildings: Record<string, Building>; map: ReturnType<typeof buildWorldSurfaceMap> } | null>(null);
-  const pushNotification = React.useCallback((next: NotificationMessage | null) => {
-    if (!next) return;
-    setNotification((current) => {
-      if (!current) return next;
-      setNotificationQueue((queued) => [...queued, next]);
-      return current;
-    });
+  const resetDebugState = React.useCallback(() => {
+    setStateUpdateCount(0);
+    setLastActionName('none');
+    setLastActionMs(0);
   }, []);
-
-  const pushNotifications = React.useCallback((items: NotificationMessage[]) => {
-    items.forEach((item) => pushNotification(item));
-  }, [pushNotification]);
-
-  const queueNotification: React.Dispatch<React.SetStateAction<NotificationMessage | null>> = React.useCallback((next) => {
-    if (typeof next === 'function') {
-      setNotification((current) => {
-        const resolved = next(current);
-        if (resolved) {
-          setNotificationQueue((queued) => [...queued, resolved]);
-        }
-        return current;
-      });
-      return;
-    }
-
-    pushNotification(next);
-  }, [pushNotification]);
-
-  const dismissNotification = React.useCallback(() => {
-    setNotificationQueue((queued) => {
-      if (queued.length === 0) {
-        setNotification(null);
-        return queued;
-      }
-
-      const [next, ...rest] = queued;
-      setNotification(next);
-      return rest;
-    });
-  }, []);
-
-  const clearStartupDismissTimer = React.useCallback(() => {
-    if (startupDismissTimerRef.current !== null) {
-      window.clearTimeout(startupDismissTimerRef.current);
-      startupDismissTimerRef.current = null;
-    }
-  }, []);
-
-  const updateStartupLoading = React.useCallback((progress: number, phase: string) => {
-    setStartupLoading((prev) => {
-      if (!prev.visible) return prev;
-      const nextProgress = Math.max(prev.progress, Math.min(100, Math.round(progress)));
-      if (nextProgress === prev.progress && phase === prev.phase) return prev;
-      return {
-        ...prev,
-        progress: nextProgress,
-        phase
-      };
-    });
-  }, []);
-
-  const finishStartupLoading = React.useCallback((phase = 'Access Granted') => {
-    clearStartupDismissTimer();
-    setStartupLoading((prev) => {
-      if (!prev.visible) return prev;
-      return {
-        ...prev,
-        progress: 100,
-        phase,
-        awaitingWorldBoot: false
-      };
-    });
-
-    startupDismissTimerRef.current = window.setTimeout(() => {
-      setStartupLoading((prev) => ({
-        ...prev,
-        visible: false,
-        awaitingWorldBoot: false
-      }));
-      startupDismissTimerRef.current = null;
-    }, STARTUP_OVERLAY_HIDE_MS);
-  }, [clearStartupDismissTimer]);
-
-  const beginStartupLoading = React.useCallback((awaitingWorldBoot: boolean, phase: string) => {
-    clearStartupDismissTimer();
-    setStartupLoading({
-      visible: true,
-      progress: awaitingWorldBoot ? 4 : 12,
-      phase,
-      awaitingWorldBoot
-    });
-  }, [clearStartupDismissTimer]);
-
-  const appendActionLog = (title: string, msg: string) => {
-    const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    setActionLog(prev => [
-      { id: `${Date.now()}-${Math.random()}`, timestamp, title, msg },
-      ...prev
-    ].slice(0, 40));
-  };
-
-  useEffect(() => {
-    const saved = loadSavedGameState();
-    setHasSave(hasSavedGameState());
-    setSavePreview(saved);
-  }, []);
+  const {
+    gameStarted,
+    hasSave,
+    savePreview,
+    startupLoading,
+    hasCompletedInitialWorldBoot,
+    handleStartNewGame,
+    handleContinueGame,
+    handleInitialSceneMounted,
+    handleInitialWorldLoadingProgress,
+    handleInitialWorldReady,
+  } = useGameSession({
+    state,
+    setState,
+    homePos: HOME_POS,
+    plannerEnabled,
+    hydrateBuildings,
+    pushNotification,
+    resetUiState: React.useCallback(() => {
+      resetNotifications();
+      resetChrome();
+    }, [resetChrome, resetNotifications]),
+    resetDebugState,
+  });
 
   useEffect(() => {
     if (!gameStarted) {
@@ -340,26 +180,6 @@ export default function App() {
 
     return () => window.clearTimeout(timer);
   }, [gameStarted, hasCompletedInitialWorldBoot, state.currentScene]);
-
-  useEffect(() => {
-    return () => {
-      clearStartupDismissTimer();
-    };
-  }, [clearStartupDismissTimer]);
-
-  useEffect(() => {
-    if (!gameStarted) return;
-    const timer = setTimeout(() => {
-      saveGameState(state);
-      setHasSave(true);
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [gameStarted, state]);
-
-  useEffect(() => {
-    if (!notification) return;
-    appendActionLog(notification.title, notification.msg);
-  }, [notification]);
 
   useEffect(() => {
     setStateUpdateCount(c => c + 1);
@@ -397,98 +217,6 @@ export default function App() {
   useMovementLoop({ setState, setNotification: queueNotification, homePos: HOME_POS, enabled: gameStarted });
   useTutorialProgression(state, setState, queueNotification, gameStarted);
   useCityEventLoop({ setState, setNotification: queueNotification, enabled: gameStarted });
-
-  const hydrateSavedState = React.useCallback((saved: GameState): GameState => {
-    const baseState = buildInitialGameState();
-    const saveUsesLegacyLayout =
-      saved.buildings?.player_home?.pos.x !== BUILDINGS.player_home.pos.x ||
-      saved.buildings?.player_home?.pos.y !== BUILDINGS.player_home.pos.y ||
-      Object.keys(saved.buildings ?? {}).some((id) => !(id in BUILDINGS));
-    const shouldResetWorldSpawn = saveUsesLegacyLayout || saved.currentScene === 'WORLD';
-
-    return {
-      ...baseState,
-      ...saved,
-      currentScene: saved.currentScene === 'CITY_PLANNER' && !plannerEnabled ? 'WORLD' : saved.currentScene,
-      ftuePhase: saved.ftuePhase ?? deriveFtuePhaseFromTutorialStep(saved.tutorialStep),
-      buildings: hydrateBuildings(saved.buildings),
-      playerPos: shouldResetWorldSpawn ? HOME_POS : (saved.playerPos ?? baseState.playerPos),
-      targetPos: shouldResetWorldSpawn ? null : (saved.targetPos ?? baseState.targetPos),
-      path: shouldResetWorldSpawn ? [] : (saved.path ?? baseState.path),
-      meters: { ...baseState.meters, ...(saved.meters ?? {}) },
-      camera: { ...baseState.camera, ...(saved.camera ?? {}) },
-      dialogueCooldowns: saved.dialogueCooldowns ?? {},
-      worldEffects: { ...EMPTY_WORLD_EFFECTS, ...(saved.worldEffects ?? {}) },
-      storyFlags: saved.storyFlags ?? [],
-      lastCityEventHour: saved.lastCityEventHour ?? -1,
-      unlockedEndings: saved.unlockedEndings ?? [],
-      activeEndingId: saved.activeEndingId ?? null,
-      tutorialStep: saved.tutorialStep === 99
-        ? 99
-        : (saved.tutorialStep ?? getLegacyTutorialStepForFtuePhase(saved.ftuePhase ?? deriveFtuePhaseFromTutorialStep(saved.tutorialStep)))
-    };
-  }, [HOME_POS, hydrateBuildings]);
-
-  const handleStartNewGame = React.useCallback(() => {
-    clearSavedGameState();
-    beginStartupLoading(true, 'Opening new archive file...');
-    setState(buildInitialGameState());
-    setHasCompletedInitialWorldBoot(false);
-    setNotification(null);
-    setNotificationQueue([]);
-    setActionLog([]);
-    setShowActionLog(false);
-    setShowDebugPanel(false);
-    setShowUtilityDrawer(false);
-    setStateUpdateCount(0);
-    setLastActionName('none');
-    setLastActionMs(0);
-    setShowMinePicker(false);
-    setShowMarket(false);
-    setHasSave(false);
-    setSavePreview(null);
-    setGameStarted(true);
-  }, [beginStartupLoading]);
-
-  const handleContinueGame = React.useCallback(() => {
-    let saved: GameState | null = null;
-    try {
-      saved = loadSavedGameState();
-    } catch {
-      pushNotification({ title: 'Load Failed', msg: 'Save data is corrupted. Starting fresh.' });
-      return;
-    }
-    if (!saved) return;
-    const bootingWorld = saved.currentScene === 'WORLD';
-    beginStartupLoading(bootingWorld, bootingWorld ? 'Opening archived world state...' : 'Restoring case file...');
-    setHasCompletedInitialWorldBoot(!bootingWorld);
-    setState(hydrateSavedState(saved));
-    setSavePreview(saved);
-    setHasSave(true);
-    setGameStarted(true);
-    pushNotification({ title: 'Save Loaded', msg: 'Resumed your previous session.' });
-  }, [beginStartupLoading, hydrateSavedState, pushNotification]);
-
-  const handleInitialSceneMounted = React.useCallback((scene: GameState['currentScene']) => {
-    if (!startupLoading.visible) return;
-
-    if (startupLoading.awaitingWorldBoot || scene === 'WORLD') {
-      updateStartupLoading(12, 'Preparing voxel renderer...');
-      return;
-    }
-
-    updateStartupLoading(100, 'Scene Ready');
-    finishStartupLoading('Scene Ready');
-  }, [finishStartupLoading, startupLoading.awaitingWorldBoot, startupLoading.visible, updateStartupLoading]);
-
-  const handleInitialWorldLoadingProgress = React.useCallback((progress: number, phase: string) => {
-    updateStartupLoading(progress, phase);
-  }, [updateStartupLoading]);
-
-  const handleInitialWorldReady = React.useCallback(() => {
-    setHasCompletedInitialWorldBoot(true);
-    finishStartupLoading();
-  }, [finishStartupLoading]);
 
   const handlePointerDown = (e: React.PointerEvent) => {
     isDraggingRef.current = true;

@@ -1,14 +1,7 @@
 import {
-  GameInteractionState,
-  GameNarrativeState,
-  GameProgressionState,
+  GameState,
   RelationshipFeedback,
 } from '../../types';
-
-type DialogueConsequenceState =
-  Pick<GameInteractionState, 'activeNPCId'> &
-  Pick<GameProgressionState, 'npcs'> &
-  Pick<GameNarrativeState, 'feedbacks'>;
 
 const makeFeedback = (
   npcId: string,
@@ -37,10 +30,10 @@ export const queueFeedback = (
 };
 
 export const applyDialogueSocialConsequences = (
-  oldState: DialogueConsequenceState,
-  nextState: DialogueConsequenceState,
+  oldState: GameState,
+  nextState: GameState,
   queue: RelationshipFeedback[]
-): DialogueConsequenceState => {
+): GameState => {
   if (!oldState.activeNPCId) return nextState;
 
   const activeNpcId = oldState.activeNPCId;

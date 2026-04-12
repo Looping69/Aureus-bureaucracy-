@@ -1,25 +1,14 @@
 import {
-  GameFtueState,
-  GameInteractionState,
-  GameMeterState,
-  GameProgressionState,
-  GameResourceState,
+  GameState,
 } from '../../types';
 import { approvePermit } from '../permitProgression';
 import { GameNotification } from './mineActions';
 
-type PermitActionState =
-  Pick<GameResourceState, 'money' | 'evidence'> &
-  Pick<GameMeterState, 'meters'> &
-  Pick<GameProgressionState, 'permits' | 'mines'> &
-  Pick<GameFtueState, 'tutorialStep'> &
-  Pick<GameInteractionState, 'activeMiniGame' | 'activePermitId' | 'pendingPermitAction'>;
-
 export const applyPermitOverlayAction = (
-  prev: PermitActionState,
+  prev: GameState,
   id: string,
   action: 'SUBMIT' | 'PAY' | 'FAST_TRACK'
-): { nextState: PermitActionState; notifications: GameNotification[] } => {
+): { nextState: GameState; notifications: GameNotification[] } => {
   const permit = prev.permits[id];
   if (!permit) return { nextState: prev, notifications: [] };
   const standardCost = permit.status === 'REJECTED' ? 100 : permit.cost;
@@ -58,9 +47,9 @@ export const applyPermitOverlayAction = (
 };
 
 export const applyMiniGameCompletion = (
-  prev: PermitActionState,
+  prev: GameState,
   results: { accuracy: number; time: number }
-): { nextState: PermitActionState; notifications: GameNotification[] } => {
+): { nextState: GameState; notifications: GameNotification[] } => {
   if (!prev.activePermitId) {
     return {
       nextState: { ...prev, activeMiniGame: null, pendingPermitAction: null },

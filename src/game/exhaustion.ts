@@ -1,25 +1,14 @@
 import {
-  GameInteractionState,
-  GameOfficeState,
-  GameProgressionState,
-  GameResourceState,
-  GameWorldState,
+  GameState,
 } from '../types';
 import { getBuildingAccessPosition } from '../utils/buildingAccess';
-
-type ExhaustionState =
-  Pick<GameResourceState, 'money' | 'energy' | 'maxEnergy'> &
-  Pick<GameProgressionState, 'activeMineId'> &
-  Pick<GameInteractionState, 'currentScene' | 'activeNPCId' | 'activePermitId' | 'activeBuildingId' | 'activeMiniGame'> &
-  Pick<GameOfficeState, 'explorationActive'> &
-  Pick<GameWorldState, 'buildings' | 'playerPos' | 'targetPos' | 'path' | 'day' | 'time'>;
 
 export const EXHAUSTION_FINE = 200;
 
 export const applyExhaustionCollapse = (
-  state: ExhaustionState,
+  state: GameState,
   fine: number = EXHAUSTION_FINE
-): { nextState: ExhaustionState; notification: { title: string; msg: string } } => {
+): { nextState: GameState; notification: { title: string; msg: string } } => {
   const homeBuilding = state.buildings.player_home;
   const homePos = homeBuilding
     ? getBuildingAccessPosition(homeBuilding)

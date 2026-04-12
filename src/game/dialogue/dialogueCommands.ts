@@ -1,5 +1,6 @@
 import {
   DialogueCommand,
+  DialogueFeedbackType,
   DirtItem,
   GameMeterState,
   GameState,
