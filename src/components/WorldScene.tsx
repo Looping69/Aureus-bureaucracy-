@@ -95,8 +95,8 @@ export const WorldScene = ({
   }, [mapItems]);
 
   const terrainData = React.useMemo(
-    () => buildWorldTerrainVoxels(state.buildings, WORLD_SIZE),
-    [state.buildings]
+    () => buildWorldTerrainVoxels(state.buildings, WORLD_SIZE, state.navigationZones),
+    [state.buildings, state.navigationZones]
   );
   const pickupVoxels = React.useMemo(
     () => buildStreetPickupVoxels(state.streetPickups, terrainData.surfaceMap),
@@ -287,9 +287,10 @@ export const WorldScene = ({
 
   return (
     <div className={`flex-1 relative overflow-hidden transition-colors duration-1000 ${isNight ? 'bg-slate-950' : 'bg-slate-200'} cursor-crosshair`}>
-      <VoxelWorldContainer 
+      <VoxelWorldContainer
         voxels={allVoxels}
         buildings={worldBuildings}
+        navigationZones={state.navigationZones}
         npcs={state.npcs}
         time={state.time}
         playerPos={renderPlayerPos}

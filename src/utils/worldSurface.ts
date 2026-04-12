@@ -1,4 +1,4 @@
-import { Building, VoxelData } from '../types';
+import { Building, NavigationZone, VoxelData } from '../types';
 import { COLORS, CONFIG, WORLD_HALF_SIZE, WORLD_SIZE } from './voxelConstants';
 import {
   getBuildingFootprint,
@@ -168,7 +168,8 @@ const applyBlockedSurface = (
 
 export const buildWorldSurfaceMap = (
   buildings: Record<string, Building> | Building[],
-  mapSize: number = WORLD_SIZE
+  mapSize: number = WORLD_SIZE,
+  navigationZones: NavigationZone[] = []
 ): WorldSurfaceMap => {
   const entries = Array.isArray(buildings) ? buildings : Object.values(buildings);
   const tiles = new Map<string, SurfaceTile>();
@@ -219,6 +220,18 @@ export const buildWorldSurfaceMap = (
 
         applyWalkableSurface(tile, 'PLAZA', Math.max(tile.height, foundationHeight - 1));
         tile.buildingId = building.id;
+      }
+
+      for (const zone of navigationZones) {
+        if (
+          zone.kind === 'BLOCKED' &&
+          x >= zone.minX &&
+          x <= zone.maxX &&
+          y >= zone.minY &&
+          y <= zone.maxY
+        ) {
+          applyBlockedSurface(tile, zone.id, tile.height);
+        }
       }
 
       tiles.set(keyFor(x, y), tile);
@@ -288,9 +301,10 @@ export const getNearestWalkableTile = (
 
 export const buildWorldTerrainVoxels = (
   buildings: Record<string, Building> | Building[],
-  mapSize: number = WORLD_SIZE
+  mapSize: number = WORLD_SIZE,
+  navigationZones: NavigationZone[] = []
 ) => {
-  const surfaceMap = buildWorldSurfaceMap(buildings, mapSize);
+  const surfaceMap = buildWorldSurfaceMap(buildings, mapSize, navigationZones);
   const voxels: VoxelData[] = [];
 
   for (const tile of surfaceMap.tiles.values()) {

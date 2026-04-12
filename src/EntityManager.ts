@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { VoxelCharacter } from './VoxelCharacter';
 import { VoxelBuilding } from './VoxelBuilding';
-import { Building, NPC, WorldPosition } from './types';
+import { Building, NavigationZone, NPC, WorldPosition } from './types';
 import { CONFIG, WORLD_HALF_SIZE } from './utils/voxelConstants';
 import {
   getBuildingAccessPosition,
@@ -166,7 +166,11 @@ export class EntityManager {
   }
 
   /** Set up commuting routes for NPCs that have separate home / work buildings. */
-  public initNpcMovement(allNpcs: Record<string, NPC>, buildings: Record<string, Building>) {
+  public initNpcMovement(
+    allNpcs: Record<string, NPC>,
+    buildings: Record<string, Building>,
+    navigationZones: NavigationZone[] = []
+  ) {
     this.npcMovement.clear();
 
     for (const npc of Object.values(allNpcs)) {
@@ -180,8 +184,8 @@ export class EntityManager {
       const homePos = getBuildingAccessPosition(homeBuilding);
       const workPos = getBuildingAccessPosition(workBuilding);
 
-      const pathToWork = findPath(homePos, workPos, buildings);
-      const pathToHome = findPath(workPos, homePos, buildings);
+      const pathToWork = findPath(homePos, workPos, buildings, undefined, navigationZones);
+      const pathToHome = findPath(workPos, homePos, buildings, undefined, navigationZones);
 
       if (pathToWork.length === 0 && pathToHome.length === 0) continue;
 

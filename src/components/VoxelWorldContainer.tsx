@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { VoxelEngine } from '../VoxelEngine';
-import { Building, NPC, AppState, VoxelData, WorldHoverInfo } from '../types';
+import { Building, NPC, AppState, NavigationZone, VoxelData, WorldHoverInfo } from '../types';
 import { useCameraControls } from '../hooks/useCameraControls';
 import { WORLD_HALF_SIZE } from '../utils/voxelConstants';
 import { buildWorldSurfaceMap, getWorldSurfaceHeight } from '../utils/worldSurface';
@@ -9,6 +9,7 @@ import { LoadingScreen } from './LoadingScreen';
 interface VoxelWorldProps {
   voxels: VoxelData[];
   buildings: Building[];
+  navigationZones: NavigationZone[];
   npcs: Record<string, NPC>;
   time: number;
   playerPos: { x: number, y: number };
@@ -33,6 +34,7 @@ interface VoxelWorldProps {
 export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({ 
   voxels, 
   buildings,
+  navigationZones,
   npcs,
   time, 
   playerPos, 
@@ -60,7 +62,10 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
   const readyReportedRef = useRef(false);
   const onReadyRef = useRef(onReady);
   const onProgressRef = useRef(onProgress);
-  const surfaceMap = React.useMemo(() => buildWorldSurfaceMap(buildings), [buildings]);
+  const surfaceMap = React.useMemo(
+    () => buildWorldSurfaceMap(buildings, undefined, navigationZones),
+    [buildings, navigationZones]
+  );
   const playerSurfaceY = React.useMemo(
     () => getWorldSurfaceHeight(playerPos, surfaceMap),
     [playerPos, surfaceMap]
@@ -123,7 +128,7 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
       // Initialise NPC commuting routes
       const buildingsMap: Record<string, Building> = {};
       buildings.forEach(b => { buildingsMap[b.id] = b; });
-      engineRef.current.entities.initNpcMovement(npcs, buildingsMap);
+      engineRef.current.entities.initNpcMovement(npcs, buildingsMap, navigationZones);
       reportProgress(86, 'Deploying field personnel...');
 
       engineRef.current.updateTime(time);
@@ -197,8 +202,8 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
     // Re-initialise NPC commuting routes
     const buildingsMap: Record<string, Building> = {};
     buildings.forEach(b => { buildingsMap[b.id] = b; });
-    entities.initNpcMovement(npcs, buildingsMap);
-  }, [buildings]);
+    entities.initNpcMovement(npcs, buildingsMap, navigationZones);
+  }, [buildings, navigationZones, npcs]);
 
   useEffect(() => {
     if (engineRef.current) {

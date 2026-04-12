@@ -408,6 +408,7 @@ export const MineWorldScene = ({
       <VoxelWorldContainer
         voxels={allVoxels}
         buildings={MINE_BUILDINGS_LIST}
+        navigationZones={[]}
         npcs={state.npcs}
         time={state.time}
         playerPos={currentPlayerPos}
