@@ -3,6 +3,7 @@ import { EMPTY_WORLD_EFFECTS } from './dialogue/worldEffects';
 import { deriveFtuePhaseFromTutorialStep, getLegacyTutorialStepForFtuePhase } from './ftue';
 import { getBuildingAccessPosition } from '../utils/buildingAccess';
 import { GameState, GameWorldState, WorldPosition } from '../types';
+import { createInitialStreetPickups } from './streetPickups';
 
 const cloneSerializable = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
 
@@ -26,6 +27,7 @@ export const buildHydratedBuildings = (
 
 export const buildInitialGameState = (): GameState => {
   const homePos = getBuildingAccessPosition(BUILDINGS.player_home);
+  const buildings = buildHydratedBuildings();
 
   return {
     money: 1000,
@@ -64,12 +66,13 @@ export const buildInitialGameState = (): GameState => {
     activeBuildingId: null,
     activeMiniGame: null,
     pendingPermitAction: null,
-    buildings: buildHydratedBuildings(),
+    buildings,
     day: 1,
     time: 8,
     playerPos: homePos,
     targetPos: null,
     path: [],
+    streetPickups: createInitialStreetPickups(buildings, [homePos]),
     feedbacks: [],
     dialogueCooldowns: {},
     worldEffects: EMPTY_WORLD_EFFECTS,
@@ -113,6 +116,7 @@ export const hydrateSavedState = ({
     playerPos: shouldResetWorldSpawn ? homePos : (saved.playerPos ?? baseState.playerPos),
     targetPos: shouldResetWorldSpawn ? null : (saved.targetPos ?? baseState.targetPos),
     path: shouldResetWorldSpawn ? [] : (saved.path ?? baseState.path),
+    streetPickups: saved.streetPickups ?? baseState.streetPickups,
     meters: { ...baseState.meters, ...(saved.meters ?? {}) },
     dialogueCooldowns: saved.dialogueCooldowns ?? {},
     worldEffects: { ...EMPTY_WORLD_EFFECTS, ...(saved.worldEffects ?? {}) },

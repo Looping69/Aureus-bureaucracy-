@@ -4,6 +4,7 @@ import {
 } from '../types';
 import { getWorldSurfaceTile } from '../utils/worldSurface';
 import { applyExhaustionCollapse } from './exhaustion';
+import { resolveStreetPickupCollection } from './streetPickups';
 
 export type NavigationNotification = { title: string; msg: string };
 
@@ -29,32 +30,39 @@ export const applyDirectWorldMove = (
   state: GameState,
   destination: WorldPosition,
   surfaceMap: ReturnType<typeof import('../utils/worldSurface').buildWorldSurfaceMap>,
-): GameState => {
+): { nextState: GameState; notifications: NavigationNotification[] } => {
   const sameTile = state.playerPos.x === destination.x && state.playerPos.y === destination.y;
   const shouldClearPath = state.path.length > 0 || state.targetPos !== null;
 
-  if (sameTile && !shouldClearPath) return state;
+  if (sameTile && !shouldClearPath) return { nextState: state, notifications: [] };
 
   const tile = getWorldSurfaceTile(surfaceMap, destination.x, destination.y);
   if (!tile || !tile.walkable) {
-    if (!shouldClearPath) return state;
+    if (!shouldClearPath) return { nextState: state, notifications: [] };
     return {
-      ...state,
-      path: [],
-      targetPos: null,
+      nextState: {
+        ...state,
+        path: [],
+        targetPos: null,
+      },
+      notifications: [],
     };
   }
 
   const energyCost = sameTile ? 0 : 0.35;
-  if (energyCost > 0 && state.energy <= energyCost) return state;
+  if (energyCost > 0 && state.energy <= energyCost) {
+    return { nextState: state, notifications: [] };
+  }
 
-  return {
+  const movedState: GameState = {
     ...state,
     playerPos: destination,
     path: [],
     targetPos: null,
     energy: state.energy - energyCost,
   };
+
+  return resolveStreetPickupCollection(movedState, destination, surfaceMap);
 };
 
 export const applyRestAction = (

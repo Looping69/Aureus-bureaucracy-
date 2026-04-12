@@ -261,7 +261,9 @@ export default function App() {
         cachedSurfaceMapRef.current = { buildings: prev.buildings, map: surfaceMap };
       }
 
-      return applyDirectWorldMove(prev, pos, surfaceMap);
+      const result = applyDirectWorldMove(prev, pos, surfaceMap);
+      pushNotifications(result.notifications);
+      return result.nextState;
     });
   };
 

@@ -12,6 +12,7 @@ import { buildWorldTerrainVoxels } from '../utils/worldSurface';
 import { WORLD_SIZE } from '../utils/voxelConstants';
 import { useContinuousAnalogMovement } from '../hooks/game/useContinuousAnalogMovement';
 import { BUREAU_BUILDING_ID, getFtueCopy, isFtueWorldFunnelPhase } from '../game/ftue';
+import { buildStreetPickupVoxels } from '../game/streetPickups';
 
 const BUILDING_ENTRY_TYPES = new Set(['OFFICE', 'HOME', 'MINE_ENTRANCE', 'PUB', 'HOTLINE']);
 
@@ -97,7 +98,14 @@ export const WorldScene = ({
     () => buildWorldTerrainVoxels(state.buildings, WORLD_SIZE),
     [state.buildings]
   );
-  const allVoxels = terrainData.voxels;
+  const pickupVoxels = React.useMemo(
+    () => buildStreetPickupVoxels(state.streetPickups, terrainData.surfaceMap),
+    [state.streetPickups, terrainData.surfaceMap]
+  );
+  const allVoxels = React.useMemo(
+    () => [...terrainData.voxels, ...pickupVoxels],
+    [pickupVoxels, terrainData.voxels]
+  );
 
   const analogController = useContinuousAnalogMovement({
     input: analogInput,

@@ -91,6 +91,12 @@ export interface WorldPosition {
   y: number;
 }
 
+export interface WorldPickup {
+  id: string;
+  pos: WorldPosition;
+  energyRestore: number;
+}
+
 export interface WorldHoverInfo {
   x: number;
   y: number;
@@ -218,6 +224,7 @@ export interface GameWorldState {
   playerPos: WorldPosition;
   targetPos: WorldPosition | null;
   path: WorldPosition[];
+  streetPickups: WorldPickup[];
 }
 
 export interface GameNarrativeState {
