@@ -286,7 +286,7 @@ export const WorldScene = ({
   }, [bureauBuilding, isBureauFunnelActive, isPlayerNearBureau, onInteract]);
 
   return (
-    <div className={`flex-1 relative overflow-hidden transition-colors duration-1000 ${isNight ? 'bg-slate-950' : 'bg-slate-200'} cursor-crosshair`}>
+    <div className={`flex-1 relative overflow-hidden transition-colors duration-1000 ${isNight ? 'bg-slate-950' : 'bg-slate-200'}`}>
       <VoxelWorldContainer
         voxels={allVoxels}
         buildings={worldBuildings}
@@ -342,7 +342,7 @@ export const WorldScene = ({
             <div className="rounded-full bg-black/80 px-4 py-2 text-center text-[10px] font-black uppercase tracking-[0.22em] text-white shadow-xl">
               {hoverInfo?.id === BUREAU_BUILDING_ID
                 ? (isPlayerNearBureau ? 'Release Hesitation. Entry is happening.' : 'Tap the Bureau. We will move you in.')
-                : 'Crosshair matters now. Put it on the Bureau and tap.'}
+                : 'Tap the Bureau building to move there and enter.'}
             </div>
           </div>
         </>

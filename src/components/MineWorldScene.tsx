@@ -402,7 +402,7 @@ export const MineWorldScene = ({
 
   // ── render ────────────────────────────────────────────────────────────────
   return (
-    <div className={`flex-1 relative overflow-hidden transition-colors duration-1000 ${isNight ? 'bg-slate-950' : 'bg-stone-800'} cursor-crosshair`}>
+    <div className={`flex-1 relative overflow-hidden transition-colors duration-1000 ${isNight ? 'bg-slate-950' : 'bg-stone-800'}`}>
 
       {/* 3-D voxel world */}
       <VoxelWorldContainer

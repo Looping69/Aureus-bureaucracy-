@@ -7,6 +7,7 @@ import { ProgressGuide } from './ProgressGuide';
 import { RunCyclePanel } from './RunCyclePanel';
 import { OperationActionId } from '../game/runCycle';
 import { deriveOfficeViewModel } from '../game/officeViewModel';
+import { isFtueActive } from '../game/ftue';
 
 export const OfficeScene = ({ 
   state, 
@@ -32,9 +33,10 @@ export const OfficeScene = ({
   onOperationAction: (actionId: OperationActionId) => void
 }) => {
   const view = React.useMemo(() => deriveOfficeViewModel(state), [state]);
+  const showProgressGuide = !isFtueActive(state);
   const renderMetaPanels = () => (
     <>
-      <ProgressGuide state={state} />
+      {showProgressGuide && <ProgressGuide state={state} />}
       {view.showMetaPanels && <RunCyclePanel state={state} onOperationAction={onOperationAction} />}
       {view.showMetaPanels && <PoliticalPositionPanel state={state} />}
     </>

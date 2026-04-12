@@ -4,6 +4,7 @@ import { Pickaxe, Database, Users, ArrowLeft, Search, Lock, ShieldCheck, Radar }
 import { GameState } from '../types';
 import { ProgressGuide } from './ProgressGuide';
 import { RunCyclePanel } from './RunCyclePanel';
+import { isFtueActive } from '../game/ftue';
 
 export const MineScene = ({ 
   state, 
@@ -19,6 +20,7 @@ export const MineScene = ({
   onAction?: (action: string) => void
 }) => {
   const currentMine = state.mines.find(m => m.id === state.activeMineId);
+  const showProgressGuide = !isFtueActive(state);
 
   if (!currentMine) return null;
 
@@ -33,7 +35,7 @@ export const MineScene = ({
 
   return (
     <div className="flex-1 overflow-auto p-4 grid-pattern flex flex-col">
-      <ProgressGuide state={state} />
+      {showProgressGuide && <ProgressGuide state={state} />}
       <div className="mt-3">
         <RunCyclePanel state={state} />
       </div>
