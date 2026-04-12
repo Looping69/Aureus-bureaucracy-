@@ -69,7 +69,7 @@ export const Header = ({
                 ? 'bg-white/5 border-white/10 text-white hover:bg-white/10'
                 : 'bg-black/5 border-black/10 text-black hover:bg-black/10'
             }`}
-            title="Open utilities"
+            title="Open config"
           >
             <Wrench size={14} />
           </button>

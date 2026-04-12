@@ -1,6 +1,6 @@
 import React from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { Bug, Map, ScrollText, Wrench, X } from 'lucide-react';
+import { Bug, Map, ScrollText, SlidersHorizontal, X } from 'lucide-react';
 
 interface UtilityDrawerProps {
   isOpen: boolean;
@@ -42,13 +42,13 @@ export const UtilityDrawer: React.FC<UtilityDrawerProps> = ({
           >
             <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
               <div className="flex items-center gap-2">
-                <Wrench size={16} className="text-amber-300" />
-                <div className="text-[11px] font-black uppercase tracking-[0.24em]">Utilities</div>
+                <SlidersHorizontal size={16} className="text-amber-300" />
+                <div className="text-[11px] font-black uppercase tracking-[0.24em]">Config</div>
               </div>
               <button
                 onClick={onClose}
                 className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center"
-                title="Close utilities"
+                title="Close config"
               >
                 <X size={14} />
               </button>
@@ -84,8 +84,8 @@ export const UtilityDrawer: React.FC<UtilityDrawerProps> = ({
                 >
                   <Map size={16} className="text-amber-300" />
                   <div>
-                    <div className="text-sm font-black uppercase tracking-wider">City Builder</div>
-                    <div className="text-[11px] opacity-65">Dev-only world editing. Not part of the live game.</div>
+                    <div className="text-sm font-black uppercase tracking-wider">World Editor</div>
+                    <div className="text-[11px] opacity-65">Open the overhead authoring layer for buildings, NPC anchors, and blocked pathing zones.</div>
                   </div>
                 </button>
               )}
