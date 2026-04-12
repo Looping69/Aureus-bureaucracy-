@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { Building, GameScene, GameState, GameWorldState, RelationshipFeedback, WorldPosition } from './types';
+import { Building, DialogueCommand, GameScene, GameState, GameWorldState, RelationshipFeedback, WorldPosition } from './types';
 import { INITIAL_NPCS, INITIAL_PERMITS, INITIAL_MINES, BUILDINGS } from './data';
 
 // Components
@@ -27,7 +27,7 @@ import { WORLD_SIZE } from './utils/voxelConstants';
 import { applyMineSceneAction, applyMineTileInteraction } from './game/actions/mineActions';
 import { applyMiniGameCompletion, applyPermitOverlayAction } from './game/actions/permitActions';
 import { applyFoundItem, applyTakePhoto } from './game/actions/evidenceActions';
-import { applyDialogueSocialConsequences, queueFeedback } from './game/actions/dialogueActions';
+import { applyDialogueSocialConsequences } from './game/actions/dialogueActions';
 import { applyDailyEconomyTick, applyOreExport, getExportExposureIncrease, getExportOptions, getOreUnitPrice, hasExportLicense } from './game/economy';
 import { clearSavedGameState, hasSavedGameState, loadSavedGameState, saveGameState } from './game/save';
 import { useBuildingDiscovery } from './hooks/game/useBuildingDiscovery';
@@ -44,6 +44,7 @@ import {
 } from './game/ftue';
 import { getUnlockedEnding } from './game/endings';
 import { EMPTY_WORLD_EFFECTS } from './game/dialogue/worldEffects';
+import { applyDialogueCommands } from './game/dialogue/dialogueCommands';
 import { applyOperationAction } from './game/runCycle';
 import {
   applyPlannerBuildings,
@@ -489,10 +490,6 @@ export default function App() {
     finishStartupLoading();
   }, [finishStartupLoading]);
 
-  const triggerFeedback = (npcId: string, amount: number, type: 'TRUST' | 'LEVERAGE') => {
-    queueFeedback(queuedFeedbackRef.current, npcId, amount, type);
-  };
-
   const handlePointerDown = (e: React.PointerEvent) => {
     isDraggingRef.current = true;
     dragDistanceRef.current = 0;
@@ -614,12 +611,11 @@ export default function App() {
     setShowMinePicker(true);
   };
 
-  const handleDialogueAction = (action: (s: GameState) => Partial<GameState>) => {
+  const handleDialogueAction = (commands: DialogueCommand[]) => {
     beginTrackedAction('dialogue_action');
     setState(s => {
       queuedFeedbackRef.current = [];
-      const result = action(s);
-      const newState = { ...s, ...result } as GameState;
+      const newState = applyDialogueCommands(s, commands, queuedFeedbackRef.current);
       const withConsequences = applyDialogueSocialConsequences(s, newState, queuedFeedbackRef.current);
       if (queuedFeedbackRef.current.length === 0) return withConsequences;
       return {
@@ -895,7 +891,6 @@ export default function App() {
             state={state}
             onClose={() => setState(closeNpc)} 
             onAction={handleDialogueAction}
-            triggerFeedback={triggerFeedback}
           />
         )}
         {activePermit && (

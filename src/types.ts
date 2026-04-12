@@ -301,10 +301,44 @@ export interface DialogueNode {
   options: DialogueOption[];
 }
 
+export type DialogueFeedbackType = 'TRUST' | 'LEVERAGE';
+
+export type DialogueCommand =
+  | { type: 'ADD_STORY_FLAGS'; flags: StoryFlag[] }
+  | { type: 'EXTEND_WORLD_EFFECT'; effectId: WorldEffectId; hours: number }
+  | { type: 'ADJUST_NPC_TRUST'; npcId: string; delta: number }
+  | { type: 'ADJUST_NPC_LEVERAGE'; npcId: string; delta: number }
+  | { type: 'PATCH_NPC'; npcId: string; patch: Partial<NPC> }
+  | { type: 'ADJUST_METERS'; delta: Partial<Record<keyof GameMeterState['meters'], number>> }
+  | { type: 'ADD_MONEY'; amount: number }
+  | { type: 'ADD_EVIDENCE'; amount: number }
+  | { type: 'SET_TUTORIAL_STEP'; step: number }
+  | { type: 'SET_PERMIT_STATUS'; permitId: string; status: PermitStatus; rejectionReason?: string; accuracy?: number }
+  | { type: 'START_DIALOGUE_PERMIT_MINIGAME'; permitId: string; cost: number }
+  | { type: 'APPROVE_PERMIT'; permitId: string }
+  | { type: 'APPROVE_PENDING_PERMITS' }
+  | { type: 'SET_DIALOGUE_COOLDOWN'; key: string; hours: number }
+  | { type: 'QUEUE_FEEDBACK'; npcId: string; amount: number; feedbackType: DialogueFeedbackType }
+  | { type: 'ADD_UPGRADE'; upgradeId: string }
+  | { type: 'SET_MOVEMENT_SPEED'; speed: number }
+  | { type: 'ADD_DIRT_ITEMS'; items: DirtItem[] }
+  | { type: 'CLEAR_DIRT_ITEMS' }
+  | { type: 'REMOVE_FIRST_DIRT_ITEM' }
+  | { type: 'APPLY_NPC_VULNERABILITY'; npcId: string; trustDelta: number; leverageGain: number; cooldownHours: number; effectId?: WorldEffectId; effectHours?: number }
+  | { type: 'BRIBE_NPC'; npcId: string; cost: number; trustDelta: number; exposureDelta: number; cooldownHours: number }
+  | { type: 'NEGOTIATE_PENDING_PERMITS'; npcId: string; successThreshold: number; successTrustDelta: number; failureTrustDelta: number; failureExposureDelta: number; cooldownHours: number }
+  | { type: 'USE_BACKCHANNEL_APPROVAL'; npcId: string; exposureDelta: number; cooldownHours: number }
+  | { type: 'BUY_MOVEMENT_UPGRADE'; npcId: string; upgradeId: string; cost: number; speed: number; trustDelta: number }
+  | { type: 'PROCESS_FIXER_EVIDENCE'; npcId: string; cooldownHours: number; effectHours: number }
+  | { type: 'RUN_SMUGGLING_CONVOY'; cooldownHours: number; effectHours: number; moneyGain: number; exposureDelta: number; influenceDelta: number }
+  | { type: 'LEAK_DIRT_TO_HOTLINE'; cooldownHours: number; effectHours: number }
+  | { type: 'REPORT_FIRST_DIRT_TO_AUTHORITY'; reporterNpcId: string; cooldownHours: number }
+  | { type: 'FAST_TRACK_PENDING_PERMITS'; npcId: string; leverageCost: number; cooldownHours: number };
+
 export interface DialogueOption {
   text: string;
   nextNodeId?: string;
-  action?: (state: GameState) => Partial<GameState>;
+  action?: (state: GameState) => DialogueCommand[];
   condition?: (state: GameState) => boolean;
   leverageRequired?: number;
   trustRequired?: number;

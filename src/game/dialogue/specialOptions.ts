@@ -1,13 +1,10 @@
-import { DirtItem, DirtType, GameState, NPC } from '../../types';
-import { extendWorldEffect, WORLD_EFFECTS } from './worldEffects';
-import { addStoryFlag, addStoryFlags, hasStoryFlag } from './storyFlags';
-import { approvePendingPermits, approvePermit } from '../permitProgression';
-
-type TriggerFeedback = (npcId: string, amount: number, type: 'TRUST' | 'LEVERAGE') => void;
+import { DialogueCommand, GameState, NPC } from '../../types';
+import { WORLD_EFFECTS } from './worldEffects';
+import { hasStoryFlag } from './storyFlags';
 
 export type SpecialDialogueOption = {
   text: string;
-  action: (s: GameState) => Partial<GameState>;
+  action: (s: GameState) => DialogueCommand[];
   condition?: (s: GameState) => boolean;
   trustRequired?: number;
   leverageRequired?: number;
@@ -17,7 +14,6 @@ interface BuildSpecialDialogueOptionsArgs {
   npc: NPC;
   state: GameState;
   moodInfluence: number;
-  triggerFeedback: TriggerFeedback;
 }
 
 interface NpcSocialProfile {
@@ -54,18 +50,12 @@ const cooldownRemaining = (s: GameState, key: string) => {
 
 const isCoolingDown = (s: GameState, key: string) => cooldownRemaining(s, key) > 0;
 
-const withCooldown = (s: GameState, key: string, hours: number): Record<string, number> => ({
-  ...s.dialogueCooldowns,
-  [key]: currentHour(s) + hours
-});
-
 const addCooldownLabel = (base: string, s: GameState, key: string) => {
   const remaining = cooldownRemaining(s, key);
   if (remaining <= 0) return base;
   return `${base} [Cooldown ${remaining}h]`;
 };
 
-const clampPercent = (value: number) => Math.max(0, Math.min(100, value));
 const effectLabel = (effectId: keyof typeof WORLD_EFFECTS, hours: number) =>
   `, +${WORLD_EFFECTS[effectId].label} ${hours}h`;
 
@@ -73,7 +63,6 @@ export const buildSpecialDialogueOptions = ({
   npc,
   state,
   moodInfluence,
-  triggerFeedback
 }: BuildSpecialDialogueOptionsArgs): SpecialDialogueOption[] => {
   const profile = SOCIAL_PROFILES[npc.id] ?? DEFAULT_PROFILE;
   const applyMood = (val: number) => Math.round(val * (1 + moodInfluence));
@@ -82,17 +71,13 @@ export const buildSpecialDialogueOptions = ({
     {
       text: `Small Talk: Compliment their work (+Trust / minor risk)`,
       action: (s: GameState) => {
-        const freshNpc = s.npcs[npc.id];
         const success = Math.random() > 0.3;
         const baseGain = success ? 5 : -2;
         const gain = applyMood(Math.round(baseGain * profile.trustVolatility));
-        triggerFeedback(npc.id, gain, 'TRUST');
-        return {
-          npcs: {
-            ...s.npcs,
-            [npc.id]: { ...freshNpc, trustLevel: clampPercent(freshNpc.trustLevel + gain) }
-          }
-        };
+        return [
+          { type: 'QUEUE_FEEDBACK', npcId: npc.id, amount: gain, feedbackType: 'TRUST' },
+          { type: 'ADJUST_NPC_TRUST', npcId: npc.id, delta: gain },
+        ];
       }
     }
   ];
@@ -103,26 +88,24 @@ export const buildSpecialDialogueOptions = ({
       text: addCooldownLabel(`Target Vulnerability: ${npc.vulnerability.description} (+Trust, +Leverage${npc.id === 'licensing' || npc.id === 'inspector' ? effectLabel('bureauPull', 10) : npc.id === 'chief' || npc.id === 'union' ? effectLabel('communityBacking', 12) : npc.id === 'fixer' ? effectLabel('marketInsight', 12) : ''})`, state, key),
       condition: (s: GameState) => npc.trustLevel >= 20 && !isCoolingDown(s, key),
       action: (s: GameState) => {
-        const freshNpc = s.npcs[npc.id];
         const gain = applyMood(Math.round(25 * profile.trustVolatility));
-        const worldEffects =
+        const effect =
           npc.id === 'licensing' || npc.id === 'inspector'
-            ? extendWorldEffect(s, 'bureauPull', 10)
+            ? { id: 'bureauPull' as const, hours: 10 }
             : npc.id === 'chief' || npc.id === 'union'
-              ? extendWorldEffect(s, 'communityBacking', 12)
+              ? { id: 'communityBacking' as const, hours: 12 }
               : npc.id === 'fixer'
-                ? extendWorldEffect(s, 'marketInsight', 12)
-                : s.worldEffects;
-        triggerFeedback(npc.id, gain, 'TRUST');
-        triggerFeedback(npc.id, 10, 'LEVERAGE');
-        return {
-          dialogueCooldowns: withCooldown(s, key, 8),
-          worldEffects,
-          npcs: {
-            ...s.npcs,
-            [npc.id]: { ...freshNpc, trustLevel: clampPercent(freshNpc.trustLevel + gain) }
-          }
-        };
+                ? { id: 'marketInsight' as const, hours: 12 }
+                : null;
+        return [{
+          type: 'APPLY_NPC_VULNERABILITY',
+          npcId: npc.id,
+          trustDelta: gain,
+          leverageGain: 10,
+          cooldownHours: 8,
+          effectId: effect?.id,
+          effectHours: effect?.hours,
+        }];
       }
     });
   }
@@ -139,21 +122,15 @@ export const buildSpecialDialogueOptions = ({
         s.money >= bribeCost &&
         !isCoolingDown(s, key),
       action: (s: GameState) => {
-        const freshNpc = s.npcs[npc.id];
         const gain = applyMood(Math.round(14 * profile.trustVolatility));
-        triggerFeedback(npc.id, gain, 'TRUST');
-        return {
-          money: s.money - bribeCost,
-          dialogueCooldowns: withCooldown(s, key, 6),
-          meters: {
-            ...s.meters,
-            exposure: Math.min(100, s.meters.exposure + Math.ceil(2 * profile.exposureSensitivity))
-          },
-          npcs: {
-            ...s.npcs,
-            [npc.id]: { ...freshNpc, trustLevel: clampPercent(freshNpc.trustLevel + gain) }
-          }
-        };
+        return [{
+          type: 'BRIBE_NPC',
+          npcId: npc.id,
+          cost: bribeCost,
+          trustDelta: gain,
+          exposureDelta: Math.ceil(2 * profile.exposureSensitivity),
+          cooldownHours: 6,
+        }];
       }
     });
   }
@@ -174,32 +151,16 @@ export const buildSpecialDialogueOptions = ({
       action: (s: GameState) => {
         const freshNpc = s.npcs[npc.id];
         const successRate = Math.min(95, Math.max(10, (freshNpc.trustLevel / 2) + (freshNpc.leverage * 1.5) + profile.negotiateBonus));
-        const roll = Math.random() * 100;
-
-        if (roll < successRate) {
-          const approval = approvePendingPermits(s.permits, s.mines);
-          triggerFeedback(npc.id, 10, 'TRUST');
-          return {
-            dialogueCooldowns: withCooldown(s, key, 8),
-            worldEffects: extendWorldEffect(s, 'bureauPull', 10),
-            permits: approval.permits,
-            mines: approval.mines,
-          };
-        }
-
         const trustPenalty = Math.round(8 * profile.trustVolatility);
-        triggerFeedback(npc.id, -trustPenalty, 'TRUST');
-        return {
-          dialogueCooldowns: withCooldown(s, key, 8),
-          meters: {
-            ...s.meters,
-            exposure: Math.min(100, s.meters.exposure + Math.ceil(3 * profile.exposureSensitivity))
-          },
-          npcs: {
-            ...s.npcs,
-            [npc.id]: { ...freshNpc, trustLevel: Math.max(0, freshNpc.trustLevel - trustPenalty) }
-          }
-        };
+        return [{
+          type: 'NEGOTIATE_PENDING_PERMITS',
+          npcId: npc.id,
+          successThreshold: successRate,
+          successTrustDelta: 10,
+          failureTrustDelta: trustPenalty,
+          failureExposureDelta: Math.ceil(3 * profile.exposureSensitivity),
+          cooldownHours: 8,
+        }];
       }
     });
   }
@@ -216,17 +177,8 @@ export const buildSpecialDialogueOptions = ({
         !isCoolingDown(s, key),
       action: (s: GameState) => {
         const pendingPermit = Object.values(s.permits).find(p => p.status === 'PENDING');
-        if (!pendingPermit) return {};
-        const approval = approvePermit(pendingPermit.id, s.permits, s.mines);
-        return {
-          dialogueCooldowns: withCooldown(s, key, 14),
-          permits: approval.permits,
-          mines: approval.mines,
-          meters: {
-            ...s.meters,
-            exposure: Math.min(100, s.meters.exposure + 8)
-          }
-        };
+        if (!pendingPermit) return [];
+        return [{ type: 'USE_BACKCHANNEL_APPROVAL', npcId: npc.id, exposureDelta: 8, cooldownHours: 14 }];
       }
     });
   }
@@ -235,53 +187,17 @@ export const buildSpecialDialogueOptions = ({
     options.push({
       text: 'Buy Movement Upgrade: Sturdy Boots (-$200, +Speed)',
       condition: (s: GameState) => s.money >= 200 && !s.upgrades.includes('boots'),
-      action: (s: GameState) => {
-        const freshNpc = s.npcs[npc.id];
-        triggerFeedback(npc.id, 5, 'TRUST');
-        return {
-          money: s.money - 200,
-          movementSpeed: 2,
-          upgrades: [...s.upgrades, 'boots'],
-          npcs: {
-            ...s.npcs,
-            [npc.id]: { ...freshNpc, trustLevel: clampPercent(freshNpc.trustLevel + 5) }
-          }
-        };
-      }
+      action: () => [{ type: 'BUY_MOVEMENT_UPGRADE', npcId: npc.id, upgradeId: 'boots', cost: 200, speed: 2, trustDelta: 5 }]
     });
     options.push({
       text: 'Buy Movement Upgrade: Used Scooter (-$1000, ++Speed)',
       condition: (s: GameState) => s.money >= 1000 && s.upgrades.includes('boots') && !s.upgrades.includes('scooter'),
-      action: (s: GameState) => {
-        const freshNpc = s.npcs[npc.id];
-        triggerFeedback(npc.id, 10, 'TRUST');
-        return {
-          money: s.money - 1000,
-          movementSpeed: 4,
-          upgrades: [...s.upgrades, 'scooter'],
-          npcs: {
-            ...s.npcs,
-            [npc.id]: { ...freshNpc, trustLevel: clampPercent(freshNpc.trustLevel + 10) }
-          }
-        };
-      }
+      action: () => [{ type: 'BUY_MOVEMENT_UPGRADE', npcId: npc.id, upgradeId: 'scooter', cost: 1000, speed: 4, trustDelta: 10 }]
     });
     options.push({
       text: 'Buy Movement Upgrade: Rusty Truck (-$5000, +++Speed)',
       condition: (s: GameState) => s.money >= 5000 && s.upgrades.includes('scooter') && !s.upgrades.includes('truck'),
-      action: (s: GameState) => {
-        const freshNpc = s.npcs[npc.id];
-        triggerFeedback(npc.id, 20, 'TRUST');
-        return {
-          money: s.money - 5000,
-          movementSpeed: 8,
-          upgrades: [...s.upgrades, 'truck'],
-          npcs: {
-            ...s.npcs,
-            [npc.id]: { ...freshNpc, trustLevel: clampPercent(freshNpc.trustLevel + 20) }
-          }
-        };
-      }
+      action: () => [{ type: 'BUY_MOVEMENT_UPGRADE', npcId: npc.id, upgradeId: 'truck', cost: 5000, speed: 8, trustDelta: 20 }]
     });
 
     if (state.evidence > 0) {
@@ -289,46 +205,7 @@ export const buildSpecialDialogueOptions = ({
       options.push({
         text: addCooldownLabel(`Process Evidence into Dirt (${state.evidence} items${effectLabel('marketInsight', 8)}, sets cooldown)`, state, key),
         condition: (s: GameState) => !isCoolingDown(s, key),
-        action: (s: GameState) => {
-          const dirtTypes: DirtType[] = ['PERMIT_VIOLATION', 'BACKROOM_DEAL', 'PERSONAL_SECRET'];
-          const targetIds = Object.keys(s.npcs).filter(id => id !== 'fixer' && id !== 'journalist');
-
-          if (targetIds.length === 0) return { evidence: 0 };
-
-          const newDirt: DirtItem[] = Array.from({ length: s.evidence }).map((_, i) => {
-            const type = dirtTypes[Math.floor(Math.random() * dirtTypes.length)];
-            const targetNpcId = targetIds[Math.floor(Math.random() * targetIds.length)];
-            const targetName = s.npcs[targetNpcId].name;
-
-            let description = '';
-            let value = 20;
-
-            if (type === 'PERMIT_VIOLATION') {
-              description = `Evidence of ${targetName} bypassing Form 12-C.`;
-              value = 15;
-            } else if (type === 'BACKROOM_DEAL') {
-              description = `Recorded conversation of ${targetName} taking a bribe.`;
-              value = 25;
-            } else {
-              description = `Photos of ${targetName} at an unauthorized 'Joy Seminar'.`;
-              value = 30;
-            }
-
-            return {
-              id: `dirt-${Date.now()}-${i}`,
-              type,
-              description,
-              targetNpcId,
-              value
-            };
-          });
-          return {
-            evidence: 0,
-            dialogueCooldowns: withCooldown(s, key, 6),
-            worldEffects: extendWorldEffect(s, 'marketInsight', 8),
-            dirtItems: [...s.dirtItems, ...newDirt]
-          };
-        }
+        action: () => [{ type: 'PROCESS_FIXER_EVIDENCE', npcId: npc.id, cooldownHours: 6, effectHours: 8 }]
       });
     }
 
@@ -344,16 +221,7 @@ export const buildSpecialDialogueOptions = ({
           !hasStoryFlag(s, 'community_pact') &&
           !hasStoryFlag(s, 'inspector_deputized') &&
           !isCoolingDown(s, key),
-        action: (s: GameState) => ({
-          dialogueCooldowns: withCooldown(s, key, 18),
-          worldEffects: extendWorldEffect(s, 'marketInsight', 18),
-          money: s.money + 500,
-          meters: {
-            ...s.meters,
-            exposure: Math.min(100, s.meters.exposure + 10),
-            influence: Math.min(100, s.meters.influence + 4)
-          }
-        })
+        action: () => [{ type: 'RUN_SMUGGLING_CONVOY', cooldownHours: 18, effectHours: 18, moneyGain: 500, exposureDelta: 10, influenceDelta: 4 }]
       });
     }
   }
@@ -365,46 +233,7 @@ export const buildSpecialDialogueOptions = ({
         ? 'Leak Dirt to Hotline: closed while Vox is under embargo'
         : addCooldownLabel(`Leak Dirt to Hotline (${state.dirtItems.length} items, +Influence, +Exposure${effectLabel('mediaHeat', 18)})`, state, key),
       condition: (s: GameState) => !hasStoryFlag(s, 'vox_embargo') && !isCoolingDown(s, key),
-      action: (s: GameState) => {
-        let exposureGain = 0;
-        let influenceGain = 0;
-        let trustLoss = 0;
-        const npcUpdates: Record<string, NPC> = {};
-
-        s.dirtItems.forEach(d => {
-          exposureGain += Math.ceil(8 * profile.exposureSensitivity);
-          if (d.type === 'PERMIT_VIOLATION') {
-            trustLoss += 5;
-          } else if (d.type === 'BACKROOM_DEAL') {
-            influenceGain += 10;
-          } else {
-            influenceGain += 5;
-          }
-
-          const target = s.npcs[d.targetNpcId];
-          triggerFeedback(d.targetNpcId, d.value, 'LEVERAGE');
-          triggerFeedback(d.targetNpcId, -15, 'TRUST');
-          npcUpdates[d.targetNpcId] = {
-            ...target,
-            leverage: target.leverage + d.value,
-            trustLevel: Math.max(0, target.trustLevel - 15)
-          };
-        });
-
-        return {
-          dirtItems: [],
-          dialogueCooldowns: withCooldown(s, key, 10),
-          worldEffects: extendWorldEffect(s, 'mediaHeat', 18),
-          storyFlags: addStoryFlag(s, 'public_scandal'),
-          meters: {
-            ...s.meters,
-            exposure: Math.min(100, s.meters.exposure + exposureGain),
-            trust: Math.max(0, s.meters.trust - trustLoss),
-            influence: Math.min(100, s.meters.influence + influenceGain)
-          },
-          npcs: { ...s.npcs, ...npcUpdates }
-        };
-      }
+      action: () => [{ type: 'LEAK_DIRT_TO_HOTLINE', cooldownHours: 10, effectHours: 18 }]
     });
   }
 
@@ -415,60 +244,7 @@ export const buildSpecialDialogueOptions = ({
         ? 'Report a Violation: Krell will not touch your evidence anymore'
         : addCooldownLabel(`Report a Violation (major trust swing${effectLabel('bureauPull', 10)}${effectLabel('mediaHeat', 10)}, sets cooldown)`, state, key),
       condition: (s: GameState) => !(npc.id === 'inspector' && hasStoryFlag(s, 'inspector_blacklist')) && !isCoolingDown(s, key),
-      action: (s: GameState) => {
-        const item = s.dirtItems[0];
-        const remainingDirt = s.dirtItems.slice(1);
-        const freshNpc = s.npcs[npc.id];
-
-        if (item.targetNpcId === npc.id) {
-          triggerFeedback(npc.id, -freshNpc.trustLevel, 'TRUST');
-          triggerFeedback(npc.id, -freshNpc.leverage, 'LEVERAGE');
-          return {
-            dirtItems: remainingDirt,
-            dialogueCooldowns: withCooldown(s, key, 12),
-            storyFlags: addStoryFlags(s, 'vane_exposed', 'public_scandal'),
-            worldEffects: extendWorldEffect(
-              { ...s, worldEffects: extendWorldEffect(s, 'bureauPull', 10) } as GameState,
-              'mediaHeat',
-              10
-            ),
-            money: Math.max(0, s.money - 500),
-            meters: {
-              ...s.meters,
-              trust: Math.max(0, s.meters.trust - 20),
-              exposure: Math.min(100, s.meters.exposure + 10)
-            },
-            npcs: {
-              ...s.npcs,
-              [npc.id]: { ...freshNpc, trustLevel: 0, leverage: 0 }
-            }
-          };
-        }
-
-        const target = s.npcs[item.targetNpcId];
-        triggerFeedback(npc.id, 15, 'TRUST');
-        triggerFeedback(item.targetNpcId, -30, 'TRUST');
-        return {
-          dirtItems: remainingDirt,
-          dialogueCooldowns: withCooldown(s, key, 12),
-          storyFlags: npc.id === 'licensing' ? addStoryFlags(s, 'vane_exposed', 'public_scandal') : s.storyFlags,
-          worldEffects: extendWorldEffect(
-            { ...s, worldEffects: extendWorldEffect(s, 'bureauPull', 10) } as GameState,
-            'mediaHeat',
-            10
-          ),
-          meters: {
-            ...s.meters,
-            trust: Math.min(100, s.meters.trust + 10),
-            influence: Math.min(100, s.meters.influence + 5)
-          },
-          npcs: {
-            ...s.npcs,
-            [npc.id]: { ...freshNpc, trustLevel: Math.min(100, freshNpc.trustLevel + 15) },
-            [item.targetNpcId]: { ...target, trustLevel: Math.max(0, target.trustLevel - 30) }
-          }
-        };
-      }
+      action: () => [{ type: 'REPORT_FIRST_DIRT_TO_AUTHORITY', reporterNpcId: npc.id, cooldownHours: 12 }]
     });
   }
 
@@ -477,17 +253,7 @@ export const buildSpecialDialogueOptions = ({
     options.push({
       text: addCooldownLabel('Use Leverage to Fast-Track Permit (-20 Leverage, instant approval)', state, key),
       condition: (s: GameState) => !isCoolingDown(s, key),
-      action: (s: GameState) => {
-        const freshNpc = s.npcs[npc.id];
-        const approval = approvePendingPermits(s.permits, s.mines);
-        triggerFeedback(npc.id, -20, 'LEVERAGE');
-        return {
-          dialogueCooldowns: withCooldown(s, key, 12),
-          npcs: { ...s.npcs, [npc.id]: { ...freshNpc, leverage: Math.max(0, freshNpc.leverage - 20) } },
-          permits: approval.permits,
-          mines: approval.mines,
-        };
-      }
+      action: () => [{ type: 'FAST_TRACK_PENDING_PERMITS', npcId: npc.id, leverageCost: 20, cooldownHours: 12 }]
     });
   }
 

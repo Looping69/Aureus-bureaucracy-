@@ -3,6 +3,7 @@ import { extendWorldEffect } from './game/dialogue/worldEffects';
 import { addStoryFlag, addStoryFlags, hasStoryFlag } from './game/dialogue/storyFlags';
 import { approvePermit } from './game/permitProgression';
 import { adjustMeters, adjustNpcLeverage, adjustNpcTrust, beginDialoguePermitMiniGame, patchNpc, unlockPermit } from './game/dialogue/dialogueState';
+import { buildDialogueTransitionCommands } from './game/dialogue/dialogueCommands';
 import { PLAYER_HOUSE_VOXELS } from './voxelData';
 import {
   ASSET_BUILDING_A_VOXELS,
@@ -488,10 +489,10 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
         {
           text: "I need a permit to start digging. (Tutorial)",
           condition: (s) => s.tutorialStep === 2,
-          action: (s) => ({
-            tutorialStep: 3,
-            permits: unlockPermit(s, 'extraction-intent')
-          }),
+          action: () => ([
+            { type: 'SET_TUTORIAL_STEP', step: 3 },
+            { type: 'SET_PERMIT_STATUS', permitId: 'extraction-intent', status: 'AVAILABLE' },
+          ]),
           nextNodeId: 'tutorial_intro'
         },
         {
@@ -506,8 +507,8 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
         },
         {
           text: "Your filing system is remarkably efficient, Officer.",
-          action: (s) => ({
-            npcs: adjustNpcTrust(s, 'licensing', 5)
+          action: () => buildDialogueTransitionCommands({
+            npcTrustDelta: { licensing: 5 },
           }),
           nextNodeId: 'flattery'
         },
@@ -552,12 +553,16 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
       options: [
         {
           text: "I see. Initiative. [Insight]",
-          action: (s) => ({
-            tutorialStep: 5, // Advance to 'Use Knowledge' step
-            npcs: patchNpc(s, 'licensing', {
-              vulnerability: { ...s.npcs.licensing.vulnerability, discovered: true }
-            })
-          }),
+          action: (s) => [
+            { type: 'SET_TUTORIAL_STEP', step: 5 },
+            {
+              type: 'PATCH_NPC',
+              npcId: 'licensing',
+              patch: {
+                vulnerability: { ...s.npcs.licensing.vulnerability, discovered: true }
+              }
+            }
+          ],
           nextNodeId: 'negotiation_phase'
         }
       ]
@@ -570,18 +575,15 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
           text: "I heard the Director is looking for 'efficient' officers... [Use Vulnerability]",
           condition: (s) => s.npcs['licensing'].vulnerability.discovered,
           action: (s) => {
-            const approval = approvePermit('extraction-intent', s.permits, s.mines);
-            return {
-              tutorialStep: 7, // Complete tutorial
-              worldEffects: extendWorldEffect(s, 'bureauPull', 10),
-              permits: approval.permits,
-              mines: approval.mines,
-              npcs: adjustNpcTrust(s, 'licensing', 20),
-              meters: adjustMeters(s, {
-                influence: s.meters.influence + 5,
-                trust: s.meters.trust + 10
-              })
-            };
+            return [
+              { type: 'SET_TUTORIAL_STEP', step: 7 },
+              { type: 'APPROVE_PERMIT', permitId: 'extraction-intent' },
+              ...buildDialogueTransitionCommands({
+                effect: { id: 'bureauPull', hours: 10 },
+                npcTrustDelta: { licensing: 20 },
+                meterDelta: { influence: 5, trust: 10 },
+              }),
+            ];
           },
           nextNodeId: 'tutorial_success'
         },
@@ -589,17 +591,14 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
           text: "Maybe I can offer a 'processing fee'? ($50)",
           condition: (s) => s.money >= 50,
           action: (s) => {
-            const approval = approvePermit('extraction-intent', s.permits, s.mines);
-            return {
-              money: s.money - 50,
-              tutorialStep: 7, // Complete tutorial
-              permits: approval.permits,
-              mines: approval.mines,
-              meters: adjustMeters(s, {
-                exposure: s.meters.exposure + 5,
-                trust: Math.max(0, s.meters.trust - 5)
-              })
-            };
+            return [
+              { type: 'ADD_MONEY', amount: -50 },
+              { type: 'SET_TUTORIAL_STEP', step: 7 },
+              { type: 'APPROVE_PERMIT', permitId: 'extraction-intent' },
+              ...buildDialogueTransitionCommands({
+                meterDelta: { exposure: 5, trust: -5 },
+              }),
+            ];
           },
           nextNodeId: 'tutorial_success'
         }
@@ -619,7 +618,7 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
         {
           text: "Here is the $50. [Pay]",
           condition: (s) => s.money >= 50,
-          action: (s) => beginDialoguePermitMiniGame(s, 'prospecting-license', 50),
+          action: () => [{ type: 'START_DIALOGUE_PERMIT_MINIGAME', permitId: 'prospecting-license', cost: 50 }],
           nextNodeId: 'approved'
         },
         { text: "I'll come back later.", nextNodeId: 'root' }
@@ -638,27 +637,22 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
       options: [
         {
           text: 'Quietly. Open your backchannel and move my permits.',
-          action: (s) => ({
-            storyFlags: addStoryFlag(s, 'vane_backchannel'),
-            worldEffects: extendWorldEffect(s, 'bureauPull', 18),
-            npcs: adjustNpcLeverage({ ...s, npcs: adjustNpcTrust(s, 'licensing', 10) }, 'licensing', 15),
-            meters: adjustMeters(s, {
-              exposure: Math.min(100, s.meters.exposure + 6)
-            })
+          action: () => buildDialogueTransitionCommands({
+            flags: ['vane_backchannel'],
+            effect: { id: 'bureauPull', hours: 18 },
+            npcTrustDelta: { licensing: 10 },
+            npcLeverageDelta: { licensing: 15 },
+            meterDelta: { exposure: 6 },
           }),
           nextNodeId: 'backchannel_opened'
         },
         {
           text: 'Catastrophically. I am taking this public.',
-          action: (s) => ({
-            storyFlags: addStoryFlags(s, 'vane_exposed', 'public_scandal'),
-            worldEffects: extendWorldEffect(s, 'mediaHeat', 24),
-            meters: adjustMeters(s, {
-              influence: Math.min(100, s.meters.influence + 10),
-              trust: Math.min(100, s.meters.trust + 4),
-              exposure: Math.min(100, s.meters.exposure + 10)
-            }),
-            npcs: adjustNpcTrust(s, 'licensing', -35)
+          action: () => buildDialogueTransitionCommands({
+            flags: ['vane_exposed', 'public_scandal'],
+            effect: { id: 'mediaHeat', hours: 24 },
+            meterDelta: { influence: 10, trust: 4, exposure: 10 },
+            npcTrustDelta: { licensing: -35 },
           }),
           nextNodeId: 'vane_burned'
         }
@@ -701,10 +695,10 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
           text: "Let's build a clean-water pact. [Trust 45+]",
           trustRequired: 45,
           condition: (s) => !hasStoryFlag(s, 'community_pact') && !hasStoryFlag(s, 'fixer_smuggling_tie'),
-          action: (s) => ({
-            storyFlags: addStoryFlag(s, 'community_pact'),
-            worldEffects: extendWorldEffect(s, 'communityBacking', 24),
-            npcs: adjustNpcTrust(s, 'chief', 10)
+          action: () => buildDialogueTransitionCommands({
+            flags: ['community_pact'],
+            effect: { id: 'communityBacking', hours: 24 },
+            npcTrustDelta: { chief: 10 },
           }),
           nextNodeId: 'community_pact'
         },
@@ -716,9 +710,9 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
         {
           text: "I have medicine for the elders. [Give Item]",
           condition: (s) => s.upgrades.includes('meds'),
-          action: (s) => ({
-            worldEffects: extendWorldEffect(s, 'communityBacking', 18),
-            npcs: adjustNpcTrust(s, 'chief', 25)
+          action: () => buildDialogueTransitionCommands({
+            effect: { id: 'communityBacking', hours: 18 },
+            npcTrustDelta: { chief: 25 },
           }),
           nextNodeId: 'meds_given'
         }
@@ -737,15 +731,15 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
       options: [
         { 
           text: "I'll look into it. [Gain Dirt on Vane]",
-          action: (s) => ({
-            storyFlags: addStoryFlag(s, 'chief_water_quest'),
-            dirtItems: [...s.dirtItems, {
+          action: () => buildDialogueTransitionCommands({
+            flags: ['chief_water_quest'],
+            dirtItemsAppend: [{
               id: `dirt-vane-water-${Date.now()}`,
               type: 'PERMIT_VIOLATION',
               description: "Evidence of Vane ignoring water contamination reports.",
               targetNpcId: 'licensing',
               value: 20
-            }]
+            }],
           }),
           nextNodeId: 'quest_accepted'
         }
@@ -799,9 +793,9 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
       options: [
         { 
           text: "I'll talk to Chief Okon. [Gain Trust with Union]",
-          action: (s) => ({
-            worldEffects: extendWorldEffect(s, 'communityBacking', 12),
-            npcs: adjustNpcTrust(s, 'union', 10)
+          action: () => buildDialogueTransitionCommands({
+            effect: { id: 'communityBacking', hours: 12 },
+            npcTrustDelta: { union: 10 },
           }),
           nextNodeId: 'root'
         }
@@ -820,20 +814,11 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
       options: [
         {
           text: 'Do it. Burn Vane in public.',
-          action: (s) => ({
-            storyFlags: addStoryFlags(s, 'vane_exposed', 'public_scandal'),
-            worldEffects: extendWorldEffect(s, 'mediaHeat', 24),
-            meters: {
-              ...s.meters,
-              influence: Math.min(100, s.meters.influence + 12),
-              trust: Math.min(100, s.meters.trust + 6),
-              exposure: Math.min(100, s.meters.exposure + 8)
-            },
-            npcs: {
-              ...s.npcs,
-              licensing: { ...s.npcs.licensing, trustLevel: Math.max(0, s.npcs.licensing.trustLevel - 30) },
-              union: { ...s.npcs.union, trustLevel: Math.min(100, s.npcs.union.trustLevel + 8) }
-            }
+          action: () => buildDialogueTransitionCommands({
+            flags: ['vane_exposed', 'public_scandal'],
+            effect: { id: 'mediaHeat', hours: 24 },
+            meterDelta: { influence: 12, trust: 6, exposure: 8 },
+            npcTrustDelta: { licensing: -30, union: 8 },
           }),
           nextNodeId: 'root'
         },
@@ -891,17 +876,18 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
           action: (s) => {
             const exposureGain = Math.min(18, 4 + (s.dirtItems.length * 3));
             const influenceGain = Math.min(20, 6 + (s.dirtItems.length * 4));
-            return {
-              dirtItems: [],
-              worldEffects: extendWorldEffect(s, 'mediaHeat', 18),
-              storyFlags: addStoryFlag(s, 'public_scandal'),
-              meters: {
-                ...s.meters,
-                exposure: Math.min(100, s.meters.exposure + exposureGain),
-                influence: Math.min(100, s.meters.influence + influenceGain),
-                trust: Math.max(0, s.meters.trust - Math.min(8, s.dirtItems.length * 2))
-              }
-            };
+            return [
+              { type: 'CLEAR_DIRT_ITEMS' },
+              ...buildDialogueTransitionCommands({
+                effect: { id: 'mediaHeat', hours: 18 },
+                flags: ['public_scandal'],
+                meterDelta: {
+                  exposure: exposureGain,
+                  influence: influenceGain,
+                  trust: -Math.min(8, s.dirtItems.length * 2),
+                },
+              }),
+            ];
           },
           nextNodeId: 'root'
         },
@@ -914,19 +900,11 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
       options: [
         {
           text: 'Run it. I want maximum daylight.',
-          action: (s) => ({
-            storyFlags: addStoryFlags(s, 'vox_exclusive', 'public_scandal', 'vane_exposed'),
-            worldEffects: extendWorldEffect(s, 'mediaHeat', 30),
-            meters: {
-              ...s.meters,
-              influence: Math.min(100, s.meters.influence + 14),
-              exposure: Math.min(100, s.meters.exposure + 8)
-            },
-            npcs: {
-              ...s.npcs,
-              journalist: { ...s.npcs.journalist, trustLevel: Math.min(100, s.npcs.journalist.trustLevel + 15) },
-              licensing: { ...s.npcs.licensing, trustLevel: Math.max(0, s.npcs.licensing.trustLevel - 25) }
-            }
+          action: () => buildDialogueTransitionCommands({
+            flags: ['vox_exclusive', 'public_scandal', 'vane_exposed'],
+            effect: { id: 'mediaHeat', hours: 30 },
+            meterDelta: { influence: 14, exposure: 8 },
+            npcTrustDelta: { journalist: 15, licensing: -25 },
           }),
           nextNodeId: 'root'
         }
@@ -939,14 +917,11 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
         {
           text: 'Pay $150 and cool the press.',
           condition: (s) => s.money >= 150,
-          action: (s) => ({
-            money: s.money - 150,
-            storyFlags: addStoryFlag(s, 'vox_embargo'),
-            worldEffects: extendWorldEffect(s, 'bureauPull', 12),
-            meters: {
-              ...s.meters,
-              exposure: Math.max(0, s.meters.exposure - 4)
-            }
+          action: () => buildDialogueTransitionCommands({
+            moneyDelta: -150,
+            flags: ['vox_embargo'],
+            effect: { id: 'bureauPull', hours: 12 },
+            meterDelta: { exposure: -4 },
           }),
           nextNodeId: 'root'
         },
@@ -1031,19 +1006,10 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
         {
           text: 'Offer full documentation (+Trust, +Community Backing 12h if accepted).',
           condition: (s) => s.meters.trust >= 35,
-          action: (s) => ({
-            worldEffects: extendWorldEffect(s, 'communityBacking', 12),
-            npcs: {
-              ...s.npcs,
-              inspector: {
-                ...s.npcs.inspector,
-                trustLevel: Math.min(100, s.npcs.inspector.trustLevel + 12)
-              }
-            },
-            meters: {
-              ...s.meters,
-              exposure: Math.max(0, s.meters.exposure - 4)
-            }
+          action: () => buildDialogueTransitionCommands({
+            effect: { id: 'communityBacking', hours: 12 },
+            npcTrustDelta: { inspector: 12 },
+            meterDelta: { exposure: -4 },
           }),
           nextNodeId: 'sweep_success'
         },
@@ -1069,27 +1035,18 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
       options: [
         {
           text: 'Use findings to build a reform case (+Influence, +Bureau Pull 10h).',
-          action: (s) => ({
-            evidence: s.evidence + 1,
-            storyFlags: addStoryFlag(s, 'reform_alliance'),
-            worldEffects: extendWorldEffect(s, 'bureauPull', 10),
-            meters: {
-              ...s.meters,
-              influence: Math.min(100, s.meters.influence + 5)
-            }
+          action: () => buildDialogueTransitionCommands({
+            evidenceDelta: 1,
+            flags: ['reform_alliance'],
+            effect: { id: 'bureauPull', hours: 10 },
+            meterDelta: { influence: 5 },
           }),
           nextNodeId: 'root'
         },
         {
           text: 'Keep this between us.',
-          action: (s) => ({
-            npcs: {
-              ...s.npcs,
-              inspector: {
-                ...s.npcs.inspector,
-                trustLevel: Math.min(100, s.npcs.inspector.trustLevel + 6)
-              }
-            }
+          action: () => buildDialogueTransitionCommands({
+            npcTrustDelta: { inspector: 6 },
           }),
           nextNodeId: 'root'
         }
@@ -1101,14 +1058,10 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
       options: [
         {
           text: 'Do it. I want clean approvals, not favors.',
-          action: (s) => ({
-            storyFlags: addStoryFlags(s, 'reform_alliance', 'vane_exposed'),
-            worldEffects: extendWorldEffect(s, 'bureauPull', 20),
-            meters: {
-              ...s.meters,
-              influence: Math.min(100, s.meters.influence + 8),
-              exposure: Math.max(0, s.meters.exposure - 3)
-            }
+          action: () => buildDialogueTransitionCommands({
+            flags: ['reform_alliance', 'vane_exposed'],
+            effect: { id: 'bureauPull', hours: 20 },
+            meterDelta: { influence: 8, exposure: -3 },
           }),
           nextNodeId: 'root'
         }
@@ -1120,18 +1073,11 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
       options: [
         {
           text: 'Deputize me. I am done playing both sides.',
-          action: (s) => ({
-            storyFlags: addStoryFlags(s, 'inspector_deputized', 'reform_alliance', 'vane_exposed'),
-            worldEffects: extendWorldEffect(s, 'bureauPull', 24),
-            meters: {
-              ...s.meters,
-              exposure: Math.max(0, s.meters.exposure - 5),
-              influence: Math.min(100, s.meters.influence + 6)
-            },
-            npcs: {
-              ...s.npcs,
-              inspector: { ...s.npcs.inspector, trustLevel: Math.min(100, s.npcs.inspector.trustLevel + 15) }
-            }
+          action: () => buildDialogueTransitionCommands({
+            flags: ['inspector_deputized', 'reform_alliance', 'vane_exposed'],
+            effect: { id: 'bureauPull', hours: 24 },
+            meterDelta: { exposure: -5, influence: 6 },
+            npcTrustDelta: { inspector: 15 },
           }),
           nextNodeId: 'root'
         }
@@ -1143,13 +1089,10 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
       options: [
         {
           text: 'Fine. Blacklist me.',
-          action: (s) => ({
-            storyFlags: addStoryFlag(s, 'inspector_blacklist'),
-            worldEffects: extendWorldEffect(s, 'marketInsight', 12),
-            meters: {
-              ...s.meters,
-              exposure: Math.min(100, s.meters.exposure + 6)
-            }
+          action: () => buildDialogueTransitionCommands({
+            flags: ['inspector_blacklist'],
+            effect: { id: 'marketInsight', hours: 12 },
+            meterDelta: { exposure: 6 },
           }),
           nextNodeId: 'root'
         },
@@ -1198,23 +1141,13 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
         {
           text: 'Accept the run (-$60, +Evidence, +Influence, +Market Window 10h).',
           condition: (s) => s.money >= 60,
-          action: (s) => ({
-            money: s.money - 60,
-            evidence: s.evidence + 2,
-            storyFlags: addStoryFlag(s, 'fixer_smuggling_tie'),
-            worldEffects: extendWorldEffect(s, 'marketInsight', 10),
-            meters: {
-              ...s.meters,
-              influence: Math.min(100, s.meters.influence + 3),
-              exposure: Math.min(100, s.meters.exposure + 2)
-            },
-            npcs: {
-              ...s.npcs,
-              fixer: {
-                ...s.npcs.fixer,
-                trustLevel: Math.min(100, s.npcs.fixer.trustLevel + 8)
-              }
-            }
+          action: () => buildDialogueTransitionCommands({
+            moneyDelta: -60,
+            evidenceDelta: 2,
+            flags: ['fixer_smuggling_tie'],
+            effect: { id: 'marketInsight', hours: 10 },
+            meterDelta: { influence: 3, exposure: 2 },
+            npcTrustDelta: { fixer: 8 },
           }),
           nextNodeId: 'courier_done'
         },
@@ -1244,14 +1177,10 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
       options: [
         {
           text: 'Move the convoy (+$500, +Market Window, +Exposure).',
-          action: (s) => ({
-            worldEffects: extendWorldEffect(s, 'marketInsight', 18),
-            meters: {
-              ...s.meters,
-              exposure: Math.min(100, s.meters.exposure + 10),
-              influence: Math.min(100, s.meters.influence + 4)
-            },
-            money: s.money + 500
+          action: () => buildDialogueTransitionCommands({
+            moneyDelta: 500,
+            effect: { id: 'marketInsight', hours: 18 },
+            meterDelta: { exposure: 10, influence: 4 },
           }),
           nextNodeId: 'root'
         },
@@ -1267,19 +1196,10 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
       options: [
         {
           text: 'Use the tip (+small trust and influence, +Market Window 12h).',
-          action: (s) => ({
-            worldEffects: extendWorldEffect(s, 'marketInsight', 12),
-            npcs: {
-              ...s.npcs,
-              fixer: {
-                ...s.npcs.fixer,
-                trustLevel: Math.min(100, s.npcs.fixer.trustLevel + 4)
-              }
-            },
-            meters: {
-              ...s.meters,
-              influence: Math.min(100, s.meters.influence + 2)
-            }
+          action: () => buildDialogueTransitionCommands({
+            effect: { id: 'marketInsight', hours: 12 },
+            npcTrustDelta: { fixer: 4 },
+            meterDelta: { influence: 2 },
           }),
           nextNodeId: 'root'
         }
