@@ -11,6 +11,8 @@ import { CONFIG, COLORS, WORLD_HALF_SIZE, WORLD_SIZE } from './utils/voxelConsta
 import { EntityManager } from './EntityManager';
 import { GreedyMesher } from './utils/GreedyMesher';
 import { BuildingFootprint } from './utils/worldNavigation';
+import { WorldEnvironmentSystem } from './lighting/WorldEnvironmentSystem';
+import { configureWorldRenderer } from './lighting/WorldRenderAdapter';
 import backgroundData from '../background.json';
 
 export const WORLD_CAMERA_AZIMUTH = Math.PI / 4;
@@ -19,10 +21,6 @@ const WORLD_CAMERA_DISTANCE = WORLD_CAMERA_OFFSET.length();
 const WORLD_CAMERA_POLAR = Math.acos(WORLD_CAMERA_OFFSET.y / WORLD_CAMERA_DISTANCE);
 
 export class VoxelEngine {
-  private static readonly FOG_NEAR_DAY = 120;
-  private static readonly FOG_FAR_DAY = 280;
-  private static readonly FOG_NEAR_NIGHT = 80;
-  private static readonly FOG_FAR_NIGHT = 220;
   private static readonly ANALOG_MOVE_CONVERGE_THRESHOLD = 0.05;
   private static readonly PLAYER_MOVE_SPEED = 12; // world units per second (XZ only)
   private static readonly CAMERA_FOLLOW_DAMPING_XZ = 22;
@@ -35,17 +33,12 @@ export class VoxelEngine {
   private physicsWorld: CANNON.World;
   private instanceMesh: THREE.InstancedMesh | null = null;
   private terrainGroup: THREE.Group;
-  private sun: THREE.Mesh;
-  private moon: THREE.Mesh;
-  private ambientLight: THREE.AmbientLight;
-  private dirLight: THREE.DirectionalLight;
-  private hemiLight: THREE.HemisphereLight;
   private targetIndicator: THREE.Mesh;
   private pathLine: THREE.Line;
-  private skyDome: THREE.Mesh;
   private floor: THREE.Mesh;
   private edgeGroup: THREE.Group;
   private worldGrid: THREE.GridHelper;
+  private environment: WorldEnvironmentSystem;
   public entities: EntityManager;
   private dummy = new THREE.Object3D();
   
@@ -107,7 +100,6 @@ export class VoxelEngine {
 
     // Init Three.js
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.Fog(CONFIG.BG_COLOR, 120, 280);
     
     this.physicsWorld = new CANNON.World({
       gravity: new CANNON.Vec3(0, -9.82, 0),
@@ -126,8 +118,7 @@ export class VoxelEngine {
     this.renderer.setClearColor(0x000000, 0); // Transparent background
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.setSize(width, height);
-    this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFShadowMap;
+    configureWorldRenderer(this.renderer);
     container.appendChild(this.renderer.domElement);
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
@@ -148,27 +139,6 @@ export class VoxelEngine {
     this.controls.update();
     this.enforceCameraBounds();
 
-    // Lights
-    this.ambientLight = new THREE.AmbientLight(0xffffff, 0.15);
-    this.scene.add(this.ambientLight);
-
-    this.hemiLight = new THREE.HemisphereLight(0x87CEEB, 0x3b82f6, 0.25);
-    this.scene.add(this.hemiLight);
-    
-    this.dirLight = new THREE.DirectionalLight(0xffffff, 0);
-    this.dirLight.position.set(50, 80, 30);
-    this.dirLight.castShadow = true;
-    this.dirLight.shadow.mapSize.width = 4096;
-    this.dirLight.shadow.mapSize.height = 4096;
-    this.dirLight.shadow.camera.left = -100;
-    this.dirLight.shadow.camera.right = 100;
-    this.dirLight.shadow.camera.top = 100;
-    this.dirLight.shadow.camera.bottom = -100;
-    this.dirLight.shadow.camera.near = 0.5;
-    this.dirLight.shadow.camera.far = 400;
-    this.dirLight.shadow.bias = -0.0003;
-    this.scene.add(this.dirLight);
-
     // Target Indicator
     const targetGeom = new THREE.RingGeometry(0.4, 0.5, 32);
     const targetMat = new THREE.MeshBasicMaterial({ color: 0x00ff00, transparent: true, opacity: 0.8, side: THREE.DoubleSide });
@@ -184,23 +154,6 @@ export class VoxelEngine {
     this.pathLine.visible = false;
     this.scene.add(this.pathLine);
 
-    // Sun & Moon
-    const sunGeom = new THREE.SphereGeometry(4, 32, 32);
-    const sunMat = new THREE.MeshBasicMaterial({ color: 0xffcc00 });
-    this.sun = new THREE.Mesh(sunGeom, sunMat);
-    this.scene.add(this.sun);
-
-    const moonGeom = new THREE.SphereGeometry(3, 32, 32);
-    const moonMat = new THREE.MeshBasicMaterial({ color: 0xdddddd });
-    this.moon = new THREE.Mesh(moonGeom, moonMat);
-    this.scene.add(this.moon);
-
-    // Sky Dome
-    const skyGeom = new THREE.SphereGeometry(900, 32, 32);
-    const skyMat = new THREE.MeshBasicMaterial({ color: 0x87CEEB, side: THREE.BackSide });
-    this.skyDome = new THREE.Mesh(skyGeom, skyMat);
-    this.scene.add(this.skyDome);
-
     // Floor – use an unlit material that matches the fog colour so the plane
     // blends seamlessly with the background at every camera angle.
     const planeMat = new THREE.MeshBasicMaterial({ color: 0xe2e8f0 });
@@ -208,6 +161,7 @@ export class VoxelEngine {
     this.floor.rotation.x = -Math.PI / 2;
     this.floor.position.y = CONFIG.FLOOR_Y - 3.01; // Just below terrain + edge buildings
     this.scene.add(this.floor);
+    this.environment = new WorldEnvironmentSystem(this.scene, this.floor, this.renderer);
 
     // Ground ring – covers the gap between the terrain edge and the edge
     // building ring so background buildings no longer appear to float.
@@ -356,58 +310,6 @@ export class VoxelEngine {
 
   public updateTime(time: number) {
     this.time = time;
-    const angle = ((time - 6) / 24) * Math.PI * 2;
-    const radius = 120;
-    const x = Math.cos(angle) * radius;
-    const y = Math.sin(angle) * radius;
-    const z = Math.sin(angle * 0.5) * 20;
-    this.sun.position.set(x, y, z);
-    this.moon.position.set(-x, -y, -z);
-    
-    let dayFactor = 0;
-    if (time >= 5 && time < 7) dayFactor = (time - 5) / 2;
-    else if (time >= 7 && time < 17) dayFactor = 1;
-    else if (time >= 17 && time < 19) dayFactor = 1 - (time - 17) / 2;
-
-    this.ambientLight.intensity = 0.1 + dayFactor * 0.2;
-    this.hemiLight.intensity = 0.2 + dayFactor * 0.3;
-    
-    if (dayFactor > 0) {
-      this.dirLight.intensity = dayFactor * 1.0;
-      this.dirLight.position.copy(this.sun.position).normalize().multiplyScalar(100);
-      this.dirLight.color.setHex(0xffffff);
-    } else {
-      const nightFactor = 1 - dayFactor;
-      this.dirLight.intensity = nightFactor * 0.3;
-      this.dirLight.position.copy(this.moon.position).normalize().multiplyScalar(100);
-      this.dirLight.color.setHex(0xaaaaff);
-    }
-
-    const isDay = time >= 6 && time < 18;
-    const fogColor = isDay ? 0xe2e8f0 : 0x020617;
-    if (this.scene.fog) {
-      this.scene.fog.color.setHex(fogColor);
-      // Push fog far enough so world never vanishes during navigation
-      (this.scene.fog as THREE.Fog).near = isDay ? VoxelEngine.FOG_NEAR_DAY : VoxelEngine.FOG_NEAR_NIGHT;
-      (this.scene.fog as THREE.Fog).far = isDay ? VoxelEngine.FOG_FAR_DAY : VoxelEngine.FOG_FAR_NIGHT;
-    }
-
-    // Keep the floor colour in sync with the fog so it stays invisible
-    (this.floor.material as THREE.MeshBasicMaterial).color.setHex(fogColor);
-
-    // Update street lights
-    const isNight = time >= 19 || time < 6;
-    // Street lights are now handled by EntityManager light pool
-    
-    // Update Sky Dome Color
-    const skyMat = this.skyDome.material as THREE.MeshBasicMaterial;
-    if (dayFactor > 0.5) {
-      skyMat.color.setHex(0x87CEEB); // Day sky blue
-    } else if (dayFactor > 0) {
-      skyMat.color.setHex(0xFF7F50); // Sunset/Sunrise orange
-    } else {
-      skyMat.color.setHex(0x020617); // Night sky dark
-    }
   }
 
   public setPlayerPosition(
@@ -1645,6 +1547,7 @@ export class VoxelEngine {
     this.entities.player.group.rotation.y += diff * Math.min(rotationLerpFactor, 0.5);
 
     this.updateCameraFollow(deltaTime);
+    this.environment.update(this.time, this.currentCameraFocus, deltaTime);
     this.enforceCameraBounds();
     this.controls.update();
     this.physicsWorld.step(1 / 60, deltaTime, 3);
