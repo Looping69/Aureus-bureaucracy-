@@ -1,4 +1,5 @@
 import { Building, GameState, GameWorldState } from '../types';
+import { CompiledAuthoringWorld } from '../editor/types';
 import { getBuildingAccessPosition } from '../utils/buildingAccess';
 
 const OFFICE_INTERACTION_TYPES = new Set<Building['type']>(['OFFICE', 'HOME', 'PUB', 'HOTLINE']);
@@ -77,11 +78,13 @@ export const returnToWorldScene = (
     : state.playerPos,
 });
 
-export const applyPlannerBuildings = (
+export const applyPlannerWorld = (
   state: GameState,
-  buildings: GameWorldState['buildings'],
+  world: CompiledAuthoringWorld,
 ): GameState => ({
   ...state,
-  buildings,
+  buildings: world.buildings,
+  navigationZones: world.navigationZones,
+  npcs: world.npcs,
   currentScene: 'WORLD',
 });

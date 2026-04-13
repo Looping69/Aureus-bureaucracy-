@@ -1,5 +1,4 @@
 import { GameState, Permit } from '../types';
-import { getFtueCopy, isFtueActive } from './ftue';
 
 export interface ProgressGuidance {
   title: string;
@@ -26,15 +25,6 @@ const withMoneyBlocker = (state: GameState, permit: Permit | undefined, fallback
 };
 
 export const getProgressGuidance = (state: GameState): ProgressGuidance => {
-  if (isFtueActive(state)) {
-    const ftueCopy = getFtueCopy(state.ftuePhase);
-    return {
-      title: ftueCopy.title,
-      detail: ftueCopy.body,
-      tone: 'INFO'
-    };
-  }
-
   const extractionIntent = state.permits['extraction-intent'];
   const prospecting = state.permits['prospecting-license'];
   const miningIron = state.permits['mining-permit-iron'];

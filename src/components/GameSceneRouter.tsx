@@ -1,6 +1,7 @@
 import React from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { GameScene, GameState, GameWorldState, WorldPosition } from '../types';
+import { GameScene, GameState, WorldPosition } from '../types';
+import { CompiledAuthoringWorld } from '../editor/types';
 import { MinePickerModal } from './MinePickerModal';
 import { MineSceneFallback } from './MineSceneFallback';
 import { LightLoadingOverlay } from './LightLoadingOverlay';
@@ -43,7 +44,7 @@ interface GameSceneRouterProps {
   onSelectMine: (mineId: string) => void;
   onCloseMinePicker: () => void;
   onWorldInteract: (npcId: string, buildingId: string) => void;
-  onUpdateBuildings: (newBuildings: GameWorldState['buildings']) => void;
+  onApplyAuthoring: (world: CompiledAuthoringWorld) => void;
   onClosePlanner: () => void;
   onReturnMineToWorld: () => void;
   onCollectMineResource: (amount: number) => void;
@@ -98,7 +99,7 @@ export const GameSceneRouter: React.FC<GameSceneRouterProps> = ({
   onSelectMine,
   onCloseMinePicker,
   onWorldInteract,
-  onUpdateBuildings,
+  onApplyAuthoring,
   onClosePlanner,
   onReturnMineToWorld,
   onCollectMineResource,
@@ -208,7 +209,7 @@ export const GameSceneRouter: React.FC<GameSceneRouterProps> = ({
               <SceneMountSignal scene="CITY_PLANNER" onMounted={onInitialSceneMounted} />
               <CityPlanner
                 state={state}
-                onUpdateBuildings={onUpdateBuildings}
+                onApplyAuthoring={onApplyAuthoring}
                 onClose={onClosePlanner}
               />
             </React.Suspense>

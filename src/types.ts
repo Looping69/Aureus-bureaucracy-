@@ -91,6 +91,18 @@ export interface WorldPosition {
   y: number;
 }
 
+export type NavigationZoneKind = 'BLOCKED';
+
+export interface NavigationZone {
+  id: string;
+  kind: NavigationZoneKind;
+  name: string;
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+}
+
 export interface WorldPickup {
   id: string;
   pos: WorldPosition;
@@ -219,6 +231,7 @@ export interface GameInteractionState {
 
 export interface GameWorldState {
   buildings: Record<string, Building>;
+  navigationZones: NavigationZone[];
   day: number;
   time: number; // 0 to 2400 (military time representation or just 0-24 float)
   playerPos: WorldPosition;

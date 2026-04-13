@@ -42,7 +42,7 @@ import { applyDialogueCommands } from './game/dialogue/dialogueCommands';
 import { applyOperationAction } from './game/runCycle';
 import { buildHydratedBuildings, buildInitialGameState } from './game/session';
 import {
-  applyPlannerBuildings,
+  applyPlannerWorld,
   closeOfficeExploration,
   enterMineWorldScene,
   enterOfficeBuilding,
@@ -120,7 +120,11 @@ export default function App() {
   const lastPointerPosRef = useRef({ x: 0, y: 0 });
   const pendingActionRef = useRef<{ name: string; startedAt: number } | null>(null);
   const previousSceneRef = useRef<GameScene | null>(null);
-  const cachedSurfaceMapRef = useRef<{ buildings: Record<string, Building>; map: ReturnType<typeof buildWorldSurfaceMap> } | null>(null);
+  const cachedSurfaceMapRef = useRef<{
+    buildings: Record<string, Building>;
+    navigationZones: GameState['navigationZones'];
+    map: ReturnType<typeof buildWorldSurfaceMap>;
+  } | null>(null);
   const resetDebugState = React.useCallback(() => {
     setStateUpdateCount(0);
     setLastActionName('none');
@@ -245,7 +249,13 @@ export default function App() {
   const handleMove = (pos: WorldPosition, options?: { ignoreDrag?: boolean }) => {
     if (!options?.ignoreDrag && dragDistanceRef.current > 10) return;
     setState(prev => {
-      const path = findPath(prev.playerPos, pos, getWorldMapBuildings(prev.buildings));
+      const path = findPath(
+        prev.playerPos,
+        pos,
+        getWorldMapBuildings(prev.buildings),
+        WORLD_SIZE,
+        prev.navigationZones
+      );
       return applyPlannedWorldMove(prev, pos, path);
     });
   };
@@ -254,11 +264,21 @@ export default function App() {
     setState(prev => {
       // Reuse cached surface map when buildings haven't changed
       const cached = cachedSurfaceMapRef.current;
-      const surfaceMap = cached && cached.buildings === prev.buildings
+      const surfaceMap = cached &&
+        cached.buildings === prev.buildings &&
+        cached.navigationZones === prev.navigationZones
         ? cached.map
-        : buildWorldSurfaceMap(prev.buildings, WORLD_SIZE);
-      if (!cached || cached.buildings !== prev.buildings) {
-        cachedSurfaceMapRef.current = { buildings: prev.buildings, map: surfaceMap };
+        : buildWorldSurfaceMap(prev.buildings, WORLD_SIZE, prev.navigationZones);
+      if (
+        !cached ||
+        cached.buildings !== prev.buildings ||
+        cached.navigationZones !== prev.navigationZones
+      ) {
+        cachedSurfaceMapRef.current = {
+          buildings: prev.buildings,
+          navigationZones: prev.navigationZones,
+          map: surfaceMap,
+        };
       }
 
       const result = applyDirectWorldMove(prev, pos, surfaceMap);
@@ -508,7 +528,7 @@ export default function App() {
         onSelectMine={handleTravel}
         onCloseMinePicker={() => setShowMinePicker(false)}
         onWorldInteract={handleWorldInteract}
-        onUpdateBuildings={(newBuildings) => setState(s => applyPlannerBuildings(s, newBuildings))}
+        onApplyAuthoring={(world) => setState(s => applyPlannerWorld(s, world))}
         onClosePlanner={() => setState(returnToWorldScene)}
         onReturnMineToWorld={() => setState(returnToWorldScene)}
         onCollectMineResource={(amount) => {

@@ -1,4 +1,4 @@
-import { Building, WorldPosition } from '../types';
+import { Building, NavigationZone, WorldPosition } from '../types';
 import { WORLD_SIZE } from './voxelConstants';
 import {
   buildWorldSurfaceMap,
@@ -209,9 +209,10 @@ export const findPath = (
   start: WorldPosition,
   end: WorldPosition,
   buildings: Record<string, Building>,
-  mapSize: number = WORLD_SIZE
+  mapSize: number = WORLD_SIZE,
+  navigationZones: NavigationZone[] = []
 ): WorldPosition[] => {
-  const surfaceMap = buildWorldSurfaceMap(buildings, mapSize);
+  const surfaceMap = buildWorldSurfaceMap(buildings, mapSize, navigationZones);
   const blocked = buildBlockedTiles(surfaceMap);
 
   const startTile = getNearestWalkableTile(clampWorldPosition(start, mapSize), surfaceMap);

@@ -487,11 +487,13 @@ export const DIALOGUE_TREES: Record<string, Record<string, DialogueNode>> = {
       text: "Vane doesn't look up from his ledger. 'Form 1-A is the foundation of civilization. Without it, you are merely a loiterer with a shovel. What do you want?'",
       options: [
         {
-          text: "I need a permit to start digging. (Tutorial)",
-          condition: (s) => s.tutorialStep === 2,
-          action: () => ([
-            { type: 'SET_TUTORIAL_STEP', step: 3 },
-            { type: 'SET_PERMIT_STATUS', permitId: 'extraction-intent', status: 'AVAILABLE' },
+          text: "I need a permit to start digging.",
+          condition: (s) =>
+            s.permits['extraction-intent'].status === 'LOCKED' ||
+            s.permits['extraction-intent'].status === 'AVAILABLE',
+          action: (s) => ([
+            ...(s.tutorialStep === 2 ? [{ type: 'SET_TUTORIAL_STEP', step: 3 } as const] : []),
+            { type: 'SET_PERMIT_STATUS', permitId: 'extraction-intent', status: 'AVAILABLE' as const },
           ]),
           nextNodeId: 'tutorial_intro'
         },
