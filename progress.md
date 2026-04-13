@@ -417,3 +417,17 @@ Original prompt: Okay so there are still so many gaps in the gameplay we need to
     - npm run lint (pass)
     - npm run build (pass)
     - npm run smoke:regression (pass)
+
+- 2026-04-13 engine-guide pass:
+  - Added docs/engine-guide.md as the missing practical systems guide for onboarding and maintenance.
+  - Documented:
+    - top-level file structure,
+    - boot/session flow,
+    - scene routing,
+    - gameplay action flow,
+    - runtime hooks,
+    - voxel renderer stack,
+    - save/load path,
+    - office/run-cycle layer,
+    - planner derive -> mutate -> validate -> compile pipeline.
+  - Linked the new guide from README.md so it is discoverable from the repo root.
