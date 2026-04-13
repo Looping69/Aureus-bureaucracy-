@@ -85,7 +85,7 @@ export const CityPlanner: React.FC<CityPlannerProps> = ({ state, onApplyAuthorin
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-auto bg-[#020617] p-4">
+        <div className="min-h-0 flex-1 overflow-hidden bg-[#020617] p-4">
           <PlannerCanvas
             buildings={editor.displayBuildings}
             zones={editor.scene.navigationZones}
@@ -99,6 +99,7 @@ export const CityPlanner: React.FC<CityPlannerProps> = ({ state, onApplyAuthorin
             onCanvasPointerDown={editor.handleCanvasPointerDown}
             onCanvasPointerMove={editor.handleCanvasPointerMove}
             onCanvasPointerUp={editor.handleCanvasPointerUp}
+            onCanvasPointerLeave={() => editor.setHoverTile(null)}
             onBuildingPointerDown={editor.handleBuildingPointerDown}
             onZonePointerDown={editor.handleZonePointerDown}
           />
