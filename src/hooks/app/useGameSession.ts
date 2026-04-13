@@ -13,6 +13,8 @@ export type StartupLoadingState = {
   awaitingWorldBoot: boolean;
 };
 
+type SessionMode = 'game' | 'planner-home';
+
 type UseGameSessionParams = {
   state: GameState;
   setState: React.Dispatch<React.SetStateAction<GameState>>;
@@ -34,7 +36,7 @@ export const useGameSession = ({
   resetUiState,
   resetDebugState,
 }: UseGameSessionParams) => {
-  const [gameStarted, setGameStarted] = React.useState(false);
+  const [sessionMode, setSessionMode] = React.useState<SessionMode | null>(null);
   const [hasSave, setHasSave] = React.useState(false);
   const [savePreview, setSavePreview] = React.useState<GameState | null>(null);
   const [hasCompletedInitialWorldBoot, setHasCompletedInitialWorldBoot] = React.useState(false);
@@ -118,13 +120,13 @@ export const useGameSession = ({
   }, [clearStartupDismissTimer]);
 
   React.useEffect(() => {
-    if (!gameStarted) return;
+    if (sessionMode !== 'game') return;
     const timer = window.setTimeout(() => {
       saveGameState(state);
       setHasSave(true);
     }, 500);
     return () => window.clearTimeout(timer);
-  }, [gameStarted, state]);
+  }, [sessionMode, state]);
 
   const handleStartNewGame = React.useCallback(() => {
     clearSavedGameState();
@@ -135,7 +137,7 @@ export const useGameSession = ({
     resetDebugState();
     setHasSave(false);
     setSavePreview(null);
-    setGameStarted(true);
+    setSessionMode('game');
   }, [beginStartupLoading, resetDebugState, resetUiState, setState]);
 
   const handleContinueGame = React.useCallback(() => {
@@ -151,9 +153,41 @@ export const useGameSession = ({
     setState(hydrateSavedState(saved));
     setSavePreview(saved);
     setHasSave(true);
-    setGameStarted(true);
+    setSessionMode('game');
     pushNotification({ title: 'Save Loaded', msg: 'Resumed your previous session.' });
   }, [beginStartupLoading, hydrateSavedState, pushNotification, setState]);
+
+  const handleOpenPlannerFromHome = React.useCallback(() => {
+    clearStartupDismissTimer();
+    setStartupLoading({
+      visible: false,
+      progress: 0,
+      phase: 'Opening planner...',
+      awaitingWorldBoot: false,
+    });
+    setHasCompletedInitialWorldBoot(true);
+    resetUiState();
+    resetDebugState();
+    setState(() => ({
+      ...buildInitialGameState(),
+      currentScene: 'CITY_PLANNER',
+    }));
+    setSessionMode('planner-home');
+  }, [clearStartupDismissTimer, resetDebugState, resetUiState, setState]);
+
+  const handleExitPlannerToHome = React.useCallback(() => {
+    clearStartupDismissTimer();
+    setStartupLoading({
+      visible: false,
+      progress: 0,
+      phase: 'Opening archive file...',
+      awaitingWorldBoot: false,
+    });
+    setHasCompletedInitialWorldBoot(false);
+    resetUiState();
+    resetDebugState();
+    setSessionMode(null);
+  }, [clearStartupDismissTimer, resetDebugState, resetUiState]);
 
   const handleInitialSceneMounted = React.useCallback((scene: GameState['currentScene']) => {
     if (!startupLoading.visible) return;
@@ -177,13 +211,16 @@ export const useGameSession = ({
   }, [finishStartupLoading]);
 
   return {
-    gameStarted,
+    gameStarted: sessionMode !== null,
+    isPlannerHomeSession: sessionMode === 'planner-home',
     hasSave,
     savePreview,
     startupLoading,
     hasCompletedInitialWorldBoot,
     handleStartNewGame,
     handleContinueGame,
+    handleOpenPlannerFromHome,
+    handleExitPlannerToHome,
     handleInitialSceneMounted,
     handleInitialWorldLoadingProgress,
     handleInitialWorldReady,
