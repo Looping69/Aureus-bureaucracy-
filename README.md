@@ -266,6 +266,7 @@ For the implementation-level breakdown, see [`docs/game-architecture.md`](docs/g
 
 ## Documentation
 
+- [`docs/engine-guide.md`](docs/engine-guide.md) — Engineer-facing guide to file structure, boot flow, state flow, scenes, loops, voxel rendering, save/load, and planner pipeline
 - [`docs/game-architecture.md`](docs/game-architecture.md) — Runtime architecture, state boundaries, scene routing, editor pipeline, save model, and verification notes
 - [`progress.md`](progress.md) — Chronological development log, refactor history, and validation notes
 
