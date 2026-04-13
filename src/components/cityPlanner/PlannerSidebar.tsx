@@ -3,21 +3,26 @@ import {
   AlertTriangle,
   Copy,
   Eraser,
+  ImageDown,
   Grid2X2,
   Map,
   MousePointer2,
   Move,
+  PanelsTopLeft,
   Redo2,
   RefreshCcw,
   Save,
   Square,
   Undo2,
+  FileJson,
 } from 'lucide-react';
 import { BUILDING_TEMPLATES } from '../../editor/templates';
-import { EditorOverlayState, EditorTool } from '../../editor/types';
+import { EditorOverlayState, EditorTool, EditorViewportMode } from '../../editor/types';
 
 type PlannerSidebarProps = {
   tool: EditorTool;
+  viewportMode: EditorViewportMode;
+  setViewportMode: (mode: EditorViewportMode) => void;
   selectedTemplateId: string;
   setSelectedTemplateId: (templateId: string) => void;
   setTool: (tool: EditorTool) => void;
@@ -39,6 +44,8 @@ type PlannerSidebarProps = {
   onLoadSavedBlueprint: () => void;
   onResetFromRuntime: () => void;
   onDuplicateSelection: () => void;
+  onExportViewport: () => void;
+  onExportBlueprint: () => void;
 };
 
 const TOOL_OPTIONS: Array<{ id: EditorTool; label: string; icon: React.ReactNode; shortcut: string }> = [
@@ -60,8 +67,16 @@ const OVERLAY_OPTIONS: Array<{ key: keyof EditorOverlayState; label: string }> =
   { key: 'showBounds', label: 'Bounds' },
 ];
 
+const VIEWPORT_OPTIONS: Array<{ id: EditorViewportMode; label: string }> = [
+  { id: 'screen', label: 'Screen' },
+  { id: '2d', label: '2D' },
+  { id: '3d', label: '3D' },
+];
+
 export const PlannerSidebar: React.FC<PlannerSidebarProps> = ({
   tool,
+  viewportMode,
+  setViewportMode,
   selectedTemplateId,
   setSelectedTemplateId,
   setTool,
@@ -83,6 +98,8 @@ export const PlannerSidebar: React.FC<PlannerSidebarProps> = ({
   onLoadSavedBlueprint,
   onResetFromRuntime,
   onDuplicateSelection,
+  onExportViewport,
+  onExportBlueprint,
 }) => (
   <aside className="w-80 shrink-0 border-r border-white/10 bg-slate-900/80 p-5 overflow-y-auto">
     <div>
@@ -110,6 +127,31 @@ export const PlannerSidebar: React.FC<PlannerSidebarProps> = ({
           </span>
         </button>
       ))}
+    </div>
+
+    <div className="mt-6 rounded-2xl border border-white/10 bg-slate-900/60 p-4">
+      <div className="flex items-center gap-2 text-sm font-semibold">
+        <PanelsTopLeft size={14} />
+        Viewport Mode
+      </div>
+      <div className="mt-3 grid grid-cols-3 gap-2">
+        {VIEWPORT_OPTIONS.map((entry) => (
+          <button
+            key={entry.id}
+            onClick={() => setViewportMode(entry.id)}
+            className={`rounded-xl border px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] ${
+              viewportMode === entry.id
+                ? 'border-cyan-400/60 bg-cyan-500/15 text-cyan-50'
+                : 'border-white/10 bg-slate-800 text-slate-300 hover:bg-slate-700'
+            }`}
+          >
+            {entry.label}
+          </button>
+        ))}
+      </div>
+      <p className="mt-3 text-xs leading-relaxed text-slate-400">
+        `Screen` is the presentation preview, `2D` is exact top-down planning, `3D` is the full workspace.
+      </p>
     </div>
 
     <div className="mt-6 rounded-2xl border border-white/10 bg-slate-900/60 p-4">
@@ -215,6 +257,20 @@ export const PlannerSidebar: React.FC<PlannerSidebarProps> = ({
         >
           <span className="flex items-center gap-2"><Copy size={14} /> Duplicate Selection</span>
         </button>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={onExportViewport}
+            className="rounded-xl border border-white/10 bg-slate-800 px-3 py-2 text-sm text-slate-200 hover:bg-slate-700"
+          >
+            <span className="flex items-center gap-2"><ImageDown size={14} /> Export PNG</span>
+          </button>
+          <button
+            onClick={onExportBlueprint}
+            className="rounded-xl border border-white/10 bg-slate-800 px-3 py-2 text-sm text-slate-200 hover:bg-slate-700"
+          >
+            <span className="flex items-center gap-2"><FileJson size={14} /> Export JSON</span>
+          </button>
+        </div>
         <button
           onClick={onLoadSavedBlueprint}
           className="rounded-xl border border-white/10 bg-slate-800 px-3 py-2 text-sm text-slate-200 hover:bg-slate-700"

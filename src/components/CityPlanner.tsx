@@ -1,10 +1,11 @@
 import React from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import { AlertTriangle, X } from 'lucide-react';
 import { GameState } from '../types';
 import { compileAuthoringScene } from '../editor/compiler';
-import { EditorValidationIssue } from '../editor/types';
+import { EditorValidationIssue, EditorViewportMode } from '../editor/types';
 import { useCityPlannerEditor } from '../hooks/editor/useCityPlannerEditor';
-import { PlannerCanvas } from './cityPlanner/PlannerCanvas';
+import { PlannerCanvas, PlannerCanvasHandle } from './cityPlanner/PlannerCanvas';
 import { PlannerInspector } from './cityPlanner/PlannerInspector';
 import { PlannerSidebar } from './cityPlanner/PlannerSidebar';
 
@@ -29,13 +30,53 @@ const IssueBadge = ({ issue }: { issue: EditorValidationIssue }) => (
 
 export const CityPlanner: React.FC<CityPlannerProps> = ({ state, onApplyAuthoring, onClose }) => {
   const editor = useCityPlannerEditor(state, onApplyAuthoring, onClose);
+  const canvasRef = React.useRef<PlannerCanvasHandle | null>(null);
+  const [viewportMode, setViewportMode] = React.useState<EditorViewportMode>('screen');
+  const [showBootCurtain, setShowBootCurtain] = React.useState(true);
   const errorCount = editor.issues.filter((issue) => issue.severity === 'error').length;
   const warningCount = editor.issues.filter((issue) => issue.severity === 'warning').length;
+
+  React.useEffect(() => {
+    const timer = window.setTimeout(() => setShowBootCurtain(false), 950);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  const downloadBlob = React.useCallback((blob: Blob, fileName: string) => {
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = fileName;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }, []);
+
+  const handleExportViewport = React.useCallback(async () => {
+    const exported = await canvasRef.current?.exportViewportPng();
+    if (!exported) {
+      window.alert('Viewport export failed. Try again after the editor finishes rendering.');
+    }
+  }, []);
+
+  const handleExportBlueprint = React.useCallback(() => {
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      viewportMode,
+      authoredScene: editor.scene,
+      compiledWorld: editor.compiledWorld,
+      issues: editor.issues,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    downloadBlob(blob, `aureus-editor-blueprint-${viewportMode}.json`);
+  }, [downloadBlob, editor.compiledWorld, editor.issues, editor.scene, viewportMode]);
 
   return (
     <div className="fixed inset-0 z-50 flex bg-slate-950 text-white">
       <PlannerSidebar
         tool={editor.tool}
+        viewportMode={viewportMode}
+        setViewportMode={setViewportMode}
         selectedTemplateId={editor.selectedTemplateId}
         setSelectedTemplateId={editor.setSelectedTemplateId}
         setTool={editor.setTool}
@@ -57,6 +98,8 @@ export const CityPlanner: React.FC<CityPlannerProps> = ({ state, onApplyAuthorin
         onLoadSavedBlueprint={editor.loadSavedBlueprint}
         onResetFromRuntime={editor.resetFromRuntime}
         onDuplicateSelection={editor.duplicateSelection}
+        onExportViewport={handleExportViewport}
+        onExportBlueprint={handleExportBlueprint}
       />
 
       <main className="flex min-w-0 flex-1 flex-col">
@@ -72,6 +115,9 @@ export const CityPlanner: React.FC<CityPlannerProps> = ({ state, onApplyAuthorin
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <div className="rounded-xl border border-cyan-400/20 bg-cyan-500/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-cyan-100">
+              {viewportMode} view
+            </div>
             <div className="rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-xs text-slate-300">
               {errorCount} errors / {warningCount} warnings
             </div>
@@ -87,6 +133,8 @@ export const CityPlanner: React.FC<CityPlannerProps> = ({ state, onApplyAuthorin
 
         <div className="min-h-0 flex-1 overflow-hidden bg-[#020617] p-4">
           <PlannerCanvas
+            ref={canvasRef}
+            mode={viewportMode}
             buildings={editor.displayBuildings}
             zones={editor.scene.navigationZones}
             selection={editor.selection}
@@ -141,6 +189,42 @@ export const CityPlanner: React.FC<CityPlannerProps> = ({ state, onApplyAuthorin
         onClearAllZones={editor.clearAllZones}
         selectionLabel={editor.selectionLabel}
       />
+
+      <AnimatePresence>
+        {showBootCurtain && (
+          <motion.div
+            initial={{ opacity: 1 }}
+            exit={{ opacity: 0, transition: { duration: 0.28, ease: 'easeInOut' } }}
+            className="pointer-events-none absolute inset-0 z-[70] overflow-hidden bg-[#020617]"
+          >
+            <motion.div
+              initial={{ scaleX: 1 }}
+              exit={{ scaleX: 0, transition: { duration: 0.5, ease: [0.76, 0, 0.24, 1] } }}
+              style={{ transformOrigin: 'left center' }}
+              className="absolute inset-0 bg-[linear-gradient(90deg,#020617_0%,#071127_30%,#0b1f46_70%,#123a7a_100%)]"
+            />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <motion.div
+                initial={{ opacity: 0, y: 18 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -16, transition: { duration: 0.18 } }}
+                className="rounded-[32px] border border-cyan-400/20 bg-slate-950/80 px-8 py-7 shadow-[0_30px_90px_rgba(2,12,27,0.7)] backdrop-blur-md"
+              >
+                <div className="text-[10px] uppercase tracking-[0.28em] text-cyan-300/70">Authoring Layer</div>
+                <div className="mt-3 text-3xl font-semibold tracking-tight text-white">Developer World Editor</div>
+                <div className="mt-2 text-sm text-slate-300">Bypassing game boot. Bringing the workspace online.</div>
+                <motion.div
+                  initial={{ scaleX: 0.15 }}
+                  animate={{ scaleX: 1 }}
+                  transition={{ duration: 0.8, ease: 'easeInOut' }}
+                  style={{ transformOrigin: 'left center' }}
+                  className="mt-5 h-1.5 rounded-full bg-gradient-to-r from-cyan-400 via-blue-500 to-slate-200"
+                />
+              </motion.div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

@@ -1,6 +1,7 @@
 import { Building, NavigationZone, NPC, WorldPosition } from '../types';
 
 export type EditorTool = 'select' | 'move' | 'place-building' | 'draw-blocked-zone' | 'erase';
+export type EditorViewportMode = 'screen' | '2d' | '3d';
 
 export interface AuthoredBuilding {
   id: string;
