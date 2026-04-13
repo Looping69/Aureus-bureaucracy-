@@ -1,6 +1,6 @@
 import { Building, NavigationZone, NPC, WorldPosition } from '../types';
 
-export type EditorTool = 'select' | 'place-building' | 'draw-blocked-zone' | 'erase';
+export type EditorTool = 'select' | 'move' | 'place-building' | 'draw-blocked-zone' | 'erase';
 
 export interface AuthoredBuilding {
   id: string;
@@ -44,6 +44,22 @@ export interface CompiledAuthoringWorld {
   buildings: Record<string, Building>;
   navigationZones: NavigationZone[];
   npcs: Record<string, NPC>;
+}
+
+export interface EditorSelection {
+  buildingIds: string[];
+  zoneIds: string[];
+}
+
+export interface EditorOverlayState {
+  showWorldGrid: boolean;
+  showPathGrid: boolean;
+  showSurface: boolean;
+  showWalkability: boolean;
+  showAccessPoints: boolean;
+  showTypeOverlay: boolean;
+  showZoneOverlay: boolean;
+  showBounds: boolean;
 }
 
 export interface EditorValidationIssue {

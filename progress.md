@@ -400,3 +400,20 @@ Original prompt: Okay so there are still so many gaps in the gameplay we need to
   - Live dev server on http://127.0.0.1:3001
 - Follow-up:
   - The world debug overlay is still visible in the main world view and should be hidden again once placement validation is done.
+
+- 2026-04-13 documentation sync:
+  - Audited the checked-in docs against the current codebase shape instead of the older pre-editor architecture.
+  - Updated README.md to reflect the real scene stack, dev-only city planner/editor pipeline, run-cycle operations layer, versioned save key (`aureus-save-v2`), and current top-level structure.
+  - Updated docs/game-architecture.md to document the boot flow, operation desk / route panels, and the planner derive -> mutate -> validate -> compile pipeline.
+  - Corrected verification notes so the architecture doc describes the regression harness that actually exists today rather than earlier broader coverage claims.
+  - Noted an unresolved repo metadata issue: this workspace snapshot references a license in the README but does not include a checked-in LICENSE file, so license claims should be treated as unverified until the file is restored.
+
+- 2026-04-13 shell drift reduction pass:
+  - Added src/game/scenePolicy.ts to centralize scene-nav metadata and renderable-scene fallback logic previously split across App.tsx, GameSceneRouter.tsx, and SideNavPanel.tsx.
+  - Added src/game/shellView.ts to centralize compact FTUE HUD policy and shared meta-panel visibility rules used by App, OfficeScene, and MineScene.
+  - Added src/game/saveMetadata.json and rewired src/game/save.ts plus scripts/smoke-regression.mjs to consume the same save key/version constants.
+  - Removed one layer of duplicated office-only shell gating by moving office and mine meta-panel visibility onto the same shared policy.
+  - Validation:
+    - npm run lint (pass)
+    - npm run build (pass)
+    - npm run smoke:regression (pass)

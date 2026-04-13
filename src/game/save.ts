@@ -1,8 +1,9 @@
 import { GameState } from '../types';
+import saveMetadata from './saveMetadata.json';
 
-const SAVE_KEY = 'aureus-save-v2';
-const LEGACY_SAVE_KEYS = ['aureus-save-v1'];
-const SAVE_VERSION = 2;
+export const SAVE_KEY = saveMetadata.saveKey;
+export const LEGACY_SAVE_KEYS = saveMetadata.legacySaveKeys;
+export const SAVE_VERSION = saveMetadata.saveVersion;
 
 type SaveEnvelope = {
   version: number;

@@ -1,10 +1,11 @@
 import { chromium } from 'playwright';
 import { createServer } from 'vite';
+import saveMetadata from '../src/game/saveMetadata.json' with { type: 'json' };
 
 const APP_URL = 'http://127.0.0.1:4173';
-const SAVE_KEY = 'aureus-save-v2';
-const LEGACY_SAVE_KEYS = ['aureus-save-v1'];
-const SAVE_VERSION = 2;
+const SAVE_KEY = saveMetadata.saveKey;
+const LEGACY_SAVE_KEYS = saveMetadata.legacySaveKeys;
+const SAVE_VERSION = saveMetadata.saveVersion;
 const MOBILE_VIEWPORT_WIDTH = 430;
 const ANALOG_STICK_DRAG_DISTANCE = 26;
 const STICK_CENTER_TOLERANCE_PX = 40;

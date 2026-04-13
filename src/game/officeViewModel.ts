@@ -17,7 +17,6 @@ export interface OfficeViewModel {
   discoveredBuildings: Building[];
   activePermits: Permit[];
   buildingPermits: Permit[];
-  showMetaPanels: boolean;
   lockDirectory: boolean;
   highlightVane: boolean;
   highlightForm17B: boolean;
@@ -60,7 +59,6 @@ export const deriveOfficeViewModel = (state: OfficeSceneState): OfficeViewModel 
     discoveredBuildings: Object.values(state.buildings).filter(isDirectoryVisibleBuilding),
     activePermits,
     buildingPermits,
-    showMetaPanels: state.ftuePhase === 'ftue_complete' || state.tutorialStep === 99,
     lockDirectory: shouldLockBureauDirectory(state) && state.activeBuildingId === 'licensing_office',
     highlightVane: shouldHighlightVane(state),
     highlightForm17B: shouldHighlightForm17B(state),

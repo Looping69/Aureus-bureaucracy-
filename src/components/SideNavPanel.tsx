@@ -2,6 +2,7 @@ import React from 'react';
 import { Briefcase, ChevronLeft, ChevronRight, Mountain, Pickaxe, Store, Users } from 'lucide-react';
 import { motion } from 'motion/react';
 import { GameState } from '../types';
+import { getVisibleSceneNavItems, isSceneActive, SceneNavItem } from '../game/scenePolicy';
 
 interface SideNavPanelProps {
   state: GameState;
@@ -14,14 +15,11 @@ interface SideNavPanelProps {
   onExport: () => void;
 }
 
-interface NavAction {
-  key: string;
-  label: string;
+interface NavAction extends SceneNavItem {
   active?: boolean;
   accentClassName?: string;
   icon: React.ComponentType<{ size?: number; className?: string }>;
   onClick: () => void;
-  title?: string;
 }
 
 export const SideNavPanel: React.FC<SideNavPanelProps> = ({
@@ -34,41 +32,31 @@ export const SideNavPanel: React.FC<SideNavPanelProps> = ({
   onOpenOffice,
   onExport
 }) => {
+  const iconMap: Record<SceneNavItem['scene'], NavAction['icon']> = {
+    MINE: Pickaxe,
+    MINE_WORLD: Mountain,
+    WORLD: Users,
+    OFFICE: Briefcase,
+  };
+
+  const clickMap: Record<SceneNavItem['scene'], () => void> = {
+    MINE: onOpenMine,
+    MINE_WORLD: onOpenMineWorld,
+    WORLD: onOpenWorld,
+    OFFICE: onOpenOffice,
+  };
+
   const actions: NavAction[] = [
-    {
-      key: 'mine',
-      label: 'Mine',
-      active: state.currentScene === 'MINE',
-      icon: Pickaxe,
-      onClick: onOpenMine
-    },
-    {
-      key: 'mine_world',
-      label: 'Shaft',
-      active: state.currentScene === 'MINE_WORLD',
-      icon: Mountain,
-      onClick: onOpenMineWorld,
-      title: 'Enter the 3-D mine shaft.'
-    },
-    {
-      key: 'world',
-      label: 'World',
-      active: state.currentScene === 'WORLD',
-      icon: Users,
-      onClick: onOpenWorld
-    },
-    ...(state.currentScene === 'OFFICE'
-      ? [{
-          key: 'office',
-          label: 'Office',
-          active: state.currentScene === 'OFFICE',
-          icon: Briefcase,
-          onClick: onOpenOffice
-        }]
-      : []),
+    ...getVisibleSceneNavItems(state.currentScene).map((item) => ({
+      ...item,
+      active: isSceneActive(state.currentScene, item.scene),
+      icon: iconMap[item.scene],
+      onClick: clickMap[item.scene],
+    })),
     {
       key: 'market',
       label: 'Market',
+      scene: 'WORLD',
       icon: Store,
       accentClassName: state.ore > 0 ? 'text-emerald-700' : 'text-black/45',
       onClick: onExport,

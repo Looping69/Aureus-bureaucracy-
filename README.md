@@ -47,16 +47,15 @@ The game is rendered in an isometric 3D voxel style using Three.js, with a full 
 
 ## Features
 
-- **Isometric 3D Voxel World** — Explore a procedurally generated town with 30+ buildings, day/night lighting, and physics
-- **6 Unique NPCs** — Each with their own personality, schedule, dialogue trees, vulnerabilities, and leverage mechanics
-- **Branching Dialogue System** — Conversations change based on trust, influence, story flags, time of day, and discovered items
-- **Permit Progression Chain** — 10+ permits with a form-filling mini-game, NPC negotiation bonuses, and unlock dependencies
-- **3 Mining Sites** — Progressive difficulty (Iron Vein → Deep Hollow → Abyssal Reach) with tile stability, hazards, and equipment upgrades
-- **Dynamic Economy** — Daily overhead, ore export with exposure risk, audit/aid checks, and world effect modifiers
-- **3 Ending Routes** — Bureau Tycoon, People's Champion, or Shadow Broker — determined by your choices and meter levels
-- **Story Flags** — 11 flags gate exclusive content and lock/unlock ending paths
-- **Tutorial & Progression Guide** — Step-by-step onboarding with real-time hints
-- **Save System** — Auto-persist progress to browser LocalStorage
+- **Layered scene flow** — Move between the world map, office directory/interiors, the 2D mine board, and the 3D mine shaft from one shared game state
+- **Developer world editor** — A dev-only City Planner can author buildings and blocked zones, validate them, and apply the compiled layout back into the runtime
+- **6 unique NPCs** — Each with schedule windows, dialogue branches, leverage hooks, and route-closing political choices
+- **Permit progression chain** — Multi-step permits, a form-processing minigame, and approval pressure from dialogue and run-cycle actions
+- **Three mining sites** — Iron Vein, Deep Hollow, and Abyssal Reach with prospecting, operational mining, stability hazards, and equipment upgrades
+- **Run-cycle operations layer** — Secure, prepare, execute, resolve, and route phases surfaced through office-side operation actions and route tracking panels
+- **Dynamic economy and world effects** — Export pricing, daily upkeep, audits/subsidies, and temporary effects such as Bureau Pull, Market Insight, Community Backing, and Media Heat
+- **Three route-gated endings** — Bureau Tycoon, People's Champion, and Shadow Broker depend on both meters and irreversible political alignments
+- **Title screen and autosave** — New Game / Continue boot flow with versioned LocalStorage save envelopes and legacy save fallback
 
 ---
 
@@ -98,44 +97,34 @@ npm run preview   # Preview the production build locally
 
 ```
 ├── src/
-│   ├── components/            # 24 React UI components
-│   │   ├── GameSceneRouter    # Scene routing (World, Mine, Office, City Planner)
-│   │   ├── WorldScene         # Main isometric world with building interaction
-│   │   ├── MineScene          # Mining tile-grid interface
-│   │   ├── OfficeScene        # Office exploration mini-scene
-│   │   ├── DialogueOverlay    # NPC conversation UI
-│   │   ├── PermitOverlay      # Permit management
-│   │   ├── FormMiniGame       # Permit form-filling mini-game
-│   │   ├── Header / BottomNav # HUD: money, ore, energy, time, meters
-│   │   └── ...                # Overlays, panels, modals, start screen
+│   ├── components/
+│   │   ├── GameSceneRouter.tsx      # Lazy scene routing for world, office, mine, shaft, planner
+│   │   ├── WorldScene.tsx           # Main explorable voxel town
+│   │   ├── OfficeScene.tsx          # Directory, building interiors, operation panels
+│   │   ├── MineScene.tsx            # 2D mining board and equipment controls
+│   │   ├── MineWorldScene.tsx       # 3D shaft scene
+│   │   ├── StartScreen.tsx          # New Game / Continue boot flow
+│   │   ├── RunCyclePanel.tsx        # Secure/prepare/execute/resolve/route guidance
+│   │   ├── PoliticalPositionPanel.tsx
+│   │   ├── cityPlanner/             # Planner canvas, sidebar, inspector
+│   │   └── ...                      # HUD, overlays, debug, utility, notifications
+│   ├── editor/                      # Authoring compiler, validation, mutations, history
 │   ├── game/
-│   │   ├── actions/           # State mutation handlers
-│   │   │   ├── permitActions  # Permit submission & approval logic
-│   │   │   ├── mineActions    # Mining tile interactions & equipment
-│   │   │   ├── dialogueActions# Relationship consequence handlers
-│   │   │   └── evidenceActions# Item discovery & photo evidence
-│   │   ├── dialogue/          # Dialogue engine
-│   │   │   ├── specialOptions # NPC-specific branching options
-│   │   │   ├── storyFlags     # Story flag management & route locks
-│   │   │   ├── status         # NPC availability & mood by time
-│   │   │   └── worldEffects   # Temporary world state modifiers
-│   │   ├── economy            # Daily costs, exports, audits, aid
-│   │   ├── exhaustion         # Energy collapse mechanic
-│   │   ├── endings            # 3 ending routes with condition checks
-│   │   ├── objectives         # Objective completion helpers
-│   │   ├── permitProgression  # Permit unlock chains
-│   │   ├── progressionGuide   # Real-time hint engine
-│   │   └── save               # LocalStorage persistence
+│   │   ├── actions/                 # Permit, mine, dialogue, evidence mutations
+│   │   ├── dialogue/                # Dialogue commands, flags, status, effects
+│   │   ├── economy.ts               # Export, audits, upkeep
+│   │   ├── runCycle.ts              # Operation desk phase logic and actions
+│   │   ├── save.ts                  # Versioned LocalStorage envelopes
+│   │   └── session.ts               # Initial state and save hydration
 │   ├── hooks/
-│   │   └── game/              # Game loop hooks (movement, time, events, etc.)
-│   ├── utils/                 # Greedy mesher, pathfinding, world generation
-│   ├── VoxelEngine            # Three.js scene, camera, lighting, physics
-│   ├── EntityManager          # Building/NPC entity lifecycle
-│   ├── VoxelBuilding / VoxelCharacter / VoxelObject
-│   ├── App.tsx                # Root component & game state orchestration
-│   ├── data.ts                # All game data (NPCs, permits, mines, dialogue)
-│   ├── types.ts               # TypeScript interfaces
-│   └── main.tsx               # React entry point
+│   │   ├── app/                     # Startup/session/chrome hooks
+│   │   ├── editor/                  # City planner state orchestration
+│   │   └── game/                    # Runtime loop hooks
+│   ├── utils/                       # Pathfinding, surface maps, access helpers, voxel constants
+│   ├── App.tsx                      # Root orchestration shell
+│   ├── data.ts                      # Authored game content and world layout
+│   ├── types.ts                     # Canonical game and world types
+│   └── main.tsx                     # React entry point
 ├── docs/
 │   └── game-architecture.md   # Technical architecture reference
 ├── scripts/
@@ -249,15 +238,16 @@ Eleven story flags gate exclusive content and lock/unlock these paths — choice
 
 ## Architecture
 
-The game follows a **three-layer architecture**:
+The current client is organized around one serialized `GameState` and a few explicit boundaries:
 
-1. **Presentation** — 24 React components handle the UI, HUD overlays, and Three.js canvas integration. Scenes are lazy-loaded for performance.
-2. **Logic** — Game modules under `src/game/` manage permits, mining, dialogue, economy, story flags, and progression. State mutations flow through action handlers.
-3. **Data** — A single `GameState` object is persisted to LocalStorage (`aureus-save-v1`). All game data (NPCs, permits, mines, buildings, dialogue trees) is defined in `src/data.ts`.
+1. **Shell orchestration** — `src/App.tsx` wires scenes, overlays, notifications, startup flow, and tracked actions without owning the low-level rules.
+2. **Game rules** — `src/game/` holds permit, mining, dialogue, economy, run-cycle, ending, and save/session logic.
+3. **Scene surfaces** — `src/components/` contains the world, office, mine, shaft, and overlay UIs, routed through `GameSceneRouter.tsx`.
+4. **Authoring pipeline** — `src/editor/` plus `src/hooks/editor/useCityPlannerEditor.ts` lets the dev-only planner derive, mutate, validate, and compile world layouts back into runtime data.
 
-The voxel engine (`src/VoxelEngine.ts`) manages the Three.js scene with a greedy mesher for terrain optimization, instanced rendering for buildings, A* pathfinding for player movement, and a day/night lighting system.
+Save data is currently stored as a versioned LocalStorage envelope under `aureus-save-v2`, with fallback loading from `aureus-save-v1`.
 
-For a deeper technical reference, see [`docs/game-architecture.md`](docs/game-architecture.md).
+For the implementation-level breakdown, see [`docs/game-architecture.md`](docs/game-architecture.md).
 
 ---
 
@@ -276,11 +266,11 @@ For a deeper technical reference, see [`docs/game-architecture.md`](docs/game-ar
 
 ## Documentation
 
-- [`docs/game-architecture.md`](docs/game-architecture.md) — Technical architecture, core game loop, world generation, isometric rendering
-- [`progress.md`](progress.md) — Development log with refactoring milestones and gameplay audits
+- [`docs/game-architecture.md`](docs/game-architecture.md) — Runtime architecture, state boundaries, scene routing, editor pipeline, save model, and verification notes
+- [`progress.md`](progress.md) — Chronological development log, refactor history, and validation notes
 
 ---
 
 ## License
 
-This project is licensed under the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0).
+This workspace snapshot does not currently include a checked-in `LICENSE` file, so the effective license should be confirmed before redistribution.
