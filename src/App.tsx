@@ -132,12 +132,15 @@ export default function App() {
   }, []);
   const {
     gameStarted,
+    isPlannerHomeSession,
     hasSave,
     savePreview,
     startupLoading,
     hasCompletedInitialWorldBoot,
     handleStartNewGame,
     handleContinueGame,
+    handleOpenPlannerFromHome,
+    handleExitPlannerToHome,
     handleInitialSceneMounted,
     handleInitialWorldLoadingProgress,
     handleInitialWorldReady,
@@ -457,6 +460,8 @@ export default function App() {
         savePreview={savePreview}
         onNewGame={handleStartNewGame}
         onContinue={handleContinueGame}
+        onOpenPlanner={handleOpenPlannerFromHome}
+        showPlannerAccess={plannerEnabled}
       />
     );
   }
@@ -529,7 +534,13 @@ export default function App() {
         onCloseMinePicker={() => setShowMinePicker(false)}
         onWorldInteract={handleWorldInteract}
         onApplyAuthoring={(world) => setState(s => applyPlannerWorld(s, world))}
-        onClosePlanner={() => setState(returnToWorldScene)}
+        onClosePlanner={() => {
+          if (isPlannerHomeSession) {
+            handleExitPlannerToHome();
+            return;
+          }
+          setState(returnToWorldScene);
+        }}
         onReturnMineToWorld={() => setState(returnToWorldScene)}
         onCollectMineResource={(amount) => {
           beginTrackedAction('mine_world_collect');

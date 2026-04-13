@@ -8,6 +8,8 @@ interface StartScreenProps {
   savePreview: GameState | null;
   onNewGame: () => void;
   onContinue: () => void;
+  onOpenPlanner?: () => void;
+  showPlannerAccess?: boolean;
 }
 
 const formatTime = (time: number) => {
@@ -20,7 +22,9 @@ export const StartScreen: React.FC<StartScreenProps> = ({
   hasSave,
   savePreview,
   onNewGame,
-  onContinue
+  onContinue,
+  onOpenPlanner,
+  showPlannerAccess = false,
 }) => {
   return (
     <div className="min-h-[100dvh] bg-[#d7dbdf] text-slate-950 overflow-hidden">
@@ -140,6 +144,18 @@ export const StartScreen: React.FC<StartScreenProps> = ({
               <div className="px-2 text-center text-[10px] font-mono uppercase tracking-[0.26em] text-slate-500">
                 Extraction rights are temporary. Consequences are not.
               </div>
+
+              {showPlannerAccess && onOpenPlanner && (
+                <button
+                  type="button"
+                  onClick={onOpenPlanner}
+                  className="self-end mr-2 text-[9px] font-mono uppercase tracking-[0.24em] text-slate-500/55 hover:text-slate-700/80 transition-colors"
+                  aria-label="Open world editor"
+                  title="Open world editor"
+                >
+                  editor
+                </button>
+              )}
         </motion.div>
       </div>
     </div>
