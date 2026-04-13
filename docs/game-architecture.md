@@ -41,6 +41,25 @@ Boot/session and shell concerns are intentionally pushed outward:
 
 This router is the boundary between shell orchestration and heavy scene rendering. It also carries initial-scene readiness signals back to the startup loader.
 
+### Boot flow and shell surfaces
+
+The runtime no longer boots directly into the world by default. The shell starts at [`src/components/StartScreen.tsx`](/C:/Users/willi/Downloads/remix_-aureus_-below%20(3)/src/components/StartScreen.tsx), and [`src/hooks/app/useGameSession.ts`](/C:/Users/willi/Downloads/remix_-aureus_-below%20(3)/src/hooks/app/useGameSession.ts) decides whether the player is:
+
+- starting a fresh run
+- continuing a saved run
+- entering the dev planner from the title screen
+
+That matters for documentation because autosave, onboarding, and first-scene loading are now part of the application shell, not incidental glue around the world scene.
+
+### Shared shell policy
+
+The shell now has two explicit policy helpers so scene/UI rules do not get reimplemented across `App`, the router, and individual scene components:
+
+- [`src/game/scenePolicy.ts`](/C:/Users/willi/Downloads/remix_-aureus_-below%20(3)/src/game/scenePolicy.ts): canonical scene navigation items, active-scene checks, and the renderable-scene fallback policy
+- [`src/game/shellView.ts`](/C:/Users/willi/Downloads/remix_-aureus_-below%20(3)/src/game/shellView.ts): compact FTUE HUD logic plus shared meta-panel/progression-guide visibility
+
+This is a small but important architectural boundary. It moves shell behavior out of scattered JSX conditionals and into named policy modules.
+
 ## State Model
 
 The canonical state shape lives in [`src/types.ts`](/C:/Users/willi/Downloads/remix_-aureus_-below%20(3)/src/types.ts) as `GameState`, which is composed from smaller slices:
@@ -85,6 +104,16 @@ Some surfaces use derivation layers instead of burying display logic inside comp
 
 That keeps presentation decisions explainable and reusable across overlays and panels.
 
+### Operation desk and route tracking
+
+Office-side strategic planning is now its own rules surface instead of an ad hoc UI extra:
+
+- [`runCycle.ts`](/C:/Users/willi/Downloads/remix_-aureus_-below%20(3)/src/game/runCycle.ts): cycle summary, phase state, and office operation actions
+- [`RunCyclePanel.tsx`](/C:/Users/willi/Downloads/remix_-aureus_-below%20(3)/src/components/RunCyclePanel.tsx): secure/prepare/execute/resolve/route guidance
+- [`PoliticalPositionPanel.tsx`](/C:/Users/willi/Downloads/remix_-aureus_-below%20(3)/src/components/PoliticalPositionPanel.tsx): current deals, locked routes, and run ledger
+
+This is important because the game is no longer only "world -> permit -> mine". Route identity and political commitments are now explicit first-class progression surfaces.
+
 ## Runtime Loops
 
 The game does not run a monolithic engine update loop. Instead, continuous systems are split into targeted hooks that mutate state on their own cadence:
@@ -124,6 +153,32 @@ Navigation depends on actual placed voxel footprints rather than fake blockers:
 
 The current world is a 240x240 grid with layout normalization to keep authored content inside bounds.
 
+## Authoring and Planner Pipeline
+
+The dev-only city planner is now a real subsystem, not a temporary debug toy.
+
+### Planner state
+
+[`src/hooks/editor/useCityPlannerEditor.ts`](/C:/Users/willi/Downloads/remix_-aureus_-below%20(3)/src/hooks/editor/useCityPlannerEditor.ts) owns editor-only concerns:
+
+- authoring history with undo/redo
+- selection state for buildings and blocked zones
+- transient drag/move previews
+- overlay toggles for world, path, type, access, and bounds views
+- blueprint load/save and apply/reset flows
+
+### Planner data pipeline
+
+The planner runs through explicit authoring stages under [`src/editor`](/C:/Users/willi/Downloads/remix_-aureus_-below%20(3)/src/editor):
+
+- [`derive.ts`](/C:/Users/willi/Downloads/remix_-aureus_-below%20(3)/src/editor/derive.ts): derive an editable authoring scene from runtime state
+- [`sceneMutations.ts`](/C:/Users/willi/Downloads/remix_-aureus_-below%20(3)/src/editor/sceneMutations.ts): pure building/zone edit operations
+- [`validation.ts`](/C:/Users/willi/Downloads/remix_-aureus_-below%20(3)/src/editor/validation.ts): footprint, overlap, and binding validation
+- [`compiler.ts`](/C:/Users/willi/Downloads/remix_-aureus_-below%20(3)/src/editor/compiler.ts): compile authored data back into runtime buildings, NPC bindings, and navigation zones
+- [`storage.ts`](/C:/Users/willi/Downloads/remix_-aureus_-below%20(3)/src/editor/storage.ts): browser persistence for saved blueprints
+
+That split is deliberate: the planner can mutate authoring state aggressively without contaminating the runtime game model until the user explicitly applies the result.
+
 ## Save and Session Model
 
 [`src/game/save.ts`](/C:/Users/willi/Downloads/remix_-aureus_-below%20(3)/src/game/save.ts) stores a versioned save envelope in localStorage:
@@ -131,6 +186,8 @@ The current world is a 240x240 grid with layout normalization to keep authored c
 - current key: `aureus-save-v2`
 - legacy fallback: `aureus-save-v1`
 - payload: `{ version, savedAt, state }`
+
+The save metadata itself is now shared via [`src/game/saveMetadata.json`](/C:/Users/willi/Downloads/remix_-aureus_-below%20(3)/src/game/saveMetadata.json) so the app layer and regression harness do not drift on key/version constants.
 
 Why this matters:
 
@@ -163,14 +220,11 @@ The important rule here is that shell state should not own game rules. It only o
 
 [`scripts/smoke-regression.mjs`](/C:/Users/willi/Downloads/remix_-aureus_-below%20(3)/scripts/smoke-regression.mjs) is the current end-to-end sanity check. It boots a local Vite server and verifies:
 
-- title screen and fresh-start flow
-- FTUE start into the world scene
-- analog-stick movement persistence
-- mine scene entry from navigation
-- ore export payout and notification behavior
-- market-effect export bonus behavior
-- political-position panel rendering
-- route-gated ending unlock logic
+- title screen boot with no-save messaging
+- new-game flow into FTUE and the world scene
+- analog-stick movement persisting into the versioned save
+- mine scene entry from side navigation
+- save continuity after scene transitions
 
 The script mutates versioned save envelopes directly between scenarios. That is intentional, because forcing every regression path through long narrative setup would make the suite too slow and too brittle.
 

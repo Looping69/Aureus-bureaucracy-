@@ -7,7 +7,7 @@ import { ProgressGuide } from './ProgressGuide';
 import { RunCyclePanel } from './RunCyclePanel';
 import { OperationActionId } from '../game/runCycle';
 import { deriveOfficeViewModel } from '../game/officeViewModel';
-import { isFtueActive } from '../game/ftue';
+import { getSceneMetaVisibility } from '../game/shellView';
 
 export const OfficeScene = ({ 
   state, 
@@ -33,12 +33,12 @@ export const OfficeScene = ({
   onOperationAction: (actionId: OperationActionId) => void
 }) => {
   const view = React.useMemo(() => deriveOfficeViewModel(state), [state]);
-  const showProgressGuide = !isFtueActive(state);
+  const metaVisibility = React.useMemo(() => getSceneMetaVisibility(state), [state]);
   const renderMetaPanels = () => (
     <>
-      {showProgressGuide && <ProgressGuide state={state} />}
-      {view.showMetaPanels && <RunCyclePanel state={state} onOperationAction={onOperationAction} />}
-      {view.showMetaPanels && <PoliticalPositionPanel state={state} />}
+      {metaVisibility.showProgressGuide && <ProgressGuide state={state} />}
+      {metaVisibility.showMetaPanels && <RunCyclePanel state={state} onOperationAction={onOperationAction} />}
+      {metaVisibility.showMetaPanels && <PoliticalPositionPanel state={state} />}
     </>
   );
 

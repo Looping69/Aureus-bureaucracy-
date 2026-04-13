@@ -2,7 +2,7 @@ import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { AlertTriangle } from 'lucide-react';
 
-const AUTO_DISMISS_MS = 2800;
+const AUTO_DISMISS_MS = 2400;
 
 export const NotificationOverlay = ({ 
   notification, 
@@ -21,20 +21,23 @@ export const NotificationOverlay = ({
     <AnimatePresence>
       {notification && (
         <motion.div 
-          initial={{ opacity: 0, scale: 0.9, y: 20 }}
+          initial={{ opacity: 0, scale: 0.96, y: -16 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.9, y: 20 }}
-          className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/60 backdrop-blur-md"
+          exit={{ opacity: 0, scale: 0.97, y: -12 }}
+          transition={{ duration: 0.18, ease: 'easeOut' }}
+          className="pointer-events-none fixed inset-x-0 top-20 z-[100] flex justify-center px-4"
         >
-          <div className="w-full max-w-sm bg-white rounded-3xl shadow-2xl overflow-hidden border-4 border-black">
-            <div className="bg-amber-400 p-6 flex items-center gap-4 border-b-4 border-black">
-              <div className="w-12 h-12 bg-black text-amber-400 rounded-2xl flex items-center justify-center shadow-lg">
-                <AlertTriangle size={24} />
+          <div className="w-full max-w-[280px] overflow-hidden rounded-2xl border-[3px] border-black bg-white shadow-[0_14px_36px_rgba(0,0,0,0.28)]">
+            <div className="flex items-center gap-3 border-b-[3px] border-black bg-amber-400 px-4 py-3">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-black text-amber-400 shadow-sm">
+                <AlertTriangle size={16} />
               </div>
-              <h2 className="text-2xl font-black uppercase tracking-tighter leading-none">{notification.title}</h2>
+              <h2 className="text-sm font-black uppercase leading-none tracking-tight text-black">{notification.title}</h2>
             </div>
-            <div className="p-8">
-              <p className="text-lg font-bold leading-tight text-slate-800 italic">"{notification.msg}"</p>
+            <div className="px-4 py-3">
+              <p className="text-xs font-semibold leading-snug text-slate-800/90">
+                {notification.msg}
+              </p>
             </div>
           </div>
         </motion.div>

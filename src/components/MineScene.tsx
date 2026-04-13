@@ -4,7 +4,7 @@ import { Pickaxe, Database, Users, ArrowLeft, Search, Lock, ShieldCheck, Radar }
 import { GameState } from '../types';
 import { ProgressGuide } from './ProgressGuide';
 import { RunCyclePanel } from './RunCyclePanel';
-import { isFtueActive } from '../game/ftue';
+import { getSceneMetaVisibility } from '../game/shellView';
 
 export const MineScene = ({ 
   state, 
@@ -20,7 +20,7 @@ export const MineScene = ({
   onAction?: (action: string) => void
 }) => {
   const currentMine = state.mines.find(m => m.id === state.activeMineId);
-  const showProgressGuide = !isFtueActive(state);
+  const metaVisibility = React.useMemo(() => getSceneMetaVisibility(state), [state]);
 
   if (!currentMine) return null;
 
@@ -35,10 +35,12 @@ export const MineScene = ({
 
   return (
     <div className="flex-1 overflow-auto p-4 grid-pattern flex flex-col">
-      {showProgressGuide && <ProgressGuide state={state} />}
-      <div className="mt-3">
-        <RunCyclePanel state={state} />
-      </div>
+      {metaVisibility.showProgressGuide && <ProgressGuide state={state} />}
+      {metaVisibility.showMetaPanels && (
+        <div className="mt-3">
+          <RunCyclePanel state={state} />
+        </div>
+      )}
 
       <div className="mb-6 flex justify-between items-start">
         <button 

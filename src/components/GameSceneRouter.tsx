@@ -6,6 +6,7 @@ import { MinePickerModal } from './MinePickerModal';
 import { MineSceneFallback } from './MineSceneFallback';
 import { LightLoadingOverlay } from './LightLoadingOverlay';
 import { OperationActionId } from '../game/runCycle';
+import { getRenderableScene } from '../game/scenePolicy';
 
 const WorldScene = React.lazy(() =>
   import('./WorldScene').then((module) => ({ default: module.WorldScene }))
@@ -119,11 +120,12 @@ export const GameSceneRouter: React.FC<GameSceneRouterProps> = ({
   onInitialSceneMounted
 }) => {
   const sceneLoading = <LightLoadingOverlay />;
+  const renderableScene = getRenderableScene(state.currentScene, plannerEnabled);
 
   return (
     <>
       <AnimatePresence mode="wait">
-        {state.currentScene === 'MINE_WORLD' ? (
+        {renderableScene === 'MINE_WORLD' ? (
           <motion.div
             key="mine-world"
             initial={{ opacity: 0, scale: 1.05 }}
@@ -144,7 +146,7 @@ export const GameSceneRouter: React.FC<GameSceneRouterProps> = ({
               />
             </React.Suspense>
           </motion.div>
-        ) : state.currentScene === 'MINE' ? (
+        ) : renderableScene === 'MINE' ? (
           <motion.div
             key="mine"
             initial={{ opacity: 0, x: -20 }}
@@ -170,7 +172,7 @@ export const GameSceneRouter: React.FC<GameSceneRouterProps> = ({
               />
             )}
           </motion.div>
-        ) : state.currentScene === 'WORLD' ? (
+        ) : renderableScene === 'WORLD' ? (
           <motion.div
             key="world"
             initial={{ opacity: 0, scale: 1.1 }}
@@ -197,7 +199,7 @@ export const GameSceneRouter: React.FC<GameSceneRouterProps> = ({
               />
             </React.Suspense>
           </motion.div>
-        ) : plannerEnabled && CityPlanner && state.currentScene === 'CITY_PLANNER' ? (
+        ) : renderableScene === 'CITY_PLANNER' && CityPlanner ? (
           <motion.div
             key="planner"
             initial={{ opacity: 0 }}

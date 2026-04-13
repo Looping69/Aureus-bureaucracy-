@@ -36,7 +36,6 @@ import { usePermitProcessingLoop } from './hooks/game/usePermitProcessingLoop';
 import { useTimeAndCurfewLoop } from './hooks/game/useTimeAndCurfewLoop';
 import { useTutorialProgression } from './hooks/game/useTutorialProgression';
 import { useCityEventLoop } from './hooks/game/useCityEventLoop';
-import { BUREAU_PERMIT_ID } from './game/ftue';
 import { getUnlockedEnding } from './game/endings';
 import { applyDialogueCommands } from './game/dialogue/dialogueCommands';
 import { applyOperationAction } from './game/runCycle';
@@ -74,6 +73,7 @@ import {
 import { useAppChrome } from './hooks/app/useAppChrome';
 import { useGameSession } from './hooks/app/useGameSession';
 import { useNotificationCenter } from './hooks/app/useNotificationCenter';
+import { shouldShowCompactFtueHud } from './game/shellView';
 
 // --- Main App ---
 
@@ -444,14 +444,7 @@ export default function App() {
     };
   }, [state]);
 
-  const isCompactFtueHud = useMemo(
-    () =>
-      state.tutorialStep !== 99 &&
-      state.ftuePhase !== 'ftue_complete' &&
-      state.activePermitId !== BUREAU_PERMIT_ID &&
-      state.pendingPermitAction === null,
-    [state.activePermitId, state.ftuePhase, state.pendingPermitAction, state.tutorialStep]
-  );
+  const isCompactFtueHud = useMemo(() => shouldShowCompactFtueHud(state), [state]);
 
   if (!gameStarted) {
     return (
