@@ -47,6 +47,7 @@ export const useGameSession = ({
     awaitingWorldBoot: false,
   });
   const startupDismissTimerRef = React.useRef<number | null>(null);
+  const hasPersistedCurrentSessionRef = React.useRef(false);
 
   const clearStartupDismissTimer = React.useCallback(() => {
     if (startupDismissTimerRef.current !== null) {
@@ -121,15 +122,25 @@ export const useGameSession = ({
 
   React.useEffect(() => {
     if (sessionMode !== 'game') return;
+    if (!hasPersistedCurrentSessionRef.current) {
+      saveGameState(state);
+      hasPersistedCurrentSessionRef.current = true;
+      setHasSave(true);
+      setSavePreview(state);
+      return;
+    }
+
     const timer = window.setTimeout(() => {
       saveGameState(state);
       setHasSave(true);
+      setSavePreview(state);
     }, 500);
     return () => window.clearTimeout(timer);
   }, [sessionMode, state]);
 
   const handleStartNewGame = React.useCallback(() => {
     clearSavedGameState();
+    hasPersistedCurrentSessionRef.current = false;
     beginStartupLoading(true, 'Opening new archive file...');
     setState(buildInitialGameState());
     setHasCompletedInitialWorldBoot(false);
@@ -147,6 +158,7 @@ export const useGameSession = ({
       return;
     }
 
+    hasPersistedCurrentSessionRef.current = false;
     const bootingWorld = saved.currentScene === 'WORLD';
     beginStartupLoading(bootingWorld, bootingWorld ? 'Opening archived world state...' : 'Restoring case file...');
     setHasCompletedInitialWorldBoot(!bootingWorld);
@@ -159,6 +171,7 @@ export const useGameSession = ({
 
   const handleOpenPlannerFromHome = React.useCallback(() => {
     clearStartupDismissTimer();
+    hasPersistedCurrentSessionRef.current = false;
     setStartupLoading({
       visible: false,
       progress: 0,
@@ -177,6 +190,7 @@ export const useGameSession = ({
 
   const handleExitPlannerToHome = React.useCallback(() => {
     clearStartupDismissTimer();
+    hasPersistedCurrentSessionRef.current = false;
     setStartupLoading({
       visible: false,
       progress: 0,

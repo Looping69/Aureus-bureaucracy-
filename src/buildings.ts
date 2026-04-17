@@ -278,6 +278,15 @@ genFactory.addBox(-4, -4, 5, 4, 4, 5, DUST);
 genFactory.addBox(0, 0, 6, 0, 0, 7, WARM_LIGHT);
 export const FACTORY_VOXELS = genFactory.getVoxels();
 
+// Stable aliases for legacy "asset" building slots. The original imported
+// JSON models were removed from the repo, so these names now resolve to
+// maintained in-repo voxel sets with similar silhouettes and gameplay roles.
+export const ASSET_BUILDING_A_VOXELS = INSPECTOR_HQ_VOXELS;
+export const ASSET_BUILDING_B_VOXELS = GENERIC_OFFICE_VOXELS;
+export const ASSET_BUILDING_C_VOXELS = LICENSING_OFFICE_VOXELS;
+export const ASSET_BUILDING_D_VOXELS = FACTORY_VOXELS;
+export const ASSET_BUILDING_E_VOXELS = GENERIC_HOUSE_D_VOXELS;
+
 // 12. Small Park - more like a civic patch than a placeholder square.
 const genPark = new BuildingGenerator();
 genPark.addBox(-5, -5, 0, 5, 5, 0, '#4e6a4f');

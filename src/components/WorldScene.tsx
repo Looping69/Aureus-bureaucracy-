@@ -13,6 +13,7 @@ import { WORLD_SIZE } from '../utils/voxelConstants';
 import { useContinuousAnalogMovement } from '../hooks/game/useContinuousAnalogMovement';
 import { BUREAU_BUILDING_ID, getFtueCopy, isFtueWorldFunnelPhase } from '../game/ftue';
 import { buildStreetPickupVoxels } from '../game/streetPickups';
+import { formatWeatherLabel, getWeatherMovementMultiplier, getWeatherToneClassName, getWeatherWarningCopy, isSevereWeather } from '../game/weatherSystem';
 
 const BUILDING_ENTRY_TYPES = new Set(['OFFICE', 'HOME', 'MINE_ENTRANCE', 'PUB', 'HOTLINE']);
 
@@ -49,6 +50,10 @@ export const WorldScene = ({
   const hoverRafRef = React.useRef<number | null>(null);
   const bureauAutoEnterRef = React.useRef(false);
   const isNight = state.time >= 20 || state.time < 6;
+  const weatherLabel = React.useMemo(() => formatWeatherLabel(state.weather.current), [state.weather.current]);
+  const weatherToneClassName = React.useMemo(() => getWeatherToneClassName(state.weather.current), [state.weather.current]);
+  const severeWeather = React.useMemo(() => isSevereWeather(state.weather.current), [state.weather.current]);
+  const movementMultiplier = React.useMemo(() => getWeatherMovementMultiplier(state.weather), [state.weather]);
   const ftueCopy = React.useMemo(() => getFtueCopy(state.ftuePhase), [state.ftuePhase]);
   const isBureauFunnelActive = isFtueWorldFunnelPhase(state.ftuePhase);
   const bureauBuilding = state.buildings[BUREAU_BUILDING_ID] ?? null;
@@ -102,15 +107,10 @@ export const WorldScene = ({
     () => buildStreetPickupVoxels(state.streetPickups, terrainData.surfaceMap),
     [state.streetPickups, terrainData.surfaceMap]
   );
-  const allVoxels = React.useMemo(
-    () => [...terrainData.voxels, ...pickupVoxels],
-    [pickupVoxels, terrainData.voxels]
-  );
-
   const analogController = useContinuousAnalogMovement({
     input: analogInput,
     authoritativePosition: state.playerPos,
-    movementSpeed: state.movementSpeed ?? 1,
+    movementSpeed: (state.movementSpeed ?? 1) * movementMultiplier,
     surfaceMap: terrainData.surfaceMap,
     cameraAzimuth: WORLD_CAMERA_AZIMUTH,
     bounds: { min: 0, max: WORLD_SIZE - 1 },
@@ -288,11 +288,13 @@ export const WorldScene = ({
   return (
     <div className={`flex-1 relative overflow-hidden transition-colors duration-1000 ${isNight ? 'bg-slate-950' : 'bg-slate-200'}`}>
       <VoxelWorldContainer
-        voxels={allVoxels}
+        voxels={terrainData.voxels}
+        pickupVoxels={pickupVoxels}
         buildings={worldBuildings}
         navigationZones={state.navigationZones}
         npcs={state.npcs}
         time={state.time}
+        weather={state.weather}
         playerPos={renderPlayerPos}
         isMoving={usingAnalogMovement || state.path.length > 0}
         targetPos={usingAnalogMovement ? null : state.targetPos}
@@ -320,8 +322,38 @@ export const WorldScene = ({
         />
       )}
 
+      <div className="absolute right-16 top-4 z-30 flex flex-col items-end gap-2 pointer-events-none">
+        <div className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] shadow-lg backdrop-blur-sm ${weatherToneClassName}`}>
+          {weatherLabel} {state.weather.current !== 'CLEAR' ? `· ${Math.max(1, Math.ceil(state.weather.timeLeft))}h` : ''}
+        </div>
+        {severeWeather && (
+          <div className="max-w-[220px] rounded-2xl border border-black/15 bg-black/65 px-3 py-2 text-right text-[10px] font-semibold leading-snug text-white shadow-xl">
+            {getWeatherWarningCopy(state.weather.current)}
+          </div>
+        )}
+      </div>
+
       {/* UI Overlay */}
       <AnalogStick onChange={setAnalogInput} isNight={isNight} />
+
+      <div className="pointer-events-none absolute left-1/2 top-[38%] z-30 -translate-x-1/2">
+        <AnimatePresence>
+          {state.playerFeedbacks.map((feedback) => (
+            <motion.div
+              key={feedback.id}
+              initial={{ opacity: 0, y: 18, scale: 0.75 }}
+              animate={{ opacity: 1, y: -18, scale: 1 }}
+              exit={{ opacity: 0, y: -40, scale: 1.08 }}
+              transition={{ duration: 0.9, ease: 'easeOut' }}
+              className="mb-2 text-center"
+            >
+              <div className="rounded-full border border-emerald-200/80 bg-emerald-50/92 px-3 py-1 text-sm font-black text-emerald-700 shadow-lg">
+                +{feedback.amount}
+              </div>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
 
       {isBureauFunnelActive && bureauBuilding && (
         <>

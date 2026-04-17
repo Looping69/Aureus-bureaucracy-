@@ -116,7 +116,12 @@ const waitForGameShell = async (page) => {
 
 const waitForMineSceneReady = async (page) => {
   await page.getByText(/Iron Vein Outpost/i).first().waitFor({ state: 'visible', timeout: 15000 });
-  await page.getByText('Export Ore').first().waitFor({ state: 'visible', timeout: 15000 });
+  await page.waitForFunction((key) => {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return false;
+    const parsed = JSON.parse(raw);
+    return parsed?.state?.currentScene === 'MINE' && parsed?.state?.activeMineId === 'iron-vein';
+  }, SAVE_KEY, { timeout: 15000 });
 };
 
 const openNavigationPanel = async (page) => {
@@ -228,11 +233,8 @@ const run = async () => {
     );
 
     await clickNavAction(page, 'Mine');
-    await page.waitForTimeout(1200);
-    const mineHeading = await page.getByRole('heading', { name: /Iron Vein Outpost/i }).count();
-    assert(mineHeading > 0, 'Expected mine scene to open after Mine navigation.');
+    await waitForMineSceneReady(page);
 
-    await page.waitForTimeout(1200);
     const savedAfterMineTravel = await readSavedState(page);
     assert(!!savedAfterMineTravel, 'Expected save state to still exist after mine travel.');
     assert(savedAfterMineTravel.currentScene === 'MINE', `Expected save state scene=MINE after Mine navigation, got ${savedAfterMineTravel.currentScene}.`);

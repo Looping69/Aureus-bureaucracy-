@@ -1,5 +1,6 @@
 import { GameState } from '../types';
 import { extendWorldEffect, isWorldEffectActive } from './dialogue/worldEffects';
+import { getWeatherEconomyModifiers } from './weatherSystem';
 
 export interface DailyEconomyResult {
   nextState: GameState;
@@ -33,7 +34,11 @@ export const getOreUnitPrice = (state: GameState) => {
   const licensedBonus = hasExportLicense(state) ? LICENSED_EXPORT_BONUS : 0;
   const marketWindowBonus = isWorldEffectActive(state, 'marketInsight') ? 30 : 0;
   const influenceMultiplier = 1 + (state.meters.influence * INFLUENCE_PRICE_FACTOR);
-  return Math.max(50, Math.round((BASE_EXPORT_PRICE + licensedBonus + marketWindowBonus) * influenceMultiplier));
+  const weatherModifiers = getWeatherEconomyModifiers(state.weather);
+  return Math.max(
+    50,
+    Math.round((BASE_EXPORT_PRICE + licensedBonus + marketWindowBonus) * influenceMultiplier * weatherModifiers.exportPriceMultiplier),
+  );
 };
 
 export const getExportExposureIncrease = (state: GameState) =>
@@ -162,7 +167,11 @@ export const applyOreExport = (
 export const applyDailyEconomyTick = (state: GameState): DailyEconomyResult => {
   const operationalMineCount = state.mines.filter(m => m.status === 'OPERATIONAL').length;
   const communityUpkeepRelief = isWorldEffectActive(state, 'communityBacking') ? 20 : 0;
-  const baseUpkeep = Math.max(0, 35 + (state.upgrades.length * 12) + (operationalMineCount * 25) - communityUpkeepRelief);
+  const weatherModifiers = getWeatherEconomyModifiers(state.weather);
+  const baseUpkeep = Math.max(
+    0,
+    Math.round((35 + (state.upgrades.length * 12) + (operationalMineCount * 25) - communityUpkeepRelief) * weatherModifiers.upkeepMultiplier),
+  );
   let nextState: GameState = {
     ...state,
     money: Math.max(0, state.money - baseUpkeep)
@@ -177,13 +186,15 @@ export const applyDailyEconomyTick = (state: GameState): DailyEconomyResult => {
     0.85,
     0.05 +
       (state.meters.exposure / 140) +
-      (isWorldEffectActive(state, 'mediaHeat') ? 0.18 : 0)
+      (isWorldEffectActive(state, 'mediaHeat') ? 0.18 : 0) +
+      weatherModifiers.auditRiskBonus
   );
   const aidChance = Math.min(
     0.5,
     0.04 +
       (state.meters.trust / 220) +
-      (isWorldEffectActive(state, 'communityBacking') ? 0.12 : 0)
+      (isWorldEffectActive(state, 'communityBacking') ? 0.12 : 0) +
+      weatherModifiers.subsidyChanceBonus
   );
   const roll = Math.random();
 

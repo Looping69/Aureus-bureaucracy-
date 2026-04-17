@@ -1,0 +1,618 @@
+flowchart TD
+  %% =========================
+  %% BOOT / SESSION
+  %% =========================
+  subgraph BOOT["Boot, Session, Save, Startup Flow"]
+    B1["main.tsx mounts App"]
+    B2["App builds fresh GameState via buildInitialGameState()"]
+    B3["useGameSession bootstraps session state"]
+    B4["loadSavedGameState() reads LocalStorage envelope"]
+    B5["No active session -> StartScreen"]
+    B6["New Game"]
+    B7["Continue"]
+    B8["Planner From Home"]
+    B9["clearSavedGameState()"]
+    B10["hydrateSavedState() normalizes legacy saves, buildings, FTUE, route flags, world effects"]
+    B11["sessionMode = game"]
+    B12["sessionMode = planner-home"]
+    B13["startup loading overlay shown"]
+    B14["initial scene mount signal"]
+    B15["initial world ready signal"]
+    B16["autosave debounce writes save envelope"]
+    B17["sessionMode null -> back to title screen"]
+
+    B1 --> B2 --> B3
+    B3 --> B4
+    B4 --> B5
+    B5 --> B6 --> B9 --> B11
+    B5 --> B7 --> B10 --> B11
+    B5 --> B8 --> B12
+    B11 --> B13 --> B14
+    B14 --> B15
+    B11 --> B16
+    B12 --> P0
+    B17 --> B5
+  end
+
+  %% =========================
+  %% APP SHELL
+  %% =========================
+  subgraph SHELL["App Shell, UI Chrome, Active Overlays"]
+    A1["App owns live GameState in React state"]
+    A2["useNotificationCenter manages notification queue + action log"]
+    A3["useAppChrome manages market, debug, utility drawer, nav, mine picker"]
+    A4["Header shows resources, meters, world effects"]
+    A5["SideNavPanel exposes scene jumps and market entry"]
+    A6["TutorialOverlay drives FTUE messaging"]
+    A7["ActionLogPanel shows notification history"]
+    A8["DebugPanel shows FPS, state updates, last action"]
+    A9["UtilityDrawer can open planner in dev"]
+    A10["DialogueOverlay opens when activeNPCId set"]
+    A11["PermitOverlay opens when activePermitId set"]
+    A12["FormMiniGame opens when activeMiniGame = FORM_PROCESSING"]
+    A13["MarketOverlay opens on export action"]
+    A14["EndingOverlay opens when activeEndingId set"]
+    A15["NotificationOverlay shows blocking/high-visibility notifications"]
+
+    A1 --> A2
+    A1 --> A3
+    A1 --> A4
+    A1 --> A5
+    A1 --> A6
+    A1 --> A7
+    A1 --> A8
+    A1 --> A9
+    A1 --> A10
+    A1 --> A11
+    A1 --> A12
+    A1 --> A13
+    A1 --> A14
+    A2 --> A15
+  end
+
+  B11 --> A1
+  B12 --> A1
+
+  %% =========================
+  %% SCENE ROUTER
+  %% =========================
+  subgraph ROUTER["Scene Routing via GameSceneRouter + scenePolicy"]
+    R1["state.currentScene enters router"]
+    R2["getRenderableScene() applies dev/fallback policy"]
+    R3["WORLD scene"]
+    R4["OFFICE scene"]
+    R5["MINE scene"]
+    R6["MINE_WORLD scene"]
+    R7["CITY_PLANNER scene"]
+    R8["MineSceneFallback if currentScene=MINE but activeMineId missing"]
+    R9["Lazy React.Suspense scene loading"]
+    R10["Scene mount signals feed startup loader"]
+
+    R1 --> R2
+    R2 --> R3
+    R2 --> R4
+    R2 --> R5
+    R2 --> R6
+    R2 --> R7
+    R5 --> R8
+    R3 --> R9
+    R4 --> R9
+    R5 --> R9
+    R6 --> R9
+    R7 --> R9
+    R9 --> R10
+  end
+
+  A1 --> R1
+  R10 --> B14
+
+  %% =========================
+  %% WORLD FLOW
+  %% =========================
+  subgraph WORLD["World Scene Flow"]
+    W1["WorldScene builds terrain voxels + pickup voxels"]
+    W2["VoxelWorldContainer mounts voxel engine"]
+    W3["VoxelEngine + EntityManager render world, buildings, NPCs, player, camera"]
+    W4["Hover and select callbacks return GROUND / BUILDING / NPC"]
+    W5["FTUE bureau funnel overrides normal wandering"]
+    W6["GROUND tap -> onMove()/onDirectMove()"]
+    W7["NPC tap -> onInteract(npcId, none) if near, else path toward NPC"]
+    W8["BUILDING tap -> building prompt or direct bureau routing"]
+    W9["Move Here -> getBuildingAccessPosition(building)"]
+    W10["Enter -> onInteract(none, buildingId)"]
+    W11["Near bureau during FTUE -> auto-enter bureau"]
+    W12["useBuildingDiscovery marks nearby buildings discovered"]
+    W13["New discovered building can reveal NPC contact"]
+    W14["Discover bureau during FTUE -> objective shift to enter bureau"]
+
+    R3 --> W1 --> W2 --> W3 --> W4
+    W4 --> W5
+    W4 --> W6
+    W4 --> W7
+    W4 --> W8
+    W8 --> W9
+    W8 --> W10
+    W5 --> W11
+    W6 --> N1
+    W7 --> S4
+    W7 --> N1
+    W9 --> N1
+    W10 --> S4
+    W11 --> S4
+    W12 --> W13
+    W13 --> W14
+  end
+
+  %% =========================
+  %% OFFICE FLOW
+  %% =========================
+  subgraph OFFICE["Office Scene Flow"]
+    O1["deriveOfficeViewModel(state) chooses DIRECTORY / BUILDING / EXPLORATION"]
+    O2["Directory lists discovered buildings"]
+    O3["Travel To building"]
+    O4["enterOfficeBuilding()"]
+    O5["Building mode shows personnel + contextual actions"]
+    O6["Select NPC -> activeNPCId set -> DialogueOverlay"]
+    O7["Licensing Office shows building permits"]
+    O8["Select Permit -> activePermitId set -> PermitOverlay"]
+    O9["Inspect Premises -> explorationActive true"]
+    O10["OfficeExploration"]
+    O11["Find item / take photo -> evidence + found item flows"]
+    O12["Back To Directory"]
+    O13["RunCyclePanel shown from shellView policy"]
+    O14["PoliticalPositionPanel shown from shellView policy"]
+    O15["ProgressGuide shown from shellView policy"]
+
+    R4 --> O1
+    O1 --> O2
+    O1 --> O5
+    O1 --> O10
+    O2 --> O3 --> O4 --> O5
+    O5 --> O6 --> A10
+    O5 --> O7 --> O8 --> A11
+    O5 --> O9 --> O10
+    O10 --> O11
+    O5 --> O12 --> O2
+    O2 --> O13
+    O5 --> O13
+    O2 --> O14
+    O5 --> O14
+    O2 --> O15
+    O5 --> O15
+  end
+
+  %% =========================
+  %% PERMIT FLOW
+  %% =========================
+  subgraph PERMITS["Permit Filing, Processing, Approval Chain"]
+    P1["PermitOverlay action: SUBMIT or FAST_TRACK"]
+    P2["applyPermitOverlayAction() checks cost"]
+    P3["Money deducted"]
+    P4["activeMiniGame = FORM_PROCESSING"]
+    P5["pendingPermitAction = SUBMIT or FAST_TRACK"]
+    P6["FormMiniGame completes"]
+    P7["applyMiniGameCompletion()"]
+    P8["Tutorial scripted rejection at FTUE step 5"]
+    P9["accuracy < 0.6 -> REJECTED"]
+    P10["good filing -> PENDING"]
+    P11["perfect fast filing or dialogue permit path -> immediate APPROVED"]
+    P12["approvePermit() / applyPermitApproval()"]
+    P13["permitProcessingLoop ticks every 3s"]
+    P14["Pending permit probabilistically resolves"]
+    P15["Route + world effect modifiers alter permit tempo and approval odds"]
+    P16["bureauPull / backchannel / reform speeds things up"]
+    P17["mediaHeat / blacklist / loud public route slows things down"]
+    P18["Approval can unlock next permit"]
+    P19["Approval can flip mine discovered / PROSPECTING / OPERATIONAL"]
+
+    O8 --> P1 --> P2 --> P3 --> P4 --> P5 --> A12
+    A12 --> P6 --> P7
+    P7 --> P8
+    P7 --> P9
+    P7 --> P10
+    P7 --> P11 --> P12
+    P10 --> P13 --> P14 --> P12
+    P15 --> P16
+    P15 --> P17
+    P13 --> P15
+    P12 --> P18
+    P12 --> P19
+  end
+
+  subgraph PERMIT_CHAIN["Permit Progression Chain"]
+    PC1["Extraction Intent approved"]
+    PC2["Prospecting License available"]
+    PC3["Prospecting License approved"]
+    PC4["Mining Permit Iron available"]
+    PC5["Mining Permit Iron approved"]
+    PC6["Iron Vein -> OPERATIONAL"]
+    PC7["Deep Hollow discovered -> PROSPECTING"]
+    PC8["Prospecting Permit Deep available"]
+    PC9["Mining Permit Deep approved"]
+    PC10["Deep Hollow -> OPERATIONAL"]
+    PC11["Abyssal Reach discovered -> PROSPECTING"]
+    PC12["Prospecting Permit Abyss available"]
+    PC13["Mining Permit Abyss available"]
+    PC14["Export License / Wash Plant / Claim Expansion are side permits influencing economy or mine actions"]
+
+    P18 --> PC1 --> PC2 --> PC3 --> PC4 --> PC5
+    PC5 --> PC6
+    PC5 --> PC7 --> PC8 --> PC9 --> PC10 --> PC11 --> PC12 --> PC13
+    P18 --> PC14
+  end
+
+  %% =========================
+  %% DIALOGUE FLOW
+  %% =========================
+  subgraph DIALOGUE["Dialogue, Social Fallout, Route Flags, World Effects"]
+    D1["DialogueOverlay presents option tree from NPC data"]
+    D2["Option action produces DialogueCommand[]"]
+    D3["applyDialogueCommands() reduces commands into new GameState"]
+    D4["applyDialogueSocialConsequences() adds feedback and relationship fallout"]
+    D5["Can adjust NPC trust / leverage"]
+    D6["Can adjust meters: trust / influence / exposure"]
+    D7["Can add money, evidence, dirt, upgrades, movement speed"]
+    D8["Can set cooldowns for high-impact actions"]
+    D9["Can open permit minigame or instantly approve pending permits"]
+    D10["Can add story flags"]
+    D11["Can extend world effects"]
+    D12["Story flags create permanent route commitments"]
+    D13["World effects create temporary systemic buffs/debuffs"]
+    D14["Public scandal / Vane exposed closes quiet Bureau routes"]
+    D15["Community pact closes smuggling line"]
+    D16["Fixer smuggling tie strains clean routes"]
+    D17["Inspector deputized strengthens reform route"]
+    D18["Inspector blacklist burns compliance route"]
+
+    A10 --> D1 --> D2 --> D3 --> D4
+    D3 --> D5
+    D3 --> D6
+    D3 --> D7
+    D3 --> D8
+    D3 --> D9
+    D3 --> D10 --> D12
+    D3 --> D11 --> D13
+    D12 --> D14
+    D12 --> D15
+    D12 --> D16
+    D12 --> D17
+    D12 --> D18
+  end
+
+  subgraph EFFECTS["Temporary World Effects"]
+    E1["bureauPull"]
+    E2["communityBacking"]
+    E3["marketInsight"]
+    E4["mediaHeat"]
+
+    D13 --> E1
+    D13 --> E2
+    D13 --> E3
+    D13 --> E4
+  end
+
+  %% =========================
+  %% RUN CYCLE / OPERATIONS
+  %% =========================
+  subgraph OPERATIONS["Office Strategic Loop: Secure / Prepare / Execute / Resolve / Route"]
+    RC1["getRunCycleSummary() evaluates current bottleneck"]
+    RC2["SECURE: next permit is blocker"]
+    RC3["PREPARE: pending permits or setup window"]
+    RC4["EXECUTE: mine/prospect while windows are hot"]
+    RC5["RESOLVE: ore exists, decide export strategy"]
+    RC6["POLITICAL: no immediate blocker, push route identity"]
+    RC7["Operation Desk actions"]
+    RC8["Pressure Clerks -> money down, Bureau Pull, Influence +2"]
+    RC9["Scout Buyers -> money down, Market Insight, Exposure -1"]
+    RC10["Community Cover -> money down, Community Backing, Exposure -4"]
+    RC11["Leak To Press -> evidence down, Media Heat, Influence +5, Exposure +4"]
+
+    O13 --> RC1
+    RC1 --> RC2
+    RC1 --> RC3
+    RC1 --> RC4
+    RC1 --> RC5
+    RC1 --> RC6
+    O13 --> RC7
+    RC7 --> RC8 --> E1
+    RC7 --> RC9 --> E3
+    RC7 --> RC10 --> E2
+    RC7 --> RC11 --> E4
+  end
+
+  %% =========================
+  %% MINE FLOW
+  %% =========================
+  subgraph MINE["Mine Travel, Prospecting, Extraction, Equipment, Return"]
+    M1["Open Mine from SideNav or shell action"]
+    M2["openMineScene() validates active mine / discovered mines"]
+    M3["MinePickerModal if multiple discovered mines"]
+    M4["applyMineTravel()"]
+    M5["Check discovered"]
+    M6["Check travel energy cost"]
+    M7["Travel consumes time and energy"]
+    M8["currentScene = MINE, activeMineId set"]
+    M9["MineScene renders active mine grid"]
+    M10["Mine in PROSPECTING"]
+    M11["Need prospecting permit approved"]
+    M12["Survey tile -> reveal tile, spend 1 energy, increment prospectingCount"]
+    M13["Ore scanner can reveal adjacent tile"]
+    M14["Unstable survey warns about future hazard risk"]
+    M15["Survey cap at 10 samples"]
+    M16["Mine in OPERATIONAL"]
+    M17["Need mining permit approved"]
+    M18["Click tile -> hazard roll based on mine danger, tile stability, safety kit, community backing"]
+    M19["Successful ore tile -> ore added to inventory"]
+    M20["Rich vein bonus via high stability or ore scanner"]
+    M21["Gas leak / cave-in -> extra energy loss, ore loss possible"]
+    M22["Exposure rises with extraction danger and media heat"]
+    M23["Exhaustion collapse can fire during travel or mining"]
+    M24["Buy Safety Kit"]
+    M25["Buy Ore Scanner"]
+    M26["Use Wash Plant if permit approved"]
+    M27["Expand Claim if permit approved"]
+    M28["Export Ore action in mine scene delegates to economy"]
+    M29["Talk to Local Chief from mine scene"]
+    M30["Return to world"]
+
+    A5 --> M1 --> M2
+    M2 --> M3 --> M4
+    M2 --> M4
+    M4 --> M5
+    M4 --> M6
+    M4 --> M7 --> M8 --> R5 --> M9
+    M9 --> M10 --> M11 --> M12 --> M13
+    M12 --> M14
+    M12 --> M15
+    M9 --> M16 --> M17 --> M18
+    M18 --> M19
+    M18 --> M20
+    M18 --> M21
+    M18 --> M22
+    M18 --> M23
+    M9 --> M24
+    M9 --> M25
+    M9 --> M26
+    M9 --> M27
+    M9 --> M28 --> ECO3
+    M9 --> M29 --> A10
+    M9 --> M30 --> S6
+  end
+
+  %% =========================
+  %% MINE WORLD FLOW
+  %% =========================
+  subgraph MINEWORLD["3D Mine Shaft Scene"]
+    MW1["World interact with mine entrance or nav action"]
+    MW2["enterMineWorldScene()"]
+    MW3["currentScene = MINE_WORLD"]
+    MW4["MineWorldScene renders shaft"]
+    MW5["collectResource(amount)"]
+    MW6["addOreToInventory(amount)"]
+    MW7["Exit returns to WORLD"]
+
+    W10 --> MW1
+    A5 --> MW1
+    MW1 --> MW2 --> MW3 --> R6 --> MW4
+    MW4 --> MW5 --> MW6
+    MW4 --> MW7 --> S6
+  end
+
+  %% =========================
+  %% ECONOMY FLOW
+  %% =========================
+  subgraph ECON["Economy, Export, Daily Costs, Audits, Subsidies"]
+    ECO1["MarketOverlay previews export strategies"]
+    ECO2["getOreUnitPrice() depends on export license, influence, marketInsight"]
+    ECO3["applyOreExport()"]
+    ECO4["STANDARD sale"]
+    ECO5["QUIET sale"]
+    ECO6["REINVEST sale"]
+    ECO7["EXPOSE sale"]
+    ECO8["Ore reduced to zero or sold amount removed"]
+    ECO9["Money increases"]
+    ECO10["Exposure changes by strategy"]
+    ECO11["Influence can increase"]
+    ECO12["REINVEST grants Bureau Pull + energy bump"]
+    ECO13["EXPOSE grants Media Heat"]
+    ECO14["Daily economy tick at dawn or after rest"]
+    ECO15["Base overhead = 35 + upgrade load + operational mine load - community relief"]
+    ECO16["Audit chance scales with exposure and media heat"]
+    ECO17["Subsidy chance scales with trust and community backing"]
+    ECO18["Audit -> money loss, trust loss"]
+    ECO19["Subsidy -> money gain, influence gain"]
+
+    A13 --> ECO1 --> ECO2 --> ECO3
+    M28 --> ECO3
+    ECO3 --> ECO4
+    ECO3 --> ECO5
+    ECO3 --> ECO6
+    ECO3 --> ECO7
+    ECO3 --> ECO8 --> ECO9
+    ECO3 --> ECO10
+    ECO3 --> ECO11
+    ECO6 --> ECO12 --> E1
+    ECO7 --> ECO13 --> E4
+    T4 --> ECO14
+    N4 --> ECO14
+    ECO14 --> ECO15
+    ECO14 --> ECO16 --> ECO18
+    ECO14 --> ECO17 --> ECO19
+  end
+
+  %% =========================
+  %% CONTINUOUS LOOPS
+  %% =========================
+  subgraph LOOPS["Continuous Runtime Hooks"]
+    L1["useMovementLoop every 70ms"]
+    L2["Consumes path segments using movement budget"]
+    L3["Movement drains energy"]
+    L4["Street pickups restore energy when collected"]
+    L5["useTimeAndCurfewLoop every 1s"]
+    L6["Advances time continuously"]
+    L7["Night away from home raises exposure and drains energy"]
+    L8["Crossing dawn triggers daily economy tick"]
+    L9["usePermitProcessingLoop every 3s"]
+    L10["Pending permits randomly progress"]
+    L11["useCityEventLoop every 2.5s"]
+    L12["Random hourly-ish city event"]
+    L13["Events can modify money, trust, influence, exposure, evidence, world effects"]
+    L14["Story flags add special city events"]
+    L15["useBuildingDiscovery watches proximity to buildings"]
+    L16["useTutorialProgression watches FTUE milestones"]
+    L17["useFeedbackCleanup expires transient relationship feedback"]
+
+    A1 --> L1 --> L2 --> L3
+    L2 --> L4
+    A1 --> L5 --> L6 --> L7
+    L6 --> L8
+    A1 --> L9 --> L10
+    A1 --> L11 --> L12 --> L13
+    L12 --> L14
+    A1 --> L15
+    A1 --> L16
+    A1 --> L17
+  end
+
+  %% =========================
+  %% NAV / REST / COLLAPSE
+  %% =========================
+  subgraph NAV["Navigation, Rest, Collapse, Return"]
+    N1["applyPlannedWorldMove() stores path + target"]
+    N2["applyDirectWorldMove() teleports to adjacent valid ground target and drains energy"]
+    N3["Rest action"]
+    N4["applyRestAction() -> energy full, day +1, time = 6, player returns home"]
+    N5["applyExhaustionCollapse()"]
+    N6["Collapse sends player home, applies fine/penalty, resets path"]
+    N7["returnToWorldScene()"]
+    N8["If activeBuildingId exists, return uses that building's access tile"]
+
+    W6 --> N1
+    W6 --> N2
+    A5 --> N3 --> N4
+    L3 --> N5 --> N6
+    L7 --> N5
+    M23 --> N5
+    M30 --> N7 --> N8
+  end
+
+  %% =========================
+  %% NARRATIVE / ROUTE SURFACES
+  %% =========================
+  subgraph ROUTES["Political Position, Locked Routes, Run Ledger"]
+    PR1["storyFlags.ts derives political positions"]
+    PR2["PoliticalPositionPanel shows current deals"]
+    PR3["Panel shows locked routes"]
+    PR4["Panel shows run ledger of irreversible decisions"]
+    PR5["Examples of durable route state"]
+    PR6["community_pact"]
+    PR7["fixer_smuggling_tie"]
+    PR8["vane_backchannel"]
+    PR9["vane_exposed"]
+    PR10["public_scandal"]
+    PR11["vox_exclusive"]
+    PR12["vox_embargo"]
+    PR13["reform_alliance"]
+    PR14["inspector_deputized"]
+    PR15["inspector_blacklist"]
+
+    D12 --> PR1
+    O14 --> PR2
+    O14 --> PR3
+    O14 --> PR4
+    PR1 --> PR5
+    PR5 --> PR6
+    PR5 --> PR7
+    PR5 --> PR8
+    PR5 --> PR9
+    PR5 --> PR10
+    PR5 --> PR11
+    PR5 --> PR12
+    PR5 --> PR13
+    PR5 --> PR14
+    PR5 --> PR15
+  end
+
+  %% =========================
+  %% ENDINGS
+  %% =========================
+  subgraph ENDGAME["Ending Forecast and Unlock Flow"]
+    G1["getEndingForecast() evaluates live route health"]
+    G2["Bureau Tycoon forecast"]
+    G3["People's Champion forecast"]
+    G4["Shadow Broker forecast"]
+    G5["App effect watches for getUnlockedEnding()"]
+    G6["Bureau Tycoon unlock condition"]
+    G7["Need money >= 12000"]
+    G8["Need quiet route: vane_backchannel or vox_embargo"]
+    G9["Blocked by vox_exclusive or inspector_deputized"]
+    G10["People's Champion unlock condition"]
+    G11["Need trust >= 85, influence >= 70, exposure < 35"]
+    G12["Need community_pact and reform_alliance or inspector_deputized"]
+    G13["Blocked by inspector_blacklist or fixer_smuggling_tie"]
+    G14["Shadow Broker unlock condition"]
+    G15["Need influence >= 75, exposure >= 85, high total NPC leverage"]
+    G16["Need fixer_smuggling_tie or inspector_blacklist"]
+    G17["Blocked by community_pact or inspector_deputized"]
+    G18["Unlocked ending pushed into unlockedEndings and activeEndingId"]
+    G19["EndingOverlay presented to player"]
+
+    RC1 --> G1
+    G1 --> G2
+    G1 --> G3
+    G1 --> G4
+    A1 --> G5
+    G5 --> G6 --> G7 --> G8 --> G9
+    G5 --> G10 --> G11 --> G12 --> G13
+    G5 --> G14 --> G15 --> G16 --> G17
+    G5 --> G18 --> A14 --> G19
+  end
+
+  %% =========================
+  %% PLANNER
+  %% =========================
+  subgraph PLANNER["Dev-Only City Planner Pipeline"]
+    P0["CITY_PLANNER scene"]
+    P21["derive editable authoring world"]
+    P22["sceneMutations edit buildings / zones"]
+    P23["validation checks overlaps, bounds, bindings"]
+    P24["compiler builds runtime buildings, NPC bindings, navigation zones"]
+    P25["applyPlannerWorld() commits compiled world into live state"]
+    P26["return to WORLD"]
+
+    R7 --> P21 --> P22 --> P23 --> P24 --> P25 --> P26 --> S6
+  end
+
+  %% =========================
+  %% STATE HUB
+  %% =========================
+  subgraph STATE["Canonical State Slices"]
+    S1["Resources: money, ore, evidence, energy, upgrades"]
+    S2["Progression: permits, mines, objectives, known NPCs, endings"]
+    S3["Narrative: feedbacks, cooldowns, world effects, story flags"]
+    S4["Interaction: currentScene, activeNPCId, activePermitId, activeBuildingId, activeMiniGame"]
+    S5["World: buildings, navigationZones, day, time, playerPos, targetPos, path, pickups"]
+    S6["currentScene = WORLD"]
+  end
+
+  A1 --> S1
+  A1 --> S2
+  A1 --> S3
+  A1 --> S4
+  A1 --> S5
+
+  %% Cross-links back into state
+  D3 --> S1
+  D3 --> S2
+  D3 --> S3
+  D3 --> S4
+  P12 --> S2
+  M18 --> S1
+  M18 --> S2
+  M18 --> S3
+  ECO3 --> S1
+  ECO14 --> S1
+  L2 --> S5
+  L6 --> S5
+  O4 --> S4
+  N7 --> S6

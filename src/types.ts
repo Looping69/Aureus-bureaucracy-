@@ -109,6 +109,21 @@ export interface WorldPickup {
   energyRestore: number;
 }
 
+export type WeatherType =
+  | 'CLEAR'
+  | 'CLOUDY'
+  | 'RAIN'
+  | 'STORM'
+  | 'DUST_STORM'
+  | 'ACID_RAIN'
+  | 'HEATWAVE';
+
+export interface WeatherState {
+  current: WeatherType;
+  timeLeft: number; // In-world hours remaining in the current front
+  intensity: number; // 0..1 severity used by render and gameplay systems
+}
+
 export interface WorldHoverInfo {
   x: number;
   y: number;
@@ -135,6 +150,13 @@ export interface RelationshipFeedback {
   npcId: string;
   amount: number;
   type: 'TRUST' | 'LEVERAGE';
+  timestamp: number;
+}
+
+export interface PlayerFeedback {
+  id: string;
+  amount: number;
+  type: 'ENERGY';
   timestamp: number;
 }
 
@@ -234,6 +256,7 @@ export interface GameWorldState {
   navigationZones: NavigationZone[];
   day: number;
   time: number; // 0 to 2400 (military time representation or just 0-24 float)
+  weather: WeatherState;
   playerPos: WorldPosition;
   targetPos: WorldPosition | null;
   path: WorldPosition[];
@@ -242,6 +265,7 @@ export interface GameWorldState {
 
 export interface GameNarrativeState {
   feedbacks: RelationshipFeedback[];
+  playerFeedbacks: PlayerFeedback[];
   dialogueCooldowns: Record<string, number>;
   worldEffects: WorldEffects;
   storyFlags: StoryFlag[];

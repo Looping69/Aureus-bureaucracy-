@@ -1,23 +1,22 @@
 import * as THREE from 'three';
-import { getCelestialPosition, getDaylightFactor, isDaytime } from './dayNightCycle';
+import { WeatherState } from '../types';
+import { getCelestialPosition, getDaylightFactor, getMoonlightFactor, getTwilightFactor, isDaytime } from './dayNightCycle';
 
-const FOG_NEAR_DAY = 120;
-const FOG_FAR_DAY = 280;
-const FOG_NEAR_NIGHT = 80;
-const FOG_FAR_NIGHT = 220;
 const SUN_DISTANCE = 150;
 const SHADOW_CAMERA_HALF_EXTENT = 90;
+const PRECIPITATION_COUNT = 420;
 
 export class WorldEnvironmentSystem {
   private scene: THREE.Scene;
   private floor: THREE.Mesh;
-  private renderer: THREE.WebGLRenderer;
   private ambientLight: THREE.AmbientLight;
   private hemiLight: THREE.HemisphereLight;
   private dirLight: THREE.DirectionalLight;
   private skyDome: THREE.Mesh;
   private sunMesh: THREE.Mesh;
   private moonMesh: THREE.Mesh;
+  private precipitationSystem: THREE.InstancedMesh;
+  private precipitationDummy = new THREE.Object3D();
 
   private targetBgColor = new THREE.Color(0xe2e8f0);
   private currentBgColor = new THREE.Color(0xe2e8f0);
@@ -31,17 +30,22 @@ export class WorldEnvironmentSystem {
   private currentHemiIntensity = 0.35;
   private targetDirIntensity = 1.2;
   private currentDirIntensity = 1.2;
-  private targetFogNear = FOG_NEAR_DAY;
-  private currentFogNear = FOG_NEAR_DAY;
-  private targetFogFar = FOG_FAR_DAY;
-  private currentFogFar = FOG_FAR_DAY;
+  private targetFogNear = 130;
+  private currentFogNear = 130;
+  private targetFogFar = 320;
+  private currentFogFar = 320;
   private timeOfDay = 12;
+  private weather: WeatherState = {
+    current: 'CLEAR',
+    timeLeft: 4,
+    intensity: 0.1,
+  };
   private focus = new THREE.Vector3();
+  private lightningFlash = 0;
 
-  constructor(scene: THREE.Scene, floor: THREE.Mesh, renderer: THREE.WebGLRenderer) {
+  constructor(scene: THREE.Scene, floor: THREE.Mesh, _renderer: THREE.WebGLRenderer) {
     this.scene = scene;
     this.floor = floor;
-    this.renderer = renderer;
 
     this.ambientLight = new THREE.AmbientLight(0xffffff, this.currentAmbientIntensity);
     this.scene.add(this.ambientLight);
@@ -66,6 +70,9 @@ export class WorldEnvironmentSystem {
     this.scene.add(this.sunMesh);
     this.scene.add(this.moonMesh);
 
+    this.precipitationSystem = this.createPrecipitationSystem();
+    this.scene.add(this.precipitationSystem);
+
     const skyGeom = new THREE.SphereGeometry(900, 32, 32);
     const skyMat = new THREE.MeshBasicMaterial({ color: this.currentBgColor, side: THREE.BackSide, fog: false });
     this.skyDome = new THREE.Mesh(skyGeom, skyMat);
@@ -78,14 +85,20 @@ export class WorldEnvironmentSystem {
     return this.dirLight;
   }
 
-  update(timeOfDay: number, focus: THREE.Vector3, dt: number) {
+  update(timeOfDay: number, weather: WeatherState, focus: THREE.Vector3, dt: number) {
     this.timeOfDay = timeOfDay;
+    this.weather = weather;
     this.focus.copy(focus);
+    this.lightningFlash = Math.max(0, this.lightningFlash - dt * 2.4);
+    if (weather.current === 'STORM' && Math.random() < dt * (0.18 + weather.intensity * 0.22)) {
+      this.lightningFlash = 1;
+    }
 
-    this.calculateTargets(timeOfDay);
+    this.calculateTargets(timeOfDay, weather);
     this.interpolate(dt);
     this.updateCelestials();
     this.updateDirectionalLightRig();
+    this.updatePrecipitation(dt);
   }
 
   private createCelestialBody(radius: number, color: number, opacity: number) {
@@ -101,34 +114,108 @@ export class WorldEnvironmentSystem {
     return mesh;
   }
 
-  private calculateTargets(timeOfDay: number) {
+  private createPrecipitationSystem() {
+    const geometry = new THREE.BoxGeometry(0.06, 1.4, 0.06);
+    const material = new THREE.MeshBasicMaterial({
+      color: 0x8fcbff,
+      transparent: true,
+      opacity: 0.55,
+      fog: false,
+    });
+    const mesh = new THREE.InstancedMesh(geometry, material, PRECIPITATION_COUNT);
+    mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    mesh.visible = false;
+
+    for (let index = 0; index < PRECIPITATION_COUNT; index += 1) {
+      this.precipitationDummy.position.set(
+        (Math.random() - 0.5) * 50,
+        Math.random() * 75,
+        (Math.random() - 0.5) * 50,
+      );
+      this.precipitationDummy.updateMatrix();
+      mesh.setMatrixAt(index, this.precipitationDummy.matrix);
+    }
+
+    return mesh;
+  }
+
+  private calculateTargets(timeOfDay: number, weather: WeatherState) {
     const daylightFactor = getDaylightFactor(timeOfDay);
-    const isNight = daylightFactor <= 0;
+    const moonlightFactor = getMoonlightFactor(timeOfDay);
+    const twilightFactor = getTwilightFactor(timeOfDay);
 
-    if (isNight) {
-      this.targetBgColor.setHex(0x050510);
-      this.targetFogColor.setHex(0x050510);
-      this.targetLightColor.setHex(0x6688ff);
-      this.targetFogNear = FOG_NEAR_NIGHT;
-      this.targetFogFar = FOG_FAR_NIGHT;
-      this.targetAmbientIntensity = 0.42;
-      this.targetHemiIntensity = 0.18;
-      this.targetDirIntensity = 0.32;
-    } else {
-      const daylightBlend = 0.35 + daylightFactor * 0.65;
-      const dawnBlend = Math.max(0, 1 - daylightFactor * 2.2);
+    const nightBg = new THREE.Color(0x050816);
+    const dawnBg = new THREE.Color(0xffb36b);
+    const dayBg = new THREE.Color(0xa7d8ff);
+    const nightFog = new THREE.Color(0x070b18);
+    const dawnFog = new THREE.Color(0xe6a368);
+    const dayFog = new THREE.Color(0xd6edf8);
+    const nightLight = new THREE.Color(0x7da6ff);
+    const dawnLight = new THREE.Color(0xffd08a);
+    const dayLight = new THREE.Color(0xfffbef);
 
-      this.targetBgColor.setHex(dawnBlend > 0.05 ? 0xffc58f : 0xe2e8f0);
-      if (!dawnBlend) {
-        this.targetBgColor.setHex(0xe2e8f0);
-      }
-      this.targetFogColor.copy(this.targetBgColor);
-      this.targetLightColor.setHex(dawnBlend > 0.05 ? 0xffcd75 : 0xfff5e0);
-      this.targetFogNear = FOG_NEAR_DAY;
-      this.targetFogFar = FOG_FAR_DAY;
-      this.targetAmbientIntensity = 0.45 + daylightBlend * 0.45;
-      this.targetHemiIntensity = 0.2 + daylightBlend * 0.35;
-      this.targetDirIntensity = 0.55 + daylightFactor * 0.95;
+    this.targetBgColor.copy(nightBg).lerp(dawnBg, twilightFactor).lerp(dayBg, daylightFactor);
+    this.targetFogColor.copy(nightFog).lerp(dawnFog, twilightFactor).lerp(dayFog, daylightFactor);
+    this.targetLightColor.copy(nightLight).lerp(dawnLight, twilightFactor).lerp(dayLight, daylightFactor);
+    this.targetFogNear = THREE.MathUtils.lerp(85, 140, daylightFactor + twilightFactor * 0.4);
+    this.targetFogFar = THREE.MathUtils.lerp(220, 320, daylightFactor + twilightFactor * 0.4);
+    this.targetAmbientIntensity = 0.18 + (moonlightFactor * 0.2) + (daylightFactor * 0.62) + (twilightFactor * 0.14);
+    this.targetHemiIntensity = 0.1 + (moonlightFactor * 0.16) + (daylightFactor * 0.36) + (twilightFactor * 0.14);
+    this.targetDirIntensity = 0.16 + (moonlightFactor * 0.18) + (daylightFactor * 1.08) + (twilightFactor * 0.22);
+
+    switch (weather.current) {
+      case 'CLOUDY':
+        this.targetBgColor.lerp(new THREE.Color(0x93a6bb), 0.35 * weather.intensity);
+        this.targetFogColor.lerp(new THREE.Color(0xb6c2d0), 0.3 * weather.intensity);
+        this.targetDirIntensity *= 0.82;
+        this.targetHemiIntensity *= 0.9;
+        break;
+      case 'RAIN':
+        this.targetBgColor.lerp(new THREE.Color(0x516478), 0.6 * weather.intensity);
+        this.targetFogColor.lerp(new THREE.Color(0x73869c), 0.55 * weather.intensity);
+        this.targetLightColor.lerp(new THREE.Color(0xd8e8ff), 0.35);
+        this.targetFogNear *= 0.82;
+        this.targetFogFar *= 0.84;
+        this.targetDirIntensity *= 0.74;
+        break;
+      case 'STORM':
+        this.targetBgColor.lerp(new THREE.Color(0x1d2536), 0.9);
+        this.targetFogColor.lerp(new THREE.Color(0x2f3a4f), 0.85);
+        this.targetLightColor.lerp(new THREE.Color(0xd8e1ff), 0.55);
+        this.targetFogNear *= 0.68;
+        this.targetFogFar *= 0.72;
+        this.targetAmbientIntensity *= 0.92;
+        this.targetDirIntensity *= 0.58;
+        break;
+      case 'DUST_STORM':
+        this.targetBgColor.lerp(new THREE.Color(0xb06a2b), 0.82);
+        this.targetFogColor.lerp(new THREE.Color(0xd28e4b), 0.9);
+        this.targetLightColor.lerp(new THREE.Color(0xffc37a), 0.45);
+        this.targetFogNear = 65;
+        this.targetFogFar = 155;
+        this.targetAmbientIntensity *= 1.08;
+        this.targetDirIntensity *= 0.62;
+        break;
+      case 'ACID_RAIN':
+        this.targetBgColor.lerp(new THREE.Color(0x183218), 0.86);
+        this.targetFogColor.lerp(new THREE.Color(0x3f6b2f), 0.88);
+        this.targetLightColor.lerp(new THREE.Color(0xcfff78), 0.46);
+        this.targetFogNear *= 0.7;
+        this.targetFogFar *= 0.74;
+        this.targetAmbientIntensity *= 0.98;
+        this.targetDirIntensity *= 0.66;
+        break;
+      case 'HEATWAVE':
+        this.targetBgColor.lerp(new THREE.Color(0xffc27a), 0.55 * weather.intensity);
+        this.targetFogColor.lerp(new THREE.Color(0xf4c488), 0.65 * weather.intensity);
+        this.targetLightColor.lerp(new THREE.Color(0xffe0a6), 0.38);
+        this.targetFogNear = Math.max(this.targetFogNear, 120);
+        this.targetFogFar = Math.min(this.targetFogFar + 10, 250);
+        this.targetAmbientIntensity *= 1.06;
+        this.targetDirIntensity *= 1.04;
+        break;
+      default:
+        break;
     }
   }
 
@@ -145,6 +232,13 @@ export class WorldEnvironmentSystem {
     this.currentAmbientIntensity = THREE.MathUtils.lerp(this.currentAmbientIntensity, this.targetAmbientIntensity, intensityLerp);
     this.currentHemiIntensity = THREE.MathUtils.lerp(this.currentHemiIntensity, this.targetHemiIntensity, intensityLerp);
     this.currentDirIntensity = THREE.MathUtils.lerp(this.currentDirIntensity, this.targetDirIntensity, intensityLerp);
+
+    if (this.lightningFlash > 0) {
+      const flashStrength = this.lightningFlash;
+      this.currentLightColor.lerp(new THREE.Color(0xfafcff), flashStrength * 0.65);
+      this.currentDirIntensity += flashStrength * 1.25;
+      this.currentAmbientIntensity += flashStrength * 0.18;
+    }
 
     const skyMaterial = this.skyDome.material as THREE.MeshBasicMaterial;
     skyMaterial.color.copy(this.currentBgColor);
@@ -168,12 +262,15 @@ export class WorldEnvironmentSystem {
   private updateCelestials() {
     const sunPos = getCelestialPosition(this.timeOfDay, SUN_DISTANCE);
     const moonPos = getCelestialPosition(this.timeOfDay + 12, SUN_DISTANCE);
-    const day = isDaytime(this.timeOfDay);
+    const daylightFactor = getDaylightFactor(this.timeOfDay);
+    const moonlightFactor = getMoonlightFactor(this.timeOfDay);
 
     this.sunMesh.position.set(this.focus.x + sunPos.x, sunPos.y, this.focus.z + sunPos.z);
     this.moonMesh.position.set(this.focus.x + moonPos.x, moonPos.y, this.focus.z + moonPos.z);
-    this.sunMesh.visible = day;
-    this.moonMesh.visible = !day;
+    this.sunMesh.visible = daylightFactor > 0.02;
+    this.moonMesh.visible = moonlightFactor > 0.12;
+    (this.sunMesh.material as THREE.MeshBasicMaterial).opacity = Math.min(0.95, 0.28 + daylightFactor * 0.7);
+    (this.moonMesh.material as THREE.MeshBasicMaterial).opacity = Math.min(0.82, 0.2 + moonlightFactor * 0.5);
   }
 
   private updateDirectionalLightRig() {
@@ -189,7 +286,51 @@ export class WorldEnvironmentSystem {
     shadowCamera.bottom = -SHADOW_CAMERA_HALF_EXTENT;
     shadowCamera.updateProjectionMatrix();
 
-    this.dirLight.castShadow = isDaytime(this.timeOfDay);
+    this.dirLight.castShadow = getDaylightFactor(this.timeOfDay) > 0.32 && this.weather.current !== 'STORM';
     this.dirLight.updateMatrixWorld();
+  }
+
+  private updatePrecipitation(dt: number) {
+    const rainyWeather =
+      this.weather.current === 'RAIN' ||
+      this.weather.current === 'STORM' ||
+      this.weather.current === 'ACID_RAIN';
+    this.precipitationSystem.visible = rainyWeather;
+    if (!rainyWeather) return;
+
+    const material = this.precipitationSystem.material as THREE.MeshBasicMaterial;
+    material.color.setHex(this.weather.current === 'ACID_RAIN' ? 0xb4ff59 : 0x96d7ff);
+    material.opacity = this.weather.current === 'STORM' ? 0.8 : (0.45 + this.weather.intensity * 0.25);
+
+    const fallSpeed =
+      this.weather.current === 'STORM'
+        ? 52
+        : this.weather.current === 'ACID_RAIN'
+          ? 44
+          : 34;
+    const spread = this.weather.current === 'STORM' ? 44 : 36;
+
+    for (let index = 0; index < this.precipitationSystem.count; index += 1) {
+      this.precipitationSystem.getMatrixAt(index, this.precipitationDummy.matrix);
+      this.precipitationDummy.matrix.decompose(
+        this.precipitationDummy.position,
+        this.precipitationDummy.quaternion,
+        this.precipitationDummy.scale,
+      );
+
+      this.precipitationDummy.position.y -= fallSpeed * dt;
+      this.precipitationDummy.position.x -= dt * (this.weather.current === 'STORM' ? 6 : 3);
+
+      if (this.precipitationDummy.position.y < -4) {
+        this.precipitationDummy.position.y = 60 + Math.random() * 20;
+        this.precipitationDummy.position.x = this.focus.x + ((Math.random() - 0.5) * spread * 2);
+        this.precipitationDummy.position.z = this.focus.z + ((Math.random() - 0.5) * spread * 2);
+      }
+
+      this.precipitationDummy.updateMatrix();
+      this.precipitationSystem.setMatrixAt(index, this.precipitationDummy.matrix);
+    }
+
+    this.precipitationSystem.instanceMatrix.needsUpdate = true;
   }
 }

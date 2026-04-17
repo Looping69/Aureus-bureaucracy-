@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { VoxelEngine } from '../VoxelEngine';
-import { Building, NPC, AppState, NavigationZone, VoxelData, WorldHoverInfo } from '../types';
+import { Building, NPC, AppState, NavigationZone, VoxelData, WeatherState, WorldHoverInfo } from '../types';
 import { useCameraControls } from '../hooks/useCameraControls';
 import { WORLD_HALF_SIZE } from '../utils/voxelConstants';
 import { buildWorldSurfaceMap, getWorldSurfaceHeight } from '../utils/worldSurface';
@@ -8,10 +8,12 @@ import { LoadingScreen } from './LoadingScreen';
 
 interface VoxelWorldProps {
   voxels: VoxelData[];
+  pickupVoxels?: VoxelData[];
   buildings: Building[];
   navigationZones: NavigationZone[];
   npcs: Record<string, NPC>;
   time: number;
+  weather: WeatherState;
   playerPos: { x: number, y: number };
   isMoving: boolean;
   targetPos: { x: number, y: number } | null;
@@ -33,10 +35,12 @@ interface VoxelWorldProps {
 
 export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({ 
   voxels, 
+  pickupVoxels = [],
   buildings,
   navigationZones,
   npcs,
   time, 
+  weather,
   playerPos, 
   isMoving, 
   targetPos,
@@ -112,6 +116,7 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
       reportProgress(18, 'Allocating render systems...');
 
       engineRef.current.loadInitialModel(voxels);
+      engineRef.current.setPickupVoxels(pickupVoxels);
       reportProgress(58, 'Meshing terrain volume...');
       
       // Add buildings
@@ -132,6 +137,7 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
       reportProgress(86, 'Deploying field personnel...');
 
       engineRef.current.updateTime(time);
+      engineRef.current.updateWeather(weather);
       reportProgress(92, 'Syncing daylight cycle...');
       engineRef.current.setPlayerPosition(
         playerPos.x - WORLD_HALF_SIZE, 
@@ -178,6 +184,12 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
   }, [voxels]);
 
   useEffect(() => {
+    if (engineRef.current) {
+      engineRef.current.setPickupVoxels(pickupVoxels);
+    }
+  }, [pickupVoxels]);
+
+  useEffect(() => {
     if (!engineRef.current) return;
 
     const entities = engineRef.current.entities;
@@ -210,6 +222,12 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
       engineRef.current.updateTime(time);
     }
   }, [time]);
+
+  useEffect(() => {
+    if (engineRef.current) {
+      engineRef.current.updateWeather(weather);
+    }
+  }, [weather]);
 
   useEffect(() => {
     if (engineRef.current) {

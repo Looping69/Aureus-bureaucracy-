@@ -4,6 +4,7 @@ import { GameState } from '../../types';
 import { applyExhaustionCollapse } from '../../game/exhaustion';
 import { buildWorldSurfaceMap } from '../../utils/worldSurface';
 import { resolveStreetPickupCollection } from '../../game/streetPickups';
+import { getWeatherMovementMultiplier } from '../../game/weatherSystem';
 
 interface UseMovementLoopArgs {
   setState: React.Dispatch<React.SetStateAction<GameState>>;
@@ -31,7 +32,7 @@ export const useMovementLoop = ({ setState, setNotification, homePos, enabled = 
           cachedSurfaceMap = { buildings: prev.buildings, map: surfaceMap };
         }
 
-        movementBudget += Math.max(0.75, prev.movementSpeed * 0.75);
+        movementBudget += Math.max(0.55, prev.movementSpeed * getWeatherMovementMultiplier(prev.weather) * 0.75);
 
         let currentPos = prev.playerPos;
         let remainingPath = prev.path;

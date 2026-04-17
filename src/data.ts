@@ -5,15 +5,13 @@ import { approvePermit } from './game/permitProgression';
 import { adjustMeters, adjustNpcLeverage, adjustNpcTrust, beginDialoguePermitMiniGame, patchNpc, unlockPermit } from './game/dialogue/dialogueState';
 import { buildDialogueTransitionCommands } from './game/dialogue/dialogueCommands';
 import { PLAYER_HOUSE_VOXELS } from './voxelData';
-import {
+import { WORLD_SIZE as SHARED_WORLD_SIZE } from './utils/voxelConstants';
+import { 
   ASSET_BUILDING_A_VOXELS,
   ASSET_BUILDING_B_VOXELS,
   ASSET_BUILDING_C_VOXELS,
   ASSET_BUILDING_D_VOXELS,
   ASSET_BUILDING_E_VOXELS,
-} from './assetBuildings';
-import { WORLD_SIZE as SHARED_WORLD_SIZE } from './utils/voxelConstants';
-import { 
   LICENSING_OFFICE_VOXELS, 
   UNION_HALL_VOXELS, 
   INSPECTOR_HQ_VOXELS, 
@@ -1822,7 +1820,7 @@ const baseBuildings: Record<string, Building> = {
 
   ...cityStreets,
 
-  // ── Imported voxel model buildings ─────────────────────────────────
+  // ── Large civic filler buildings ───────────────────────────────────
   asset_tower_a: createPlacedBuilding(
     { x: 0, y: 2 },
     {

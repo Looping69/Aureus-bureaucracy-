@@ -411,6 +411,7 @@ export const MineWorldScene = ({
         navigationZones={[]}
         npcs={state.npcs}
         time={state.time}
+        weather={state.weather}
         playerPos={currentPlayerPos}
         isMoving={playerIsMoving}
         targetPos={usingAnalogMovement ? null : targetPos}

@@ -3,6 +3,7 @@ import React from 'react';
 import { GameState } from '../../types';
 import { applyDailyEconomyTick } from '../../game/economy';
 import { applyExhaustionCollapse } from '../../game/exhaustion';
+import { advanceWeatherState, getWeatherAmbientEffects } from '../../game/weatherSystem';
 
 const DAY_NIGHT_TIME_SCALE = 0.08;
 
@@ -23,6 +24,8 @@ export const useTimeAndCurfewLoop = ({ setState, setNotification, homePos, enabl
         let newDay = prev.day;
         let newExposure = prev.meters.exposure;
         let newEnergy = prev.energy;
+        const weatherAdvance = advanceWeatherState(prev.weather, ambientTimeStep, newTime);
+        const nextWeather = weatherAdvance.nextWeather;
 
         if (newTime >= 24) {
           newTime -= 24;
@@ -34,12 +37,16 @@ export const useTimeAndCurfewLoop = ({ setState, setNotification, homePos, enabl
             ...prev,
             day: newDay,
             time: newTime,
+            weather: nextWeather,
             energy: newEnergy,
             meters: {
               ...prev.meters,
               exposure: newExposure
             }
           });
+          if (weatherAdvance.notification) {
+            setNotification(weatherAdvance.notification);
+          }
           if (daily.notification) {
             setNotification(daily.notification);
           }
@@ -48,17 +55,19 @@ export const useTimeAndCurfewLoop = ({ setState, setNotification, homePos, enabl
 
         const isNight = newTime >= 20 || newTime < 6;
         const isAtHome = prev.playerPos.x === homePos.x && prev.playerPos.y === homePos.y;
+        const ambientEffects = isAtHome
+          ? { exposurePerHour: 0, energyPerHour: 0 }
+          : getWeatherAmbientEffects(nextWeather, isNight);
 
-        if (isNight && !isAtHome) {
-          newExposure = Math.min(100, newExposure + 0.2);
-          newEnergy = Math.max(0, newEnergy - 0.1);
-        }
+        newExposure = Math.min(100, newExposure + (ambientEffects.exposurePerHour * ambientTimeStep));
+        newEnergy = Math.max(0, newEnergy - (ambientEffects.energyPerHour * ambientTimeStep));
 
         if (newEnergy <= 0) {
           const collapsed = applyExhaustionCollapse({
             ...prev,
             time: newTime,
             day: newDay,
+            weather: nextWeather,
             energy: newEnergy,
             meters: {
               ...prev.meters,
@@ -69,10 +78,15 @@ export const useTimeAndCurfewLoop = ({ setState, setNotification, homePos, enabl
           return collapsed.nextState;
         }
 
+        if (weatherAdvance.notification) {
+          setNotification(weatherAdvance.notification);
+        }
+
         return {
           ...prev,
           time: newTime,
           day: newDay,
+          weather: nextWeather,
           energy: newEnergy,
           meters: {
             ...prev.meters,

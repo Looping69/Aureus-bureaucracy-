@@ -80,7 +80,7 @@ export class EntityManager {
         buildingData.id,
         shouldVaryPalette
       );
-      
+
       const worldX = buildingData.pos.x - WORLD_HALF_SIZE;
       const worldZ = buildingData.pos.y - WORLD_HALF_SIZE;
 

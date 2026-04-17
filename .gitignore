@@ -8,5 +8,6 @@ output/
 *.log
 *.png
 tmp-*-actions.json
+tmp-*.cjs
 .env*
 !.env.example

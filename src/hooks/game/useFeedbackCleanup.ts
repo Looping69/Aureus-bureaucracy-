@@ -11,11 +11,13 @@ export const useFeedbackCleanup = (
     const timer = setInterval(() => {
       const now = Date.now();
       setState(prev => {
-        const expired = prev.feedbacks.some(f => now - f.timestamp > 3000);
-        if (!expired) return prev;
+        const expiredRelationshipFeedback = prev.feedbacks.some(f => now - f.timestamp > 3000);
+        const expiredPlayerFeedback = prev.playerFeedbacks.some(f => now - f.timestamp > 1200);
+        if (!expiredRelationshipFeedback && !expiredPlayerFeedback) return prev;
         return {
           ...prev,
-          feedbacks: prev.feedbacks.filter(f => now - f.timestamp <= 3000)
+          feedbacks: prev.feedbacks.filter(f => now - f.timestamp <= 3000),
+          playerFeedbacks: prev.playerFeedbacks.filter(f => now - f.timestamp <= 1200)
         };
       });
     }, 500);

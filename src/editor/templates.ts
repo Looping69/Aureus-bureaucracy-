@@ -1,5 +1,10 @@
 import { Building } from '../types';
 import {
+  ASSET_BUILDING_A_VOXELS,
+  ASSET_BUILDING_B_VOXELS,
+  ASSET_BUILDING_C_VOXELS,
+  ASSET_BUILDING_D_VOXELS,
+  ASSET_BUILDING_E_VOXELS,
   LICENSING_OFFICE_VOXELS,
   UNION_HALL_VOXELS,
   INSPECTOR_HQ_VOXELS,
@@ -20,13 +25,6 @@ import {
   FACTORY_VOXELS,
   GENERIC_HOUSE_D_VOXELS,
 } from '../buildings';
-import {
-  ASSET_BUILDING_A_VOXELS,
-  ASSET_BUILDING_B_VOXELS,
-  ASSET_BUILDING_C_VOXELS,
-  ASSET_BUILDING_D_VOXELS,
-  ASSET_BUILDING_E_VOXELS,
-} from '../assetBuildings';
 
 export interface BuildingTemplate {
   id: string;

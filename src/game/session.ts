@@ -4,6 +4,7 @@ import { deriveFtuePhaseFromTutorialStep, getLegacyTutorialStepForFtuePhase } fr
 import { getBuildingAccessPosition } from '../utils/buildingAccess';
 import { GameState, GameWorldState, WorldPosition } from '../types';
 import { createInitialStreetPickups } from './streetPickups';
+import { createInitialWeatherState } from './weatherSystem';
 
 const cloneSerializable = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
 
@@ -70,11 +71,13 @@ export const buildInitialGameState = (): GameState => {
     navigationZones: [],
     day: 1,
     time: 8,
+    weather: createInitialWeatherState(),
     playerPos: homePos,
     targetPos: null,
     path: [],
     streetPickups: createInitialStreetPickups(buildings, [homePos]),
     feedbacks: [],
+    playerFeedbacks: [],
     dialogueCooldowns: {},
     worldEffects: EMPTY_WORLD_EFFECTS,
     storyFlags: [],
@@ -115,10 +118,12 @@ export const hydrateSavedState = ({
     ftuePhase: nextFtuePhase,
     buildings: hydrateBuildings(saved.buildings),
     navigationZones: saved.navigationZones ?? baseState.navigationZones,
+    weather: saved.weather ?? baseState.weather,
     playerPos: shouldResetWorldSpawn ? homePos : (saved.playerPos ?? baseState.playerPos),
     targetPos: shouldResetWorldSpawn ? null : (saved.targetPos ?? baseState.targetPos),
     path: shouldResetWorldSpawn ? [] : (saved.path ?? baseState.path),
     streetPickups: saved.streetPickups ?? baseState.streetPickups,
+    playerFeedbacks: saved.playerFeedbacks ?? baseState.playerFeedbacks,
     meters: { ...baseState.meters, ...(saved.meters ?? {}) },
     dialogueCooldowns: saved.dialogueCooldowns ?? {},
     worldEffects: { ...EMPTY_WORLD_EFFECTS, ...(saved.worldEffects ?? {}) },

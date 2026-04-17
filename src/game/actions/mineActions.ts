@@ -2,6 +2,7 @@ import { GameState, Tile } from '../../types';
 import { applyOreExport } from '../economy';
 import { isWorldEffectActive } from '../dialogue/worldEffects';
 import { applyExhaustionCollapse } from '../exhaustion';
+import { getWeatherMiningModifiers } from '../weatherSystem';
 
 export interface GameNotification {
   title: string;
@@ -30,6 +31,7 @@ export const applyMineTileInteraction = (
   const hasOreScanner = prev.upgrades.includes(ORE_SCANNER_UPGRADE);
   const hasCommunityBacking = isWorldEffectActive(prev, 'communityBacking');
   const hasMediaHeat = isWorldEffectActive(prev, 'mediaHeat');
+  const weatherModifiers = getWeatherMiningModifiers(prev.weather);
 
   if (activeMine.status === 'PROSPECTING') {
     if (!hasProspecting) {
@@ -100,11 +102,13 @@ export const applyMineTileInteraction = (
       });
     }
 
+    const prospectingEnergyCost = 1 + (weatherModifiers.energyMultiplier >= 1.15 ? 1 : 0);
+
     return {
       nextState: {
         ...prev,
         mines: newMines,
-        energy: Math.max(0, prev.energy - 1)
+        energy: Math.max(0, prev.energy - prospectingEnergyCost)
       },
       notifications
     };
@@ -129,7 +133,7 @@ export const applyMineTileInteraction = (
 
   const instabilityPenalty = tile.stability < 55 ? 15 : 0;
   const safetyReduction = hasSafetyKit ? 12 : 0;
-  const hazardChance = Math.min(95, Math.max(2, activeMine.danger + instabilityPenalty - safetyReduction - (hasCommunityBacking ? 8 : 0)));
+  const hazardChance = Math.min(95, Math.max(2, activeMine.danger + instabilityPenalty + weatherModifiers.hazardBonus - safetyReduction - (hasCommunityBacking ? 8 : 0)));
   const riskRoll = Math.random() * 100;
   const isHazard = riskRoll < hazardChance;
   const isGasLeak = isHazard && Math.random() > 0.5;
@@ -146,7 +150,7 @@ export const applyMineTileInteraction = (
 
   let oreGain = 0;
   let moneyGain = 0;
-  let energyCost = hasSafetyKit ? 4 : 5;
+  let energyCost = Math.ceil((hasSafetyKit ? 4 : 5) * weatherModifiers.energyMultiplier);
   let richVeinBonus = 0;
 
   if (tile.type === 'ORE') {
@@ -155,6 +159,7 @@ export const applyMineTileInteraction = (
     const foundRichVein = tile.stability >= 85 || (hasOreScanner && Math.random() < 0.35);
     richVeinBonus = foundRichVein ? multiplier : 0;
     oreGain = (activeMine.yield * multiplier) + richVeinBonus;
+    oreGain = Math.max(1, Math.round(oreGain * weatherModifiers.yieldMultiplier));
     // Economy rebalance: extraction yields ore primarily, cash comes from export flow.
     moneyGain = 0;
   }
@@ -205,7 +210,7 @@ export const applyMineTileInteraction = (
             money: prev.money + moneyGain,
             meters: {
               ...prev.meters,
-              exposure: Math.min(100, prev.meters.exposure + (activeMine.danger * 0.1) + (hasMediaHeat ? 2 : 0))
+              exposure: Math.min(100, prev.meters.exposure + (activeMine.danger * 0.1) + weatherModifiers.exposureBonus + (hasMediaHeat ? 2 : 0))
             }
           });
           return {
@@ -222,7 +227,7 @@ export const applyMineTileInteraction = (
             money: prev.money + moneyGain,
             meters: {
               ...prev.meters,
-              exposure: Math.min(100, prev.meters.exposure + (activeMine.danger * 0.1) + (hasMediaHeat ? 2 : 0))
+              exposure: Math.min(100, prev.meters.exposure + (activeMine.danger * 0.1) + weatherModifiers.exposureBonus + (hasMediaHeat ? 2 : 0))
             }
           },
           notifications

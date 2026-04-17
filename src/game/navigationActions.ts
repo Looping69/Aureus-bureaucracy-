@@ -5,6 +5,7 @@ import {
 import { getWorldSurfaceTile } from '../utils/worldSurface';
 import { applyExhaustionCollapse } from './exhaustion';
 import { resolveStreetPickupCollection } from './streetPickups';
+import { formatWeatherLabel, getWeatherTravelModifiers } from './weatherSystem';
 
 export type NavigationNotification = { title: string; msg: string };
 
@@ -97,7 +98,9 @@ export const applyMineTravel = (
     };
   }
 
-  const energyCost = mine.travelTime * 5;
+  const travelModifiers = getWeatherTravelModifiers(state.weather);
+  const travelTimeHours = mine.travelTime * travelModifiers.timeMultiplier;
+  const energyCost = Math.ceil(mine.travelTime * 5 * travelModifiers.energyMultiplier);
   if (state.energy <= energyCost) {
     return {
       kind: 'too_tired',
@@ -118,16 +121,20 @@ export const applyMineTravel = (
       nextState: collapsed.nextState,
     };
   }
+  const weatherSuffix = travelModifiers.timeMultiplier > 1.01
+    ? ` through ${formatWeatherLabel(state.weather).toLowerCase()} conditions`
+    : '';
+  const formattedTravelTime = Number.isInteger(travelTimeHours) ? `${travelTimeHours}` : travelTimeHours.toFixed(1);
 
   return {
     kind: 'traveled',
-    notification: { title: 'Travel Complete', msg: `You arrived at ${mine.name} after ${mine.travelTime} hours.` },
+    notification: { title: 'Travel Complete', msg: `You arrived at ${mine.name} after ${formattedTravelTime} hours${weatherSuffix}.` },
     nextState: {
       ...state,
       currentScene: 'MINE',
       activeMineId: mineId,
       energy: state.energy - energyCost,
-      time: (state.time + mine.travelTime) % 24,
+      time: (state.time + travelTimeHours) % 24,
     },
   };
 };

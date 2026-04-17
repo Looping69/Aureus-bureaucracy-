@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { AppState, SimulationVoxel, RebuildTarget, VoxelData, SymmetryMode, EditTool, WorldHoverInfo } from './types';
+import { AppState, SimulationVoxel, RebuildTarget, VoxelData, SymmetryMode, EditTool, WeatherState, WorldHoverInfo } from './types';
 import { CONFIG, COLORS, WORLD_HALF_SIZE, WORLD_SIZE } from './utils/voxelConstants';
 import { EntityManager } from './EntityManager';
 import { GreedyMesher } from './utils/GreedyMesher';
@@ -33,6 +33,7 @@ export class VoxelEngine {
   private physicsWorld: CANNON.World;
   private instanceMesh: THREE.InstancedMesh | null = null;
   private terrainGroup: THREE.Group;
+  private pickupGroup: THREE.Group;
   private targetIndicator: THREE.Mesh;
   private pathLine: THREE.Line;
   private floor: THREE.Mesh;
@@ -75,6 +76,11 @@ export class VoxelEngine {
   private symmetryMode: SymmetryMode = SymmetryMode.NONE;
   private isWireframe: boolean = false;
   private time: number = 12;
+  private weather: WeatherState = {
+    current: 'CLEAR',
+    timeLeft: 4,
+    intensity: 0.1,
+  };
   private targetPlayerPos = new THREE.Vector3(0, CONFIG.FLOOR_Y + 0.5, 0);
   private currentPlayerPos = new THREE.Vector3(0, CONFIG.FLOOR_Y + 0.5, 0);
   private targetCameraFocus = new THREE.Vector3(0, CONFIG.FLOOR_Y + 0.5, 0);
@@ -107,6 +113,8 @@ export class VoxelEngine {
 
     this.terrainGroup = new THREE.Group();
     this.scene.add(this.terrainGroup);
+    this.pickupGroup = new THREE.Group();
+    this.scene.add(this.pickupGroup);
 
     const width = this.container.clientWidth || window.innerWidth;
     const height = this.container.clientHeight || window.innerHeight;
@@ -310,6 +318,10 @@ export class VoxelEngine {
 
   public updateTime(time: number) {
     this.time = time;
+  }
+
+  public updateWeather(weather: WeatherState) {
+    this.weather = weather;
   }
 
   public setPlayerPosition(
@@ -1183,6 +1195,34 @@ export class VoxelEngine {
       this.loadInitialModel(updatedData);
   }
 
+  public setPickupVoxels(data: VoxelData[]) {
+    while (this.pickupGroup.children.length > 0) {
+      const child = this.pickupGroup.children[0];
+      this.pickupGroup.remove(child);
+      if (child instanceof THREE.Mesh) {
+        child.geometry.dispose();
+        if (Array.isArray(child.material)) child.material.forEach((material) => material.dispose());
+        else child.material.dispose();
+      }
+    }
+
+    data.forEach((voxel) => {
+      const geometry = new THREE.BoxGeometry(CONFIG.VOXEL_SIZE, CONFIG.VOXEL_SIZE, CONFIG.VOXEL_SIZE);
+      const material = new THREE.MeshStandardMaterial({
+        color: voxel.color,
+        emissive: voxel.color,
+        emissiveIntensity: 0.18,
+        metalness: 0.3,
+        roughness: 0.45,
+      });
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.position.set(voxel.x, voxel.y, voxel.z);
+      mesh.castShadow = false;
+      mesh.receiveShadow = true;
+      this.pickupGroup.add(mesh);
+    });
+  }
+
   private createVoxels(data: VoxelData[]) {
     if (this.instanceMesh) {
       this.terrainGroup.remove(this.instanceMesh);
@@ -1547,7 +1587,7 @@ export class VoxelEngine {
     this.entities.player.group.rotation.y += diff * Math.min(rotationLerpFactor, 0.5);
 
     this.updateCameraFollow(deltaTime);
-    this.environment.update(this.time, this.currentCameraFocus, deltaTime);
+    this.environment.update(this.time, this.weather, this.currentCameraFocus, deltaTime);
     this.enforceCameraBounds();
     this.controls.update();
     this.physicsWorld.step(1 / 60, deltaTime, 3);
@@ -1813,6 +1853,8 @@ export class VoxelEngine {
     this.container.removeEventListener('pointermove', this.boundPointerMove);
     this.container.removeEventListener('pointerdown', this.boundPointerDown);
     this.container.removeEventListener('pointerleave', this.boundPointerLeave);
+
+    this.setPickupVoxels([]);
     if (this.container && this.renderer.domElement.parentElement === this.container) {
       this.container.removeChild(this.renderer.domElement);
     }

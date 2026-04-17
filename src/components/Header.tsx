@@ -4,6 +4,7 @@ import { GameState } from '../types';
 import { Meter } from './Meter';
 import { getActiveWorldEffects } from '../game/dialogue/worldEffects';
 import { getRunCycleSummary } from '../game/runCycle';
+import { formatWeatherLabel, getWeatherToneClassName, isSevereWeather } from '../game/weatherSystem';
 
 export const Header = ({
   state,
@@ -23,6 +24,9 @@ export const Header = ({
   const isNight = state.time >= 20 || state.time < 6;
   const activeEffects = getActiveWorldEffects(state);
   const cycle = getRunCycleSummary(state);
+  const weatherLabel = formatWeatherLabel(state.weather.current);
+  const weatherToneClassName = getWeatherToneClassName(state.weather.current);
+  const severeWeather = isSevereWeather(state.weather.current);
 
   return (
     <header className={`p-4 border-b border-black/10 backdrop-blur-md flex flex-col gap-3 transition-all duration-1000 hover:opacity-20 ${isNight ? 'bg-slate-900/40 text-white' : 'bg-white/20 text-black'}`}>
@@ -37,6 +41,11 @@ export const Header = ({
             <span className="w-1 h-1 bg-current rounded-full" />
             <span className={isNight ? "text-amber-400" : "text-blue-600"}>{formatTime(state.time)}</span>
             {isNight && <span className="ml-1 text-[8px] text-red-500 animate-pulse">Curfew Active</span>}
+            <span className="w-1 h-1 bg-current rounded-full" />
+            <span className={`rounded-full border px-2 py-0.5 text-[8px] tracking-[0.18em] ${weatherToneClassName}`}>
+              {weatherLabel}
+            </span>
+            {severeWeather && <span className="text-[8px] text-red-500">Severe Front</span>}
             <span className="w-1 h-1 bg-current rounded-full" />
             <span className="text-[9px] tracking-[0.18em]">{cycle.title}</span>
           </div>

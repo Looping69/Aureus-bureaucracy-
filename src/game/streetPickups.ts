@@ -86,24 +86,26 @@ export const resolveStreetPickupCollection = (
   const restored = Math.min(pickup.energyRestore, Math.max(0, state.maxEnergy - state.energy));
   const remainingPickups = state.streetPickups.filter((candidate) => candidate.id !== pickup.id);
   const replenished = refillStreetPickups(remainingPickups, surfaceMap, [position]);
-
-  const notifications = restored > 0
-    ? [{
-      title: 'Stamina Restored',
-      msg: `Collected a gold block and restored ${restored} stamina.`,
-    }]
-    : [{
-      title: 'Gold Block Collected',
-      msg: 'You picked it up, but your stamina was already full.',
-    }];
+  const playerFeedbacks = restored > 0
+    ? [
+      ...state.playerFeedbacks,
+      {
+        id: `pickup-energy-${pickup.id}-${Date.now()}`,
+        amount: restored,
+        type: 'ENERGY' as const,
+        timestamp: Date.now(),
+      },
+    ]
+    : state.playerFeedbacks;
 
   return {
     nextState: {
       ...state,
       energy: Math.min(state.maxEnergy, state.energy + pickup.energyRestore),
       streetPickups: replenished,
+      playerFeedbacks,
     },
-    notifications,
+    notifications: [],
   };
 };
 
