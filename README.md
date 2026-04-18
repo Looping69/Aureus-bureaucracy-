@@ -268,6 +268,7 @@ For the implementation-level breakdown, see [`docs/game-architecture.md`](docs/g
 
 - [`docs/engine-guide.md`](docs/engine-guide.md) — Engineer-facing guide to file structure, boot flow, state flow, scenes, loops, voxel rendering, save/load, and planner pipeline
 - [`docs/game-architecture.md`](docs/game-architecture.md) — Runtime architecture, state boundaries, scene routing, editor pipeline, save model, and verification notes
+- [`docs/game-engine-architecture.md`](docs/game-engine-architecture.md) — File-by-file engine map covering authoritative state, boot/session flow, scheduler cadence, world rendering, entity/environment systems, save architecture, and current structural pressure points
 - [`progress.md`](progress.md) — Chronological development log, refactor history, and validation notes
 
 ---

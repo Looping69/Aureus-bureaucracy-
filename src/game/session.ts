@@ -2,9 +2,10 @@ import { BUILDINGS, INITIAL_MINES, INITIAL_NPCS, INITIAL_PERMITS } from '../data
 import { EMPTY_WORLD_EFFECTS } from './dialogue/worldEffects';
 import { deriveFtuePhaseFromTutorialStep, getLegacyTutorialStepForFtuePhase } from './ftue';
 import { getBuildingAccessPosition } from '../utils/buildingAccess';
-import { GameState, GameWorldState, WorldPosition } from '../types';
+import { GameState, GameWorldState, WorldPosition, WorldProfileId } from '../types';
 import { createInitialStreetPickups } from './streetPickups';
 import { createInitialWeatherState } from './weatherSystem';
+import { applyWorldProfileToState } from './worldProfiles';
 
 const cloneSerializable = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
 
@@ -26,11 +27,11 @@ export const buildHydratedBuildings = (
   ) as GameWorldState['buildings'];
 };
 
-export const buildInitialGameState = (): GameState => {
+export const buildInitialGameState = (worldProfileId: WorldProfileId = 'world-1'): GameState => {
   const homePos = getBuildingAccessPosition(BUILDINGS.player_home);
   const buildings = buildHydratedBuildings();
 
-  return {
+  const baseState: GameState = {
     money: 1000,
     ore: 0,
     evidence: 0,
@@ -67,6 +68,7 @@ export const buildInitialGameState = (): GameState => {
     activeBuildingId: null,
     activeMiniGame: null,
     pendingPermitAction: null,
+    worldProfileId: 'world-1',
     buildings,
     navigationZones: [],
     day: 1,
@@ -88,6 +90,8 @@ export const buildInitialGameState = (): GameState => {
     tutorialStep: 0,
     tutorialMinimized: false,
   };
+
+  return applyWorldProfileToState(baseState, worldProfileId);
 };
 
 type HydrateSavedStateParams = {
@@ -114,6 +118,7 @@ export const hydrateSavedState = ({
   return {
     ...baseState,
     ...saved,
+    worldProfileId: saved.worldProfileId ?? baseState.worldProfileId,
     currentScene: saved.currentScene === 'CITY_PLANNER' && !plannerEnabled ? 'WORLD' : saved.currentScene,
     ftuePhase: nextFtuePhase,
     buildings: hydrateBuildings(saved.buildings),

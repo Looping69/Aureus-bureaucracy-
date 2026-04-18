@@ -7,7 +7,7 @@ import {
   GameWorldState,
   Permit,
 } from '../types';
-import { shouldHighlightForm17B, shouldHighlightVane, shouldLockBureauDirectory } from './ftue';
+import { hasUnlockedBureauFilings, shouldHighlightForm17B, shouldHighlightVane, shouldLockBureauDirectory } from './ftue';
 
 export type OfficeSceneMode = 'DIRECTORY' | 'BUILDING' | 'EXPLORATION';
 
@@ -42,11 +42,14 @@ const isDirectoryVisibleBuilding = (building: Building) =>
 
 export const deriveOfficeViewModel = (state: OfficeSceneState): OfficeViewModel => {
   const building = state.activeBuildingId ? state.buildings[state.activeBuildingId] ?? null : null;
+  const bureauFilingsUnlocked = hasUnlockedBureauFilings(state);
   const activePermits = Object.values(state.permits).filter(
-    (permit) => permit.status !== 'LOCKED' && permit.status !== 'REJECTED'
+    (permit) => bureauFilingsUnlocked && permit.status !== 'LOCKED' && permit.status !== 'REJECTED'
   );
   const buildingPermits = building?.id === 'licensing_office'
-    ? Object.values(state.permits).filter((permit) => permit.status !== 'LOCKED')
+    ? (bureauFilingsUnlocked
+      ? Object.values(state.permits).filter((permit) => permit.status !== 'LOCKED')
+      : [])
     : [];
 
   return {

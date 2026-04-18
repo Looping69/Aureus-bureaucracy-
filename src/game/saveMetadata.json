@@ -1,5 +1,5 @@
 {
-  "saveKey": "aureus-save-v2",
-  "legacySaveKeys": ["aureus-save-v1"],
-  "saveVersion": 2
+  "saveKey": "aureus-save-v3",
+  "legacySaveKeys": ["aureus-save-v2", "aureus-save-v1"],
+  "saveVersion": 3
 }

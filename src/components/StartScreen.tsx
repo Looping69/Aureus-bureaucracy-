@@ -1,27 +1,22 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { ChevronRight, FolderClock, Pickaxe, Save } from 'lucide-react';
-import { GameState } from '../types';
+import { ChevronRight, Pickaxe, Save } from 'lucide-react';
+import { WorldProfileId } from '../types';
+import { WorldProfileSummary } from '../game/worldProfiles';
 
 interface StartScreenProps {
   hasSave: boolean;
-  savePreview: GameState | null;
-  onNewGame: () => void;
+  worldProfiles: WorldProfileSummary[];
+  onStartWorld: (worldProfileId: WorldProfileId) => void;
   onContinue: () => void;
   onOpenPlanner?: () => void;
   showPlannerAccess?: boolean;
 }
 
-const formatTime = (time: number) => {
-  const hour = Math.floor(time) % 24;
-  const minutes = Math.floor((time % 1) * 60);
-  return `${hour.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-};
-
 export const StartScreen: React.FC<StartScreenProps> = ({
   hasSave,
-  savePreview,
-  onNewGame,
+  worldProfiles,
+  onStartWorld,
   onContinue,
   onOpenPlanner,
   showPlannerAccess = false,
@@ -64,78 +59,59 @@ export const StartScreen: React.FC<StartScreenProps> = ({
                 </div>
 
                 <div className="px-6 py-5 space-y-4">
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50/90 p-4">
-                    <div className="flex items-start gap-3">
-                      <div className="w-11 h-11 rounded-2xl bg-slate-900 text-white flex items-center justify-center shadow-sm shrink-0">
-                        <FolderClock size={18} />
+                  <div className="space-y-3">
+                    <div className="rounded-2xl border border-slate-200 bg-white/90 p-3 shadow-sm">
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-[10px] font-mono uppercase tracking-[0.28em] text-slate-500">
+                            World Files
+                          </p>
+                        </div>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[10px] font-mono uppercase tracking-[0.28em] text-slate-500">
-                          Archive Status
-                        </p>
-                        {hasSave && savePreview ? (
-                          <>
-                            <p className="mt-1 text-sm font-black text-slate-900">
-                              Save file found
-                            </p>
-                            <p className="mt-2 text-xs leading-relaxed text-slate-600">
-                              Day {savePreview.day} at {formatTime(savePreview.time)}. Funds ${Math.round(savePreview.money)}. Ore {savePreview.ore}. Exposure {Math.round(savePreview.meters.exposure)}%.
-                            </p>
-                          </>
-                        ) : (
-                          <>
-                            <p className="mt-1 text-sm font-black text-slate-900">
-                              No previous run on file
-                            </p>
-                            <p className="mt-2 text-xs leading-relaxed text-slate-600">
-                              Start a new case file and we will begin from your house at the center of the basin.
-                            </p>
-                          </>
-                        )}
+
+                      <div className="space-y-2">
+                        {worldProfiles.map((profile) => (
+                          <button
+                            key={profile.id}
+                            onClick={() => onStartWorld(profile.id)}
+                            className="w-full rounded-[18px] border-2 border-slate-950 bg-slate-950 text-white px-3 py-2.5 shadow-lg flex items-center justify-between gap-2 active:scale-[0.99] transition-transform"
+                          >
+                            <span className="flex items-start gap-2">
+                              <span className="mt-0.5 w-7 h-7 rounded-lg bg-white/10 flex items-center justify-center shrink-0">
+                                <Pickaxe size={12} />
+                              </span>
+                              <span className="text-left leading-none">
+                                <span className="block text-[11px] font-black uppercase tracking-[0.14em]">{profile.tag}</span>
+                                <span className="mt-0.5 block text-[9px] uppercase tracking-[0.14em] text-white/75">{profile.title}</span>
+                              </span>
+                            </span>
+                            <ChevronRight size={14} className="shrink-0" />
+                          </button>
+                        ))}
                       </div>
                     </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    <button
-                      onClick={onNewGame}
-                      className="w-full rounded-2xl border-2 border-slate-950 bg-slate-950 text-white px-4 py-4 shadow-lg flex items-center justify-between gap-3 active:scale-[0.99] transition-transform"
-                    >
-                      <span className="flex items-center gap-3">
-                        <span className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center">
-                          <Pickaxe size={18} />
-                        </span>
-                        <span className="text-left">
-                          <span className="block text-sm font-black uppercase tracking-widest">New Game</span>
-                          <span className="block text-[11px] text-white/65">
-                            Open a fresh file and overwrite the old run.
-                          </span>
-                        </span>
-                      </span>
-                      <ChevronRight size={18} className="shrink-0" />
-                    </button>
 
                     <button
                       onClick={onContinue}
                       disabled={!hasSave}
-                      className={`w-full rounded-2xl border px-4 py-4 flex items-center justify-between gap-3 transition-all ${
+                      className={`w-full rounded-[18px] border px-3 py-2.5 flex items-center justify-between gap-2 transition-all ${
                         hasSave
                           ? 'border-[#8fa1ad] bg-[#edf2f5] text-slate-900 shadow-md active:scale-[0.99]'
                           : 'border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed'
                       }`}
                     >
-                      <span className="flex items-center gap-3">
-                        <span className={`w-10 h-10 rounded-2xl flex items-center justify-center ${hasSave ? 'bg-white text-slate-800' : 'bg-slate-200 text-slate-400'}`}>
-                          <Save size={18} />
+                      <span className="flex items-center gap-2">
+                        <span className={`w-8 h-8 rounded-lg flex items-center justify-center ${hasSave ? 'bg-white text-slate-800' : 'bg-slate-200 text-slate-400'}`}>
+                          <Save size={14} />
                         </span>
-                        <span className="text-left">
-                          <span className="block text-sm font-black uppercase tracking-widest">Continue</span>
-                          <span className="block text-[11px] opacity-70">
-                            {hasSave ? 'Resume your last saved run.' : 'No save available yet.'}
+                        <span className="text-left leading-none">
+                          <span className="block text-[11px] font-black uppercase tracking-[0.14em]">Continue</span>
+                          <span className="mt-0.5 block text-[9px] opacity-70">
+                            {hasSave ? 'Choose which archive file to restore.' : 'No save available yet.'}
                           </span>
                         </span>
                       </span>
-                      <ChevronRight size={18} className="shrink-0" />
+                      <ChevronRight size={14} className="shrink-0" />
                     </button>
                   </div>
                 </div>

@@ -8,26 +8,21 @@ export type NotificationMessage = {
 
 export const useNotificationCenter = () => {
   const [notification, setNotification] = React.useState<NotificationMessage | null>(null);
-  const [notificationQueue, setNotificationQueue] = React.useState<NotificationMessage[]>([]);
   const [actionLog, setActionLog] = React.useState<ActionLogEntry[]>([]);
 
-  const appendActionLog = React.useCallback((title: string, msg: string) => {
+  const appendActionLog = React.useCallback((title: string, msg: string, unread = false) => {
     const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     setActionLog((prev) => [
-      { id: `${Date.now()}-${Math.random()}`, timestamp, title, msg },
+      { id: `${Date.now()}-${Math.random()}`, timestamp, title, msg, unread },
       ...prev,
     ].slice(0, 40));
   }, []);
 
   const pushNotification = React.useCallback((next: NotificationMessage | null) => {
     if (!next) return;
-
-    setNotification((current) => {
-      if (!current) return next;
-      setNotificationQueue((queued) => [...queued, next]);
-      return current;
-    });
-  }, []);
+    appendActionLog(next.title, next.msg, true);
+    setNotification(next);
+  }, [appendActionLog]);
 
   const pushNotifications = React.useCallback((items: NotificationMessage[]) => {
     items.forEach((item) => pushNotification(item));
@@ -38,39 +33,43 @@ export const useNotificationCenter = () => {
       setNotification((current) => {
         const resolved = next(current);
         if (resolved) {
-          setNotificationQueue((queued) => [...queued, resolved]);
+          appendActionLog(resolved.title, resolved.msg, true);
         }
-        return current;
+        return resolved ?? current;
       });
       return;
     }
 
     pushNotification(next);
-  }, [pushNotification]);
+  }, [appendActionLog, pushNotification]);
 
   const dismissNotification = React.useCallback(() => {
-    setNotificationQueue((queued) => {
-      if (queued.length === 0) {
-        setNotification(null);
-        return queued;
-      }
-
-      const [next, ...rest] = queued;
-      setNotification(next);
-      return rest;
-    });
+    setNotification(null);
   }, []);
+
+  const markActionLogRead = React.useCallback((entryIds?: string[]) => {
+    setActionLog((prev) =>
+      prev.map((entry) => {
+        if (!entry.unread) return entry;
+        if (entryIds && !entryIds.includes(entry.id)) return entry;
+        return { ...entry, unread: false };
+      }),
+    );
+  }, []);
+
+  const markAllActionLogRead = React.useCallback(() => {
+    markActionLogRead();
+  }, [markActionLogRead]);
+
+  const unreadActionLogCount = React.useMemo(
+    () => actionLog.reduce((count, entry) => count + (entry.unread ? 1 : 0), 0),
+    [actionLog],
+  );
 
   const resetNotifications = React.useCallback(() => {
     setNotification(null);
-    setNotificationQueue([]);
     setActionLog([]);
   }, []);
-
-  React.useEffect(() => {
-    if (!notification) return;
-    appendActionLog(notification.title, notification.msg);
-  }, [appendActionLog, notification]);
 
   return {
     notification,
@@ -80,6 +79,9 @@ export const useNotificationCenter = () => {
     dismissNotification,
     actionLog,
     setActionLog,
+    unreadActionLogCount,
+    markActionLogRead,
+    markAllActionLogRead,
     resetNotifications,
   };
 };

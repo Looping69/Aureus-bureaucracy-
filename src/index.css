@@ -13,7 +13,15 @@
   --color-bureau-stamp: #dc2626;
 }
 
+html,
+body,
+#root {
+  min-height: 100%;
+  height: 100%;
+}
+
 body {
+  margin: 0;
   background-color: var(--color-bureau-bg);
   color: var(--color-bureau-ink);
   font-family: var(--font-sans);
@@ -65,4 +73,3 @@ body {
 .animate-shake {
   animation: shake 0.2s ease-in-out 0s 2;
 }
-

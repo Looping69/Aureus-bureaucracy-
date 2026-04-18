@@ -61,8 +61,8 @@ export const UtilityDrawer: React.FC<UtilityDrawerProps> = ({
               >
                 <ScrollText size={16} className="text-sky-300" />
                 <div>
-                  <div className="text-sm font-black uppercase tracking-wider">Action Log</div>
-                  <div className="text-[11px] opacity-65">Open the run history and recent notifications.</div>
+                  <div className="text-sm font-black uppercase tracking-wider">Story Ledger</div>
+                  <div className="text-[11px] opacity-65">Open the running archive of clues, alerts, and world updates.</div>
                 </div>
               </button>
 

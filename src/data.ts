@@ -321,7 +321,7 @@ export const INITIAL_PERMITS: Record<string, Permit> = {
     formNumber: '17-B',
     description: 'Preliminary declaration of intent to extract resources from the crust. Required for all mining operations.',
     cost: 50,
-    status: 'AVAILABLE',
+    status: 'LOCKED',
     unlocksFeature: 'prospecting'
   },
   'prospecting-license': {

@@ -9,6 +9,7 @@ import { DialogueOverlay } from './components/DialogueOverlay';
 import { PermitOverlay } from './components/PermitOverlay';
 import { FormMiniGame } from './components/FormMiniGame';
 import { StartScreen } from './components/StartScreen';
+import { SaveArchiveScreen } from './components/SaveArchiveScreen';
 import { LightLoadingOverlay } from './components/LightLoadingOverlay';
 import { LoadingScreen } from './components/LoadingScreen';
 import { TutorialOverlay } from './components/TutorialOverlay';
@@ -19,7 +20,6 @@ import { EndingOverlay } from './components/EndingOverlay';
 import { MarketOverlay } from './components/MarketOverlay';
 import { UtilityDrawer } from './components/UtilityDrawer';
 import { SideNavPanel } from './components/SideNavPanel';
-import { NotificationOverlay } from './components/NotificationOverlay';
 import { getBuildingAccessPosition } from './utils/buildingAccess';
 import { findPath } from './utils/pathfinding';
 import { buildWorldSurfaceMap, getWorldSurfaceTile } from './utils/worldSurface';
@@ -64,6 +64,7 @@ import {
   startTutorialJourney,
   toggleTutorialMinimized,
 } from './game/uiTransitions';
+import { hasUnlockedBureauFilings } from './game/ftue';
 import {
   applyDirectWorldMove,
   applyMineTravel,
@@ -74,6 +75,7 @@ import { useAppChrome } from './hooks/app/useAppChrome';
 import { useGameSession } from './hooks/app/useGameSession';
 import { useNotificationCenter } from './hooks/app/useNotificationCenter';
 import { shouldShowCompactFtueHud } from './game/shellView';
+import { WORLD_PROFILES } from './game/worldProfiles';
 
 // --- Main App ---
 
@@ -86,13 +88,13 @@ export default function App() {
 
   const [state, setState] = useState<GameState>(() => buildInitialGameState());
   const {
-    notification,
     pushNotification,
     pushNotifications,
     queueNotification,
-    dismissNotification,
     actionLog,
     setActionLog,
+    unreadActionLogCount,
+    markAllActionLogRead,
     resetNotifications,
   } = useNotificationCenter();
   const {
@@ -114,6 +116,7 @@ export default function App() {
   const [lastActionName, setLastActionName] = useState('none');
   const [lastActionMs, setLastActionMs] = useState(0);
   const [showSceneTransitionLoading, setShowSceneTransitionLoading] = useState(false);
+  const [tutorialUnreadCount, setTutorialUnreadCount] = useState(0);
   const queuedFeedbackRef = useRef<RelationshipFeedback[]>([]);
   const isDraggingRef = useRef(false);
   const dragDistanceRef = useRef(0);
@@ -133,12 +136,15 @@ export default function App() {
   const {
     gameStarted,
     isPlannerHomeSession,
+    homeScreenView,
     hasSave,
-    savePreview,
+    saveSlots,
     startupLoading,
     hasCompletedInitialWorldBoot,
     handleStartNewGame,
-    handleContinueGame,
+    handleOpenArchiveBrowser,
+    handleLoadSaveSlot,
+    handleBackToStartMenu,
     handleOpenPlannerFromHome,
     handleExitPlannerToHome,
     handleInitialSceneMounted,
@@ -209,6 +215,32 @@ export default function App() {
     }));
     pushNotification({ title: 'Ending Unlocked', msg: unlocked.title });
   }, [pushNotification, state]);
+
+  useEffect(() => {
+    if (!gameStarted) {
+      setTutorialUnreadCount(0);
+      return;
+    }
+
+    if (state.tutorialStep === 99 || state.ftuePhase === 'ftue_complete') {
+      setTutorialUnreadCount(0);
+      return;
+    }
+
+    setTutorialUnreadCount(1);
+  }, [gameStarted, state.ftuePhase, state.tutorialStep]);
+
+  useEffect(() => {
+    if (!state.tutorialMinimized) {
+      setTutorialUnreadCount(0);
+    }
+  }, [state.tutorialMinimized]);
+
+  useEffect(() => {
+    if (showActionLog && unreadActionLogCount > 0) {
+      markAllActionLogRead();
+    }
+  }, [markAllActionLogRead, showActionLog, unreadActionLogCount]);
 
   const beginTrackedAction = (name: string) => {
     pendingActionRef.current = {
@@ -445,14 +477,48 @@ export default function App() {
   }, [state]);
 
   const isCompactFtueHud = useMemo(() => shouldShowCompactFtueHud(state), [state]);
+  const bureauFilingsUnlocked = useMemo(() => hasUnlockedBureauFilings(state), [state.permits]);
+
+  const handleToggleTutorialOverlay = () => {
+    setTutorialUnreadCount(0);
+    setState(toggleTutorialMinimized);
+  };
+
+  const handleDismissTutorialOverlay = () => {
+    setTutorialUnreadCount(0);
+    setState(dismissTutorial);
+  };
+
+  const handleStartTutorialRun = () => {
+    setTutorialUnreadCount(0);
+    setState(s => startTutorialJourney(s, 'reach_bureau'));
+  };
+
+  const handleToggleStoryLedger = () => {
+    setShowActionLog(current => {
+      const next = !current;
+      if (next) markAllActionLogRead();
+      return next;
+    });
+  };
 
   if (!gameStarted) {
+    if (homeScreenView === 'archive') {
+      return (
+        <SaveArchiveScreen
+          saveSlots={saveSlots}
+          onBack={handleBackToStartMenu}
+          onLoadSlot={handleLoadSaveSlot}
+        />
+      );
+    }
+
     return (
       <StartScreen
         hasSave={hasSave}
-        savePreview={savePreview}
-        onNewGame={handleStartNewGame}
-        onContinue={handleContinueGame}
+        worldProfiles={WORLD_PROFILES}
+        onStartWorld={handleStartNewGame}
+        onContinue={handleOpenArchiveBrowser}
         onOpenPlanner={handleOpenPlannerFromHome}
         showPlannerAccess={plannerEnabled}
       />
@@ -500,206 +566,228 @@ export default function App() {
   };
 
   return (
-    <div className="h-[100dvh] flex flex-col max-w-md mx-auto bg-bureau-bg shadow-2xl relative overflow-hidden">
-      <Header
-        state={state}
-        onOpenUtilities={() => setShowUtilityDrawer(true)}
-        compactFtueHud={isCompactFtueHud}
-      />
+    <div className="relative min-h-[100dvh] overflow-hidden bg-[#c8d0dc]">
+      <div className="pointer-events-none absolute inset-0 opacity-70">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,#f8fafc_0%,#d7dee8_42%,#b7c0ce_100%)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.2),rgba(15,23,42,0.08))]" />
+      </div>
 
-      <GameSceneRouter
-        state={state}
-        showMinePicker={showMinePicker}
-        showDebug={showDebugPanel}
-        plannerEnabled={plannerEnabled}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onWheel={handleWheel}
-        onMove={handleMove}
-        onDirectMove={handleDirectMove}
-        onMine={handleMine}
-        onMineAction={handleMineAction}
-        onOpenMine={openMineScene}
-        onRest={handleRest}
-        onRecenter={handleRecenter}
-        onSelectMine={handleTravel}
-        onCloseMinePicker={() => setShowMinePicker(false)}
-        onWorldInteract={handleWorldInteract}
-        onApplyAuthoring={(world) => setState(s => applyPlannerWorld(s, world))}
-        onClosePlanner={() => {
-          if (isPlannerHomeSession) {
-            handleExitPlannerToHome();
-            return;
-          }
-          setState(returnToWorldScene);
-        }}
-        onReturnMineToWorld={() => setState(returnToWorldScene)}
-        onCollectMineResource={(amount) => {
-          beginTrackedAction('mine_world_collect');
-          setState(s => addOreToInventory(s, amount));
-        }}
-        onSelectNPC={(id) => setState(s => selectNpc(s, id))}
-        onSelectPermit={(id) => {
-          beginTrackedAction(`select_permit:${id}`);
-          setState(s => selectPermit(s, id));
-        }}
-        onFoundItem={handleFoundItem}
-        onTakePhoto={handleTakePhoto}
-        onExplorationComplete={() => {
-          beginTrackedAction('exploration_complete');
-          setState(closeOfficeExploration);
-        }}
-        onStartExploration={() => {
-          beginTrackedAction('exploration_start');
-          setState(openOfficeExploration);
-        }}
-        onTravelTo={handleTravelTo}
-        onBackToDirectory={() => {
-          beginTrackedAction('back_to_directory');
-          setState(returnOfficeToDirectory);
-        }}
-        onOperationAction={handleOperationAction}
-        suppressInitialWorldFallback={!hasCompletedInitialWorldBoot}
-        showInitialWorldLoadingOverlay={false}
-        onInitialWorldReady={handleInitialWorldReady}
-        onInitialWorldLoadingProgress={handleInitialWorldLoadingProgress}
-        onInitialSceneMounted={handleInitialSceneMounted}
-      />
+      <div className="relative mx-auto flex min-h-[100dvh] w-full items-center justify-center sm:px-6 sm:py-5">
+        <div className="relative h-[100dvh] w-full max-w-[430px] overflow-hidden bg-bureau-bg transform-gpu sm:h-[min(920px,calc(100dvh-2.5rem))] sm:rounded-[34px] sm:border sm:border-black/15 sm:shadow-[0_32px_90px_rgba(15,23,42,0.28)]">
+          <div className="pointer-events-none absolute inset-x-0 top-0 z-0 h-28 bg-[linear-gradient(180deg,rgba(255,255,255,0.45),transparent)]" />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-0 h-24 bg-[linear-gradient(0deg,rgba(15,23,42,0.08),transparent)]" />
 
-      <LoadingScreen
-        visible={startupLoading.visible}
-        progress={startupLoading.progress}
-        phase={startupLoading.phase}
-      />
-      <LightLoadingOverlay visible={showSceneTransitionLoading} />
-
-      <TutorialOverlay
-        ftuePhase={state.ftuePhase}
-        tutorialStep={state.tutorialStep}
-        tutorialMinimized={state.tutorialMinimized}
-        onToggleMinimized={() => setState(toggleTutorialMinimized)}
-        onClose={() => setState(dismissTutorial)}
-        onStartJourney={() => setState(s => startTutorialJourney(s, 'reach_bureau'))}
-      />
-
-      <SideNavPanel
-        state={state}
-        isOpen={showNavigationPanel}
-        onToggle={() => setShowNavigationPanel(v => !v)}
-        onOpenMine={openMineScene}
-        onOpenMineWorld={handleOpenMineWorld}
-        onOpenWorld={handleOpenWorldScene}
-        onOpenOffice={() => {
-          beginTrackedAction('open_office');
-          setState(enterOfficeDirectory);
-        }}
-        onExport={() => {
-          setShowMarket(true);
-        }}
-      />
-
-      <ActionLogPanel
-        entries={actionLog}
-        isOpen={showActionLog}
-        onToggle={() => setShowActionLog(v => !v)}
-        onClear={() => setActionLog([])}
-        showToggle={false}
-      />
-
-      <DebugPanel
-        state={state}
-        stateUpdates={stateUpdateCount}
-        lastAction={lastActionName}
-        lastActionMs={lastActionMs}
-        onResetStateCounter={() => setStateUpdateCount(0)}
-        isOpen={showDebugPanel}
-        onToggle={() => setShowDebugPanel(v => !v)}
-        showToggle={false}
-      />
-
-      <UtilityDrawer
-        isOpen={showUtilityDrawer}
-        onClose={() => setShowUtilityDrawer(false)}
-        onOpenActionLog={() => {
-          setShowActionLog(true);
-          setShowUtilityDrawer(false);
-        }}
-        onOpenDebug={() => {
-          setShowDebugPanel(true);
-          setShowUtilityDrawer(false);
-        }}
-        onOpenPlanner={() => {
-          setState(openPlannerScene);
-          setShowUtilityDrawer(false);
-        }}
-        showPlanner={plannerEnabled}
-      />
-
-      {/* Overlays */}
-      <AnimatePresence>
-        {activeNPC && (
-          <DialogueOverlay 
-            key="dialogue-overlay"
-            npc={activeNPC} 
-            state={state}
-            onClose={() => setState(closeNpc)} 
-            onAction={handleDialogueAction}
-          />
-        )}
-        {activePermit && (
-          <PermitOverlay 
-            key="permit-overlay"
-            permit={activePermit} 
-            onAction={handlePermitAction}
-            onClose={() => setState(closePermit)} 
-            tutorialStep={state.tutorialStep}
-          />
-        )}
-        {state.activeMiniGame === 'FORM_PROCESSING' && (
-          <FormMiniGame 
-            key="form-minigame"
-            onComplete={handleMiniGameComplete}
-            onCancel={() => setState(closeMiniGame)}
-          />
-        )}
-        {state.activeEndingId && (
-          <EndingOverlay
-            endingId={state.activeEndingId}
-            onClose={() => setState(closeEnding)}
-          />
-        )}
-        {showMarket && (
-          <MarketOverlay
-            key="market-overlay"
-            ore={state.ore}
-            unitPrice={marketSnapshot.unitPrice}
-            payout={marketSnapshot.payout}
-            exposureIncrease={marketSnapshot.exposureIncrease}
-            licensed={marketSnapshot.licensed}
-            options={marketSnapshot.options}
-            onClose={() => setShowMarket(false)}
-            onSellAll={(strategy) => {
-              beginTrackedAction(`export_ore:${strategy}`);
-              setState(s => {
-                const exported = applyOreExport(s, s.ore, strategy);
-                if (exported.notification) {
-                  pushNotification(exported.notification);
-                }
-                return exported.nextState;
-              });
-              setShowMarket(false);
+          <div
+            className="relative isolate flex h-full flex-col overflow-hidden"
+            style={{
+              paddingTop: 'env(safe-area-inset-top, 0px)',
+              paddingRight: 'env(safe-area-inset-right, 0px)',
+              paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+              paddingLeft: 'env(safe-area-inset-left, 0px)',
             }}
-          />
-        )}
-      </AnimatePresence>
+          >
+            <Header
+              state={state}
+              onOpenUtilities={() => setShowUtilityDrawer(true)}
+              compactFtueHud={isCompactFtueHud}
+            />
 
-      <NotificationOverlay notification={notification} onClose={dismissNotification} />
+            <GameSceneRouter
+              state={state}
+              showMinePicker={showMinePicker}
+              showDebug={showDebugPanel}
+              plannerEnabled={plannerEnabled}
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
+              onWheel={handleWheel}
+              onMove={handleMove}
+              onDirectMove={handleDirectMove}
+              onMine={handleMine}
+              onMineAction={handleMineAction}
+              onOpenMine={openMineScene}
+              onRest={handleRest}
+              onRecenter={handleRecenter}
+              onSelectMine={handleTravel}
+              onCloseMinePicker={() => setShowMinePicker(false)}
+              onWorldInteract={handleWorldInteract}
+              onApplyAuthoring={(world) => setState(s => applyPlannerWorld(s, world))}
+              onClosePlanner={() => {
+                if (isPlannerHomeSession) {
+                  handleExitPlannerToHome();
+                  return;
+                }
+                setState(returnToWorldScene);
+              }}
+              onReturnMineToWorld={() => setState(returnToWorldScene)}
+              onCollectMineResource={(amount) => {
+                beginTrackedAction('mine_world_collect');
+                setState(s => addOreToInventory(s, amount));
+              }}
+              onSelectNPC={(id) => setState(s => selectNpc(s, id))}
+              onSelectPermit={(id) => {
+                if (!bureauFilingsUnlocked) return;
+                beginTrackedAction(`select_permit:${id}`);
+                setState(s => selectPermit(s, id));
+              }}
+              onFoundItem={handleFoundItem}
+              onTakePhoto={handleTakePhoto}
+              onExplorationComplete={() => {
+                beginTrackedAction('exploration_complete');
+                setState(closeOfficeExploration);
+              }}
+              onStartExploration={() => {
+                beginTrackedAction('exploration_start');
+                setState(openOfficeExploration);
+              }}
+              onTravelTo={handleTravelTo}
+              onBackToDirectory={() => {
+                beginTrackedAction('back_to_directory');
+                setState(returnOfficeToDirectory);
+              }}
+              onOperationAction={handleOperationAction}
+              suppressInitialWorldFallback={!hasCompletedInitialWorldBoot}
+              showInitialWorldLoadingOverlay={false}
+              onInitialWorldReady={handleInitialWorldReady}
+              onInitialWorldLoadingProgress={handleInitialWorldLoadingProgress}
+              onInitialSceneMounted={handleInitialSceneMounted}
+            />
 
-      {/* Background Ambience */}
-      <div className="fixed inset-0 -z-10 opacity-5 pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-red-500 rounded-full blur-[120px]" />
-        <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-blue-500 rounded-full blur-[120px]" />
+            <LoadingScreen
+              visible={startupLoading.visible}
+              progress={startupLoading.progress}
+              phase={startupLoading.phase}
+            />
+            <LightLoadingOverlay visible={showSceneTransitionLoading} />
+
+            <TutorialOverlay
+              ftuePhase={state.ftuePhase}
+              tutorialStep={state.tutorialStep}
+              tutorialMinimized={state.tutorialMinimized}
+              unreadCount={tutorialUnreadCount}
+              onToggleMinimized={handleToggleTutorialOverlay}
+              onClose={handleDismissTutorialOverlay}
+              onStartJourney={handleStartTutorialRun}
+            />
+
+            <SideNavPanel
+              state={state}
+              isOpen={showNavigationPanel}
+              onToggle={() => setShowNavigationPanel(v => !v)}
+              onOpenMine={openMineScene}
+              onOpenMineWorld={handleOpenMineWorld}
+              onOpenWorld={handleOpenWorldScene}
+              onOpenOffice={() => {
+                beginTrackedAction('open_office');
+                setState(enterOfficeDirectory);
+              }}
+              onExport={() => {
+                setShowMarket(true);
+              }}
+            />
+
+            <ActionLogPanel
+              entries={actionLog}
+              unreadCount={unreadActionLogCount}
+              isOpen={showActionLog}
+              onToggle={handleToggleStoryLedger}
+              onClear={() => setActionLog([])}
+              showToggle={false}
+            />
+
+            <DebugPanel
+              state={state}
+              stateUpdates={stateUpdateCount}
+              lastAction={lastActionName}
+              lastActionMs={lastActionMs}
+              onResetStateCounter={() => setStateUpdateCount(0)}
+              isOpen={showDebugPanel}
+              onToggle={() => setShowDebugPanel(v => !v)}
+              showToggle={false}
+            />
+
+            <UtilityDrawer
+              isOpen={showUtilityDrawer}
+              onClose={() => setShowUtilityDrawer(false)}
+              onOpenActionLog={() => {
+                markAllActionLogRead();
+                setShowActionLog(true);
+                setShowUtilityDrawer(false);
+              }}
+              onOpenDebug={() => {
+                setShowDebugPanel(true);
+                setShowUtilityDrawer(false);
+              }}
+              onOpenPlanner={() => {
+                setState(openPlannerScene);
+                setShowUtilityDrawer(false);
+              }}
+              showPlanner={plannerEnabled}
+            />
+
+            <AnimatePresence>
+              {activeNPC && (
+                <DialogueOverlay
+                  key="dialogue-overlay"
+                  npc={activeNPC}
+                  state={state}
+                  onClose={() => setState(closeNpc)}
+                  onAction={handleDialogueAction}
+                />
+              )}
+              {activePermit && bureauFilingsUnlocked && (
+                <PermitOverlay
+                  key="permit-overlay"
+                  permit={activePermit}
+                  onAction={handlePermitAction}
+                  onClose={() => setState(closePermit)}
+                  tutorialStep={state.tutorialStep}
+                />
+              )}
+              {state.activeMiniGame === 'FORM_PROCESSING' && bureauFilingsUnlocked && (
+                <FormMiniGame
+                  key="form-minigame"
+                  onComplete={handleMiniGameComplete}
+                  onCancel={() => setState(closeMiniGame)}
+                />
+              )}
+              {state.activeEndingId && (
+                <EndingOverlay
+                  endingId={state.activeEndingId}
+                  onClose={() => setState(closeEnding)}
+                />
+              )}
+              {showMarket && (
+                <MarketOverlay
+                  key="market-overlay"
+                  ore={state.ore}
+                  unitPrice={marketSnapshot.unitPrice}
+                  payout={marketSnapshot.payout}
+                  exposureIncrease={marketSnapshot.exposureIncrease}
+                  licensed={marketSnapshot.licensed}
+                  options={marketSnapshot.options}
+                  onClose={() => setShowMarket(false)}
+                  onSellAll={(strategy) => {
+                    beginTrackedAction(`export_ore:${strategy}`);
+                    setState(s => {
+                      const exported = applyOreExport(s, s.ore, strategy);
+                      if (exported.notification) {
+                        pushNotification(exported.notification);
+                      }
+                      return exported.nextState;
+                    });
+                    setShowMarket(false);
+                  }}
+                />
+              )}
+            </AnimatePresence>
+
+            <div className="pointer-events-none absolute inset-0 -z-10 opacity-[0.07]">
+              <div className="absolute left-[-4rem] top-[18%] h-48 w-48 rounded-full bg-red-500 blur-[120px]" />
+              <div className="absolute bottom-[12%] right-[-2.5rem] h-56 w-56 rounded-full bg-blue-500 blur-[120px]" />
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

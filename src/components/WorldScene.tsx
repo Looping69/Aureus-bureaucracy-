@@ -11,7 +11,7 @@ import { getBuildingFootprint } from '../utils/worldNavigation';
 import { buildWorldTerrainVoxels } from '../utils/worldSurface';
 import { WORLD_SIZE } from '../utils/voxelConstants';
 import { useContinuousAnalogMovement } from '../hooks/game/useContinuousAnalogMovement';
-import { BUREAU_BUILDING_ID, getFtueCopy, isFtueWorldFunnelPhase } from '../game/ftue';
+import { BUREAU_BUILDING_ID, isFtueWorldFunnelPhase } from '../game/ftue';
 import { buildStreetPickupVoxels } from '../game/streetPickups';
 import { formatWeatherLabel, getWeatherMovementMultiplier, getWeatherToneClassName, getWeatherWarningCopy, isSevereWeather } from '../game/weatherSystem';
 
@@ -54,7 +54,6 @@ export const WorldScene = ({
   const weatherToneClassName = React.useMemo(() => getWeatherToneClassName(state.weather.current), [state.weather.current]);
   const severeWeather = React.useMemo(() => isSevereWeather(state.weather.current), [state.weather.current]);
   const movementMultiplier = React.useMemo(() => getWeatherMovementMultiplier(state.weather), [state.weather]);
-  const ftueCopy = React.useMemo(() => getFtueCopy(state.ftuePhase), [state.ftuePhase]);
   const isBureauFunnelActive = isFtueWorldFunnelPhase(state.ftuePhase);
   const bureauBuilding = state.buildings[BUREAU_BUILDING_ID] ?? null;
   const bureauAccessPos = React.useMemo(
@@ -231,14 +230,6 @@ export const WorldScene = ({
     return Math.hypot(state.playerPos.x - bureauAccessPos.x, state.playerPos.y - bureauAccessPos.y);
   }, [bureauAccessPos, state.playerPos.x, state.playerPos.y]);
   const isPlayerNearBureau = bureauDistance <= 2;
-  const bureauDirection = React.useMemo(() => {
-    if (!bureauAccessPos) return '';
-    const dx = bureauAccessPos.x - state.playerPos.x;
-    const dy = bureauAccessPos.y - state.playerPos.y;
-    const horizontal = dx > 0 ? 'east' : dx < 0 ? 'west' : '';
-    const vertical = dy > 0 ? 'south' : dy < 0 ? 'north' : '';
-    return [vertical, horizontal].filter(Boolean).join('-') || 'here';
-  }, [bureauAccessPos, state.playerPos.x, state.playerPos.y]);
   const objectiveTarget = React.useMemo<WorldHoverInfo | null>(() => {
     if (!isBureauFunnelActive || !bureauAccessPos) return null;
     return {
@@ -354,31 +345,6 @@ export const WorldScene = ({
           ))}
         </AnimatePresence>
       </div>
-
-      {isBureauFunnelActive && bureauBuilding && (
-        <>
-          <div className="absolute left-4 right-16 top-4 z-30 rounded-2xl border border-amber-300 bg-amber-100/95 px-4 py-3 shadow-xl backdrop-blur-sm">
-            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-amber-800">Primary Target</p>
-            <div className="mt-1 flex items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-black text-amber-950">{bureauBuilding.name}</p>
-                <p className="text-xs font-semibold text-amber-900/80">{ftueCopy.body}</p>
-              </div>
-              <div className="shrink-0 rounded-full bg-amber-500 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-white">
-                {isPlayerNearBureau ? 'Enter Now' : bureauDirection}
-              </div>
-            </div>
-          </div>
-
-          <div className="absolute left-4 right-4 bottom-28 z-30 flex justify-center pointer-events-none">
-            <div className="rounded-full bg-black/80 px-4 py-2 text-center text-[10px] font-black uppercase tracking-[0.22em] text-white shadow-xl">
-              {hoverInfo?.id === BUREAU_BUILDING_ID
-                ? (isPlayerNearBureau ? 'Release Hesitation. Entry is happening.' : 'Tap the Bureau. We will move you in.')
-                : 'Tap the Bureau building to move there and enter.'}
-            </div>
-          </div>
-        </>
-      )}
 
       <div className="absolute bottom-4 right-4">
         <button 

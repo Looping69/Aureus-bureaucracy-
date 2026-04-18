@@ -70,18 +70,18 @@ export const SideNavPanel: React.FC<SideNavPanelProps> = ({
   };
 
   return (
-    <div className="pointer-events-none absolute inset-y-0 right-0 z-40 flex items-center">
+    <div className="pointer-events-none absolute inset-y-0 right-0 z-40 flex items-center pr-2 sm:pr-3">
       <motion.aside
-        animate={{ x: isOpen ? 0 : 96 }}
+        animate={{ x: isOpen ? 0 : 90 }}
         transition={{ type: 'spring', stiffness: 320, damping: 26 }}
-        className="pointer-events-auto w-32 overflow-hidden rounded-l-[20px] border border-black/10 bg-white/82 shadow-2xl backdrop-blur-xl"
+        className="pointer-events-auto w-[7.25rem] overflow-hidden rounded-[24px] border border-black/10 bg-white/88 shadow-[0_18px_46px_rgba(15,23,42,0.24)] backdrop-blur-xl"
       >
-        <div className="flex min-h-[180px]">
+        <div className="flex min-h-[210px]">
           <button
             type="button"
             aria-label={isOpen ? 'Collapse navigation panel' : 'Expand navigation panel'}
             onClick={onToggle}
-            className="flex w-9 shrink-0 flex-col items-center justify-center gap-2 border-r border-black/10 bg-black/5 text-black/70 transition-colors hover:bg-black/10"
+            className="flex w-10 shrink-0 flex-col items-center justify-center gap-2 border-r border-black/10 bg-black/5 text-black/70 transition-colors hover:bg-black/10"
           >
             {isOpen ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
             <span className="[writing-mode:vertical-rl] text-[8px] font-black uppercase tracking-[0.2em]">
@@ -89,7 +89,7 @@ export const SideNavPanel: React.FC<SideNavPanelProps> = ({
             </span>
           </button>
 
-          <div className="flex flex-1 flex-col justify-center gap-1.5 p-1.5">
+          <div className="flex flex-1 flex-col justify-center gap-2 p-1.5">
             {actions.map((action) => {
               const { key, label, icon: Icon, active, accentClassName, title } = action;
               return (
@@ -98,7 +98,7 @@ export const SideNavPanel: React.FC<SideNavPanelProps> = ({
                 type="button"
                 onClick={() => handleAction(action)}
                 title={title}
-                className={`flex items-center gap-2 rounded-xl border px-2 py-1.5 text-left text-[10px] font-black uppercase tracking-[0.18em] transition-all active:scale-[0.98] ${
+                className={`flex items-center gap-2 rounded-2xl border px-2 py-2 text-left text-[10px] font-black uppercase tracking-[0.16em] transition-all active:scale-[0.98] ${
                   active
                     ? 'border-black bg-black text-white shadow-md'
                     : 'border-black/10 bg-white/80 text-black hover:bg-black/5'

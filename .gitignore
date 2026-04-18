@@ -11,3 +11,4 @@ tmp-*-actions.json
 tmp-*.cjs
 .env*
 !.env.example
+Recording *.mp4

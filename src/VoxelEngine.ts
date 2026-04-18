@@ -32,6 +32,9 @@ export class VoxelEngine {
   private controls: OrbitControls;
   private physicsWorld: CANNON.World;
   private instanceMesh: THREE.InstancedMesh | null = null;
+  private pickupMesh: THREE.InstancedMesh | null = null;
+  private pickupGeometry: THREE.BoxGeometry;
+  private pickupMaterial: THREE.MeshStandardMaterial;
   private terrainGroup: THREE.Group;
   private pickupGroup: THREE.Group;
   private targetIndicator: THREE.Mesh;
@@ -42,6 +45,7 @@ export class VoxelEngine {
   private environment: WorldEnvironmentSystem;
   public entities: EntityManager;
   private dummy = new THREE.Object3D();
+  private pickupColor = new THREE.Color();
   
   // Interaction
   private raycaster = new THREE.Raycaster();
@@ -115,6 +119,14 @@ export class VoxelEngine {
     this.scene.add(this.terrainGroup);
     this.pickupGroup = new THREE.Group();
     this.scene.add(this.pickupGroup);
+    this.pickupGeometry = new THREE.BoxGeometry(CONFIG.VOXEL_SIZE, CONFIG.VOXEL_SIZE, CONFIG.VOXEL_SIZE);
+    this.pickupMaterial = new THREE.MeshStandardMaterial({
+      vertexColors: true,
+      emissive: 0x243215,
+      emissiveIntensity: 0.32,
+      metalness: 0.3,
+      roughness: 0.45,
+    });
 
     const width = this.container.clientWidth || window.innerWidth;
     const height = this.container.clientHeight || window.innerHeight;
@@ -1196,31 +1208,34 @@ export class VoxelEngine {
   }
 
   public setPickupVoxels(data: VoxelData[]) {
-    while (this.pickupGroup.children.length > 0) {
-      const child = this.pickupGroup.children[0];
-      this.pickupGroup.remove(child);
-      if (child instanceof THREE.Mesh) {
-        child.geometry.dispose();
-        if (Array.isArray(child.material)) child.material.forEach((material) => material.dispose());
-        else child.material.dispose();
-      }
+    if (this.pickupMesh) {
+      this.pickupGroup.remove(this.pickupMesh);
+      this.pickupMesh = null;
     }
 
-    data.forEach((voxel) => {
-      const geometry = new THREE.BoxGeometry(CONFIG.VOXEL_SIZE, CONFIG.VOXEL_SIZE, CONFIG.VOXEL_SIZE);
-      const material = new THREE.MeshStandardMaterial({
-        color: voxel.color,
-        emissive: voxel.color,
-        emissiveIntensity: 0.18,
-        metalness: 0.3,
-        roughness: 0.45,
-      });
-      const mesh = new THREE.Mesh(geometry, material);
-      mesh.position.set(voxel.x, voxel.y, voxel.z);
-      mesh.castShadow = false;
-      mesh.receiveShadow = true;
-      this.pickupGroup.add(mesh);
+    if (data.length === 0) return;
+
+    const pickupMesh = new THREE.InstancedMesh(this.pickupGeometry, this.pickupMaterial, data.length);
+    pickupMesh.castShadow = false;
+    pickupMesh.receiveShadow = true;
+    pickupMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+
+    data.forEach((voxel, index) => {
+      this.dummy.position.set(voxel.x, voxel.y, voxel.z);
+      this.dummy.rotation.set(0, 0, 0);
+      this.dummy.scale.set(1, 1, 1);
+      this.dummy.updateMatrix();
+      pickupMesh.setMatrixAt(index, this.dummy.matrix);
+      pickupMesh.setColorAt(index, this.pickupColor.setHex(voxel.color));
     });
+
+    pickupMesh.instanceMatrix.needsUpdate = true;
+    if (pickupMesh.instanceColor) {
+      pickupMesh.instanceColor.needsUpdate = true;
+    }
+
+    this.pickupMesh = pickupMesh;
+    this.pickupGroup.add(pickupMesh);
   }
 
   private createVoxels(data: VoxelData[]) {
@@ -1855,6 +1870,8 @@ export class VoxelEngine {
     this.container.removeEventListener('pointerleave', this.boundPointerLeave);
 
     this.setPickupVoxels([]);
+    this.pickupGeometry.dispose();
+    this.pickupMaterial.dispose();
     if (this.container && this.renderer.domElement.parentElement === this.container) {
       this.container.removeChild(this.renderer.domElement);
     }

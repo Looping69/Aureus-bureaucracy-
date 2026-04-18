@@ -124,6 +124,8 @@ export interface WeatherState {
   intensity: number; // 0..1 severity used by render and gameplay systems
 }
 
+export type WorldProfileId = 'world-1' | 'world-2' | 'world-3' | 'world-4';
+
 export interface WorldHoverInfo {
   x: number;
   y: number;
@@ -252,6 +254,7 @@ export interface GameInteractionState {
 }
 
 export interface GameWorldState {
+  worldProfileId: WorldProfileId;
   buildings: Record<string, Building>;
   navigationZones: NavigationZone[];
   day: number;

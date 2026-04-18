@@ -1,4 +1,4 @@
-import { FtuePhase, GameFtueState, GameInteractionState } from '../types';
+import { FtuePhase, GameFtueState, GameInteractionState, GameProgressionState } from '../types';
 
 export const BUREAU_BUILDING_ID = 'licensing_office';
 export const BUREAU_NPC_ID = 'licensing';
@@ -71,6 +71,10 @@ export const shouldHighlightVane = (state: Pick<GameFtueState, 'ftuePhase' | 'tu
 export const shouldHighlightForm17B = (state: Pick<GameFtueState, 'ftuePhase' | 'tutorialStep'>) =>
   state.tutorialStep !== 99 &&
   (state.ftuePhase === 'open_form_17b' || state.ftuePhase === 'submit_form_17b');
+
+export const hasUnlockedBureauFilings = (
+  state: Pick<GameProgressionState, 'permits'>,
+) => state.permits[BUREAU_PERMIT_ID]?.status !== 'LOCKED';
 
 export const shouldLockBureauDirectory = (state: Pick<GameFtueState, 'ftuePhase' | 'tutorialStep'>) =>
   state.tutorialStep !== 99 &&

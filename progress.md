@@ -431,3 +431,8 @@ Original prompt: Okay so there are still so many gaps in the gameplay we need to
     - office/run-cycle layer,
     - planner derive -> mutate -> validate -> compile pipeline.
   - Linked the new guide from README.md so it is discoverable from the repo root.
+
+- 2026-04-17 optimization + world-profile pass in progress:
+  - Added selectable World 1-4 startup profiles and wired save/bootstrap state to remember the chosen world.
+  - Locked bureau filings behind the Officer Vane conversation so forms do not surface early.
+  - Reduced world-renderer waste by skipping duplicate initial terrain/pickup syncs and instancing pickup meshes in VoxelEngine.

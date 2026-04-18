@@ -6,6 +6,7 @@ const APP_URL = 'http://127.0.0.1:4173';
 const SAVE_KEY = saveMetadata.saveKey;
 const LEGACY_SAVE_KEYS = saveMetadata.legacySaveKeys;
 const SAVE_VERSION = saveMetadata.saveVersion;
+const DEFAULT_SLOT_ID = 'slot-1';
 const MOBILE_VIEWPORT_WIDTH = 430;
 const ANALOG_STICK_DRAG_DISTANCE = 26;
 const STICK_CENTER_TOLERANCE_PX = 40;
@@ -47,43 +48,59 @@ const clearAllSaves = async (page) => {
   }, { saveKey: SAVE_KEY, legacyKeys: LEGACY_SAVE_KEYS });
 };
 
-const readSavedState = async (page) => page.evaluate((key) => {
+const readSavedState = async (page, slotId = DEFAULT_SLOT_ID) => page.evaluate(({ key, slotId: targetSlotId }) => {
   const raw = window.localStorage.getItem(key);
   if (!raw) return null;
   const parsed = JSON.parse(raw);
-  return parsed?.state ?? null;
-}, SAVE_KEY);
+  return parsed?.slots?.[targetSlotId]?.state ?? null;
+}, { key: SAVE_KEY, slotId });
 
-const writeSavedState = async (page, state) => {
-  await page.evaluate(({ key, version, state: nextState }) => {
+const writeSavedState = async (page, state, slotId = DEFAULT_SLOT_ID) => {
+  await page.evaluate(({ key, version, state: nextState, slotId: targetSlotId }) => {
+    const raw = window.localStorage.getItem(key);
+    const parsed = raw ? JSON.parse(raw) : { version, slots: {} };
     window.localStorage.setItem(key, JSON.stringify({
       version,
-      savedAt: new Date().toISOString(),
-      state: nextState,
+      slots: {
+        ...(parsed?.slots ?? {}),
+        [targetSlotId]: {
+          version,
+          savedAt: new Date().toISOString(),
+          state: nextState,
+        },
+      },
     }));
-  }, { key: SAVE_KEY, version: SAVE_VERSION, state });
+  }, { key: SAVE_KEY, version: SAVE_VERSION, state, slotId });
 };
 
-const mutateSavedState = async (page, mutator) => {
-  const current = await readSavedState(page);
+const mutateSavedState = async (page, mutator, slotId = DEFAULT_SLOT_ID) => {
+  const current = await readSavedState(page, slotId);
   assert(!!current, 'Expected a save state to exist before mutation.');
   const nextState = mutator(structuredClone(current));
-  await writeSavedState(page, nextState);
+  await writeSavedState(page, nextState, slotId);
 };
 
-const reloadWithMutatedSave = async (page, mutator) => {
-  const current = await readSavedState(page);
+const reloadWithMutatedSave = async (page, mutator, slotId = DEFAULT_SLOT_ID) => {
+  const current = await readSavedState(page, slotId);
   assert(!!current, 'Expected a save state to exist before mutation.');
   const nextState = mutator(structuredClone(current));
 
-  await page.evaluate(({ key, version, state }) => {
+  await page.evaluate(({ key, version, state, slotId: targetSlotId }) => {
+    const raw = window.localStorage.getItem(key);
+    const parsed = raw ? JSON.parse(raw) : { version, slots: {} };
     window.localStorage.setItem(key, JSON.stringify({
       version,
-      savedAt: new Date().toISOString(),
-      state,
+      slots: {
+        ...(parsed?.slots ?? {}),
+        [targetSlotId]: {
+          version,
+          savedAt: new Date().toISOString(),
+          state,
+        },
+      },
     }));
     window.location.reload();
-  }, { key: SAVE_KEY, version: SAVE_VERSION, state: nextState });
+  }, { key: SAVE_KEY, version: SAVE_VERSION, state: nextState, slotId });
 
   await page.waitForLoadState('domcontentloaded');
 };
@@ -116,12 +133,13 @@ const waitForGameShell = async (page) => {
 
 const waitForMineSceneReady = async (page) => {
   await page.getByText(/Iron Vein Outpost/i).first().waitFor({ state: 'visible', timeout: 15000 });
-  await page.waitForFunction((key) => {
+  await page.waitForFunction(({ key, slotId }) => {
     const raw = window.localStorage.getItem(key);
     if (!raw) return false;
     const parsed = JSON.parse(raw);
-    return parsed?.state?.currentScene === 'MINE' && parsed?.state?.activeMineId === 'iron-vein';
-  }, SAVE_KEY, { timeout: 15000 });
+    const state = parsed?.slots?.[slotId]?.state;
+    return state?.currentScene === 'MINE' && state?.activeMineId === 'iron-vein';
+  }, { key: SAVE_KEY, slotId: DEFAULT_SLOT_ID }, { timeout: 15000 });
 };
 
 const openNavigationPanel = async (page) => {
@@ -140,6 +158,8 @@ const continueSavedRun = async (page) => {
   await page.waitForTimeout(250);
   if (!(await continueButton.isVisible().catch(() => false))) return;
   await continueButton.click();
+  await page.getByText(/Save Archive/i).first().waitFor({ state: 'visible', timeout: 30000 });
+  await page.getByRole('button', { name: /File 1/i }).click();
   await page.waitForTimeout(500);
   await removeBlockingNotificationOverlay(page);
 };
@@ -187,10 +207,9 @@ const run = async () => {
     await clearAllSaves(page);
     await page.reload();
 
-    const archiveStatus = page.getByText(/No previous run on file/i);
-    await archiveStatus.waitFor({ state: 'visible', timeout: 30000 });
+    await page.getByText(/World Files/i).first().waitFor({ state: 'visible', timeout: 30000 });
 
-    await page.getByRole('button', { name: /New Game/i }).click();
+    await page.getByRole('button', { name: /World 1/i }).click();
     await startJourney(page);
     const startJourneyStillVisible = await page.getByRole('button', { name: /Start Journey/i }).count();
     assert(startJourneyStillVisible === 0, 'Expected the tutorial CTA to dismiss after starting the journey.');

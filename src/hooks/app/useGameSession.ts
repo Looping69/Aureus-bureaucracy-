@@ -1,6 +1,6 @@
 import React from 'react';
-import { GameState, GameWorldState, WorldPosition } from '../../types';
-import { clearSavedGameState, hasSavedGameState, loadSavedGameState, saveGameState } from '../../game/save';
+import { GameState, GameWorldState, WorldPosition, WorldProfileId } from '../../types';
+import { SaveSlotId, getNextSaveSlotId, hasSavedGameState, listSavedGameStates, loadSavedGameState, saveGameState } from '../../game/save';
 import { buildInitialGameState, hydrateSavedState as hydrateState } from '../../game/session';
 import { NotificationMessage } from './useNotificationCenter';
 
@@ -14,6 +14,7 @@ export type StartupLoadingState = {
 };
 
 type SessionMode = 'game' | 'planner-home';
+type HomeScreenView = 'start' | 'archive';
 
 type UseGameSessionParams = {
   state: GameState;
@@ -37,8 +38,9 @@ export const useGameSession = ({
   resetDebugState,
 }: UseGameSessionParams) => {
   const [sessionMode, setSessionMode] = React.useState<SessionMode | null>(null);
+  const [homeScreenView, setHomeScreenView] = React.useState<HomeScreenView>('start');
   const [hasSave, setHasSave] = React.useState(false);
-  const [savePreview, setSavePreview] = React.useState<GameState | null>(null);
+  const [saveSlots, setSaveSlots] = React.useState(() => listSavedGameStates());
   const [hasCompletedInitialWorldBoot, setHasCompletedInitialWorldBoot] = React.useState(false);
   const [startupLoading, setStartupLoading] = React.useState<StartupLoadingState>({
     visible: false,
@@ -48,6 +50,7 @@ export const useGameSession = ({
   });
   const startupDismissTimerRef = React.useRef<number | null>(null);
   const hasPersistedCurrentSessionRef = React.useRef(false);
+  const activeSaveSlotIdRef = React.useRef<SaveSlotId | null>(null);
 
   const clearStartupDismissTimer = React.useCallback(() => {
     if (startupDismissTimerRef.current !== null) {
@@ -108,11 +111,15 @@ export const useGameSession = ({
     hydrateBuildings,
   }), [homePos, plannerEnabled, hydrateBuildings]);
 
-  React.useEffect(() => {
-    const saved = loadSavedGameState();
-    setHasSave(hasSavedGameState());
-    setSavePreview(saved);
+  const refreshSaveSlots = React.useCallback(() => {
+    const nextSaveSlots = listSavedGameStates();
+    setSaveSlots(nextSaveSlots);
+    setHasSave(nextSaveSlots.some((slot) => slot.state !== null));
   }, []);
+
+  React.useEffect(() => {
+    refreshSaveSlots();
+  }, [refreshSaveSlots]);
 
   React.useEffect(() => {
     return () => {
@@ -122,52 +129,63 @@ export const useGameSession = ({
 
   React.useEffect(() => {
     if (sessionMode !== 'game') return;
+    const activeSaveSlotId = activeSaveSlotIdRef.current ?? getNextSaveSlotId();
+    activeSaveSlotIdRef.current = activeSaveSlotId;
+
     if (!hasPersistedCurrentSessionRef.current) {
-      saveGameState(state);
+      saveGameState(state, activeSaveSlotId);
       hasPersistedCurrentSessionRef.current = true;
-      setHasSave(true);
-      setSavePreview(state);
+      refreshSaveSlots();
       return;
     }
 
     const timer = window.setTimeout(() => {
-      saveGameState(state);
-      setHasSave(true);
-      setSavePreview(state);
+      saveGameState(state, activeSaveSlotId);
+      refreshSaveSlots();
     }, 500);
     return () => window.clearTimeout(timer);
-  }, [sessionMode, state]);
+  }, [refreshSaveSlots, sessionMode, state]);
 
-  const handleStartNewGame = React.useCallback(() => {
-    clearSavedGameState();
+  const handleStartNewGame = React.useCallback((worldProfileId: WorldProfileId = 'world-1') => {
+    activeSaveSlotIdRef.current = getNextSaveSlotId();
     hasPersistedCurrentSessionRef.current = false;
     beginStartupLoading(true, 'Opening new archive file...');
-    setState(buildInitialGameState());
+    setState(buildInitialGameState(worldProfileId));
     setHasCompletedInitialWorldBoot(false);
+    setHomeScreenView('start');
     resetUiState();
     resetDebugState();
-    setHasSave(false);
-    setSavePreview(null);
     setSessionMode('game');
   }, [beginStartupLoading, resetDebugState, resetUiState, setState]);
 
-  const handleContinueGame = React.useCallback(() => {
-    const saved = loadSavedGameState();
+  const handleOpenArchiveBrowser = React.useCallback(() => {
+    if (!hasSavedGameState()) return;
+    refreshSaveSlots();
+    setHomeScreenView('archive');
+  }, [refreshSaveSlots]);
+
+  const handleLoadSaveSlot = React.useCallback((slotId: SaveSlotId) => {
+    const saved = loadSavedGameState(slotId);
     if (!saved) {
       pushNotification({ title: 'Load Failed', msg: 'Save data is corrupted. Starting fresh.' });
       return;
     }
 
+    activeSaveSlotIdRef.current = slotId;
     hasPersistedCurrentSessionRef.current = false;
     const bootingWorld = saved.currentScene === 'WORLD';
     beginStartupLoading(bootingWorld, bootingWorld ? 'Opening archived world state...' : 'Restoring case file...');
     setHasCompletedInitialWorldBoot(!bootingWorld);
     setState(hydrateSavedState(saved));
-    setSavePreview(saved);
     setHasSave(true);
+    setHomeScreenView('start');
     setSessionMode('game');
     pushNotification({ title: 'Save Loaded', msg: 'Resumed your previous session.' });
   }, [beginStartupLoading, hydrateSavedState, pushNotification, setState]);
+
+  const handleBackToStartMenu = React.useCallback(() => {
+    setHomeScreenView('start');
+  }, []);
 
   const handleOpenPlannerFromHome = React.useCallback(() => {
     clearStartupDismissTimer();
@@ -198,6 +216,7 @@ export const useGameSession = ({
       awaitingWorldBoot: false,
     });
     setHasCompletedInitialWorldBoot(false);
+    setHomeScreenView('start');
     resetUiState();
     resetDebugState();
     setSessionMode(null);
@@ -227,12 +246,15 @@ export const useGameSession = ({
   return {
     gameStarted: sessionMode !== null,
     isPlannerHomeSession: sessionMode === 'planner-home',
+    homeScreenView,
     hasSave,
-    savePreview,
+    saveSlots,
     startupLoading,
     hasCompletedInitialWorldBoot,
     handleStartNewGame,
-    handleContinueGame,
+    handleOpenArchiveBrowser,
+    handleLoadSaveSlot,
+    handleBackToStartMenu,
     handleOpenPlannerFromHome,
     handleExitPlannerToHome,
     handleInitialSceneMounted,

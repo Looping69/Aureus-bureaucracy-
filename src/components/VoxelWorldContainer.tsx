@@ -64,6 +64,9 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
   const [loadingPhase, setLoadingPhase] = useState('Booting render pipeline...');
   const engineReadyRef = useRef(false);
   const readyReportedRef = useRef(false);
+  const lastSyncedTerrainRef = useRef<VoxelData[] | null>(null);
+  const lastSyncedPickupRef = useRef<VoxelData[] | null>(null);
+  const lastEntitySyncKeyRef = useRef<string | null>(null);
   const onReadyRef = useRef(onReady);
   const onProgressRef = useRef(onProgress);
   const surfaceMap = React.useMemo(
@@ -117,6 +120,8 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
 
       engineRef.current.loadInitialModel(voxels);
       engineRef.current.setPickupVoxels(pickupVoxels);
+      lastSyncedTerrainRef.current = voxels;
+      lastSyncedPickupRef.current = pickupVoxels;
       reportProgress(58, 'Meshing terrain volume...');
       
       // Add buildings
@@ -178,19 +183,30 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
   }, []);
 
   useEffect(() => {
-    if (engineRef.current) {
-      engineRef.current.loadInitialModel(voxels);
-    }
+    if (!engineRef.current || lastSyncedTerrainRef.current === voxels) return;
+    lastSyncedTerrainRef.current = voxels;
+    engineRef.current.loadInitialModel(voxels);
   }, [voxels]);
 
   useEffect(() => {
-    if (engineRef.current) {
-      engineRef.current.setPickupVoxels(pickupVoxels);
-    }
+    if (!engineRef.current || lastSyncedPickupRef.current === pickupVoxels) return;
+    lastSyncedPickupRef.current = pickupVoxels;
+    engineRef.current.setPickupVoxels(pickupVoxels);
   }, [pickupVoxels]);
 
   useEffect(() => {
     if (!engineRef.current) return;
+
+    const entitySyncKey = [
+      buildings.map((building) => `${building.id}:${building.pos.x}:${building.pos.y}:${building.npcId}:${building.type}`).join('|'),
+      navigationZones.map((zone) => `${zone.id}:${zone.kind}:${zone.minX}:${zone.minY}:${zone.maxX}:${zone.maxY}`).join('|'),
+      Object.values(npcs)
+        .map((npc) => `${npc.id}:${npc.homeBuildingId ?? ''}:${npc.workBuildingId ?? ''}:${npc.workHours.start}:${npc.workHours.end}`)
+        .join('|'),
+    ].join('::');
+
+    if (lastEntitySyncKeyRef.current === entitySyncKey) return;
+    lastEntitySyncKeyRef.current = entitySyncKey;
 
     const entities = engineRef.current.entities;
 
