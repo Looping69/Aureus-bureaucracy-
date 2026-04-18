@@ -28,22 +28,22 @@ export const ActionLogPanel: React.FC<ActionLogPanelProps> = ({
   showToggle = true,
 }) => {
   return (
-    <div className="fixed left-4 top-[58%] z-[92] flex max-w-[calc(100vw-2rem)] items-start gap-3">
-      <button
-        onClick={onToggle}
-        className={`relative flex h-13 w-13 shrink-0 items-center justify-center rounded-[18px] border-2 border-black bg-white shadow-[0_12px_28px_rgba(15,23,42,0.18)] transition-transform active:scale-[0.97] ${
-          showToggle ? 'hover:-translate-y-0.5' : ''
-        }`}
-        title="Open story ledger"
-        aria-label={isOpen ? 'Close story ledger' : 'Open story ledger'}
-      >
-        <BookText size={20} className="text-[#6b86b6]" />
-        {unreadCount > 0 && (
-          <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-white bg-[#ef4444] px-1 text-[9px] font-black text-white">
-            {unreadCount}
-          </span>
-        )}
-      </button>
+    <div className="fixed left-4 bottom-5 z-[92] flex max-w-[calc(100vw-2rem)] items-end gap-3 sm:left-6 sm:bottom-6">
+      {showToggle && (
+        <button
+          onClick={onToggle}
+          className="relative flex h-13 w-13 shrink-0 items-center justify-center rounded-[18px] border-2 border-black bg-white shadow-[0_12px_28px_rgba(15,23,42,0.18)] transition-transform hover:-translate-y-0.5 active:scale-[0.97]"
+          title="Open story ledger"
+          aria-label={isOpen ? 'Close story ledger' : 'Open story ledger'}
+        >
+          <BookText size={20} className="text-[#6b86b6]" />
+          {unreadCount > 0 && (
+            <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-white bg-[#ef4444] px-1 text-[9px] font-black text-white">
+              {unreadCount}
+            </span>
+          )}
+        </button>
+      )}
 
       <AnimatePresence>
         {isOpen && (

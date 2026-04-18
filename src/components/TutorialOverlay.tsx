@@ -33,7 +33,7 @@ export const TutorialOverlay: React.FC<TutorialOverlayProps> = ({
           initial={{ opacity: 0, x: -32 }}
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -32 }}
-          className="fixed left-4 top-[44%] z-50 -translate-y-1/2 pointer-events-none"
+          className="fixed left-4 bottom-24 z-50 pointer-events-none sm:left-6 sm:bottom-28"
         >
           <motion.div
             animate={{ x: tutorialMinimized ? 0 : 6 }}
