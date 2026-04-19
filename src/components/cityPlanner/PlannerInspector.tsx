@@ -5,8 +5,7 @@ import { BUILDING_TEMPLATES } from '../../editor/templates';
 import { AuthoredBuilding, EditorValidationIssue } from '../../editor/types';
 import { getBuildingAccessPosition } from '../../utils/buildingAccess';
 import { getWorldSurfaceTile, WorldSurfaceMap } from '../../utils/worldSurface';
-
-const WORLD_SIZE = 240;
+import { WORLD_SIZE } from '../../utils/voxelConstants';
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 

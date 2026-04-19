@@ -9,6 +9,7 @@
 
 import { Building } from './types';
 import { BuildingGenerator } from './utils/buildingGenerator';
+import { WORLD_HALF_SIZE } from './utils/voxelConstants';
 
 // ─── colour palette ──────────────────────────────────────────────────────────
 const DARK_ROCK   = '#2d2d2d';
@@ -220,9 +221,9 @@ genRock.addBox(-1, -1, 5, 1, 1, 6, PALE_ROCK);
 export const ROCK_HILL_VOXELS = genRock.getVoxels();
 
 // ─── world layout ─────────────────────────────────────────────────────────────
-// Centre of the mine world in the 240×240 grid
-const CX = 120;
-const CY = 120;
+// Centre of the mine world in the shared runtime grid
+const CX = WORLD_HALF_SIZE;
+const CY = WORLD_HALF_SIZE;
 
 const pos = (dx: number, dy: number) => ({ x: CX + dx, y: CY + dy });
 

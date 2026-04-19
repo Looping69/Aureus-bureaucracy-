@@ -1244,14 +1244,20 @@ export const OFFICE_ITEMS: Record<string, OfficeItem> = {
 };
 
 const CITY_CELL_SIZE = 14;
-const CITY_GRID_WIDTH = 11;
-const CITY_GRID_HEIGHT = 11;
+const CITY_COORDINATE_SCALE = 2;
+const CITY_GRID_WIDTH = (10 * CITY_COORDINATE_SCALE) + 1;
+const CITY_GRID_HEIGHT = (10 * CITY_COORDINATE_SCALE) + 1;
 const CITY_ORIGIN = {
   x: WORLD_CENTER - Math.floor((CITY_GRID_WIDTH - 1) * CITY_CELL_SIZE / 2),
   y: WORLD_CENTER - Math.floor((CITY_GRID_HEIGHT - 1) * CITY_CELL_SIZE / 2),
 };
 
 type CityCell = { x: number; y: number };
+
+const expandCityCell = ({ x, y }: CityCell): CityCell => ({
+  x: x * CITY_COORDINATE_SCALE,
+  y: y * CITY_COORDINATE_SCALE,
+});
 
 const toWorldFromCityCell = ({ x, y }: CityCell): WorldPosition => ({
   x: CITY_ORIGIN.x + x * CITY_CELL_SIZE,
@@ -1268,6 +1274,32 @@ const createCityLine = (start: CityCell, end: CityCell): CityCell[] => {
   }));
 };
 
+const resolveRuntimeCityCells = (cells: CityCell[]): CityCell[] => {
+  if (cells.length === 0) {
+    return [];
+  }
+
+  const expandedCells = cells.map(expandCityCell);
+  const resolvedCells: CityCell[] = [expandedCells[0]];
+
+  for (let index = 1; index < expandedCells.length; index += 1) {
+    const previous = expandedCells[index - 1];
+    const current = expandedCells[index];
+    const dx = Math.sign(current.x - previous.x);
+    const dy = Math.sign(current.y - previous.y);
+    const steps = Math.max(Math.abs(current.x - previous.x), Math.abs(current.y - previous.y));
+
+    for (let step = 1; step <= steps; step += 1) {
+      resolvedCells.push({
+        x: previous.x + dx * step,
+        y: previous.y + dy * step,
+      });
+    }
+  }
+
+  return resolvedCells;
+};
+
 const createPlacedTiles = (
   prefix: string,
   type: 'ROAD' | 'SIDEWALK',
@@ -1277,8 +1309,9 @@ const createPlacedTiles = (
   discovered: boolean = true
 ): Record<string, Building> => {
   const tiles: Record<string, Building> = {};
+  const runtimeCells = resolveRuntimeCityCells(cells);
 
-  cells.forEach((cell, index) => {
+  runtimeCells.forEach((cell, index) => {
     const key = `${cell.x},${cell.y}`;
     if (occupiedCells.has(key)) {
       throw new Error(`City layout overlap at cell ${key} while placing ${prefix}`);
@@ -1305,7 +1338,8 @@ const createPlacedBuilding = (
   building: Omit<Building, 'pos'>,
   occupiedCells: Set<string>
 ): Building => {
-  const key = `${cell.x},${cell.y}`;
+  const runtimeCell = expandCityCell(cell);
+  const key = `${runtimeCell.x},${runtimeCell.y}`;
   if (occupiedCells.has(key)) {
     throw new Error(`City layout overlap at cell ${key} while placing ${building.id}`);
   }
@@ -1313,7 +1347,7 @@ const createPlacedBuilding = (
 
   return {
     ...building,
-    pos: toWorldFromCityCell(cell),
+    pos: toWorldFromCityCell(runtimeCell),
   };
 };
 
@@ -1346,7 +1380,7 @@ const getLayoutBounds = (buildings: Record<string, Building>) => {
 };
 
 const normalizeWorldLayout = (buildings: Record<string, Building>) => {
-  const WORLD_PADDING = 16;
+  const WORLD_PADDING = 24;
   const bounds = getLayoutBounds(buildings);
   const currentCenterX = (bounds.minX + bounds.maxX) / 2;
   const currentCenterY = (bounds.minY + bounds.maxY) / 2;

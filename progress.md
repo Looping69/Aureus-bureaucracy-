@@ -454,3 +454,13 @@ Original prompt: Okay so there are still so many gaps in the gameplay we need to
     - `npm run smoke:regression` (pass)
     - `npm run lint` (pass)
     - `npm run build` (pass)
+
+- 2026-04-19 world expansion for modular assets:
+  - Increased shared `WORLD_SIZE` from 240 to 360 in `src/utils/voxelConstants.ts`.
+  - Reprojected the authored 11x11 city layout onto a widened 21x21 runtime grid in `src/data.ts` by scaling logical city coordinates while keeping road tiles contiguous.
+  - Removed stale hardcoded world-size values from `src/editor/derive.ts`, `src/components/cityPlanner/PlannerInspector.tsx`, and `src/mineWorldData.ts` so editor/mine metadata tracks the same runtime bounds.
+  - Validation:
+    - `npm run lint` (pass)
+    - `npm run build` (pass)
+    - footprint overlap probe against live `BUILDINGS` set (pass: `count=0`)
+    - visual browser captures in `output/world-expand-check/step-2-world.png` and `output/world-expand-check/step-3-world-minimized.png`

@@ -1,5 +1,6 @@
 import { GameState } from '../types';
 import { AuthoringScene } from './types';
+import { WORLD_SIZE } from '../utils/voxelConstants';
 
 const PROTECTED_BUILDING_IDS = new Set(['player_home', 'mine_entrance', 'licensing_office']);
 
@@ -8,7 +9,7 @@ export const deriveAuthoringScene = (state: GameState): AuthoringScene => ({
   meta: {
     id: 'aureus-main-world',
     name: 'Aureus Main World',
-    worldSize: 240,
+    worldSize: WORLD_SIZE,
     updatedAt: new Date().toISOString(),
   },
   buildings: Object.values(state.buildings).map((building) => ({

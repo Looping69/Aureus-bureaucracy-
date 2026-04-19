@@ -4,7 +4,7 @@ export const CONFIG = {
   VOXEL_SIZE: 1,
 };
 
-export const WORLD_SIZE = 240;
+export const WORLD_SIZE = 360;
 export const WORLD_HALF_SIZE = WORLD_SIZE / 2;
 
 export const COLORS = {
