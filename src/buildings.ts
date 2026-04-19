@@ -1,4 +1,22 @@
 import { BuildingGenerator } from './utils/buildingGenerator';
+import {
+  CHIEF_HUT_ASSET_VOXELS,
+  CITY_HALL_ASSET_VOXELS,
+  FIRE_STATION_ASSET_VOXELS,
+  FIXER_DEN_ASSET_VOXELS,
+  GENERIC_HOUSE_A_ASSET_VOXELS,
+  GENERIC_HOUSE_B_ASSET_VOXELS,
+  GENERIC_HOUSE_C_ASSET_VOXELS,
+  GENERIC_HOUSE_D_ASSET_VOXELS,
+  HOTLINE_BOOTH_ASSET_VOXELS,
+  HOUSE_TYPE_A_ASSET_VOXELS,
+  INSPECTOR_HQ_ASSET_VOXELS,
+  LIBRARY_ASSET_VOXELS,
+  LICENSING_OFFICE_ASSET_VOXELS,
+  PARK_ASSET_VOXELS,
+  POLICE_STATION_ASSET_VOXELS,
+  UNION_HALL_ASSET_VOXELS,
+} from './assetVoxels';
 
 const SLATE = '#6f7378';
 const CHARCOAL = '#30363d';
@@ -93,7 +111,7 @@ genLicensing.addBox(1, 2, 2, 3, 4, 4, CHARCOAL);
 genLicensing.addBox(1, 2, 5, 3, 4, 5, BRASS);
 addFrontSteps(genLicensing, 2, -5, 1, PALE_STONE, CHARCOAL);
 addCornerPilasters(genLicensing, -3, -3, 3, 3, 2, 5, CHARCOAL);
-export const LICENSING_OFFICE_VOXELS = genLicensing.getVoxels();
+export const LICENSING_OFFICE_VOXELS = LICENSING_OFFICE_ASSET_VOXELS;
 
 // 2. Union Hall / Gilded Pick - broader public house with awning and sign.
 const genUnion = new BuildingGenerator();
@@ -112,7 +130,7 @@ genUnion.addBox(-2, -2, 6, 2, 2, 6, BRASS);
 genUnion.addBox(0, -5, 6, 0, -5, 8, BRASS);
 genUnion.addBox(-1, -5, 8, 1, -5, 8, BRASS);
 addFrontSteps(genUnion, 2, -6, 1, PALE_STONE, CHARCOAL);
-export const UNION_HALL_VOXELS = genUnion.getVoxels();
+export const UNION_HALL_VOXELS = UNION_HALL_ASSET_VOXELS;
 
 // 3. Compliance Tower - slender core with podium and observation crown.
 const genInspector = new BuildingGenerator();
@@ -130,7 +148,7 @@ genInspector.addBox(-1, -1, 13, 1, 1, 13, SIGNAL_RED);
 genInspector.addBox(-3, 0, 4, -3, 0, 8, SIGNAL_BLUE);
 genInspector.addBox(3, 0, 4, 3, 0, 8, SIGNAL_BLUE);
 addFrontSteps(genInspector, 1, -4, 1, PALE_STONE, CHARCOAL);
-export const INSPECTOR_HQ_VOXELS = genInspector.getVoxels();
+export const INSPECTOR_HQ_VOXELS = INSPECTOR_HQ_ASSET_VOXELS;
 
 // 4. Slink's Salvage - patched yard with shack, lean-to, crates, and scrap gantry.
 const genFixer = new BuildingGenerator();
@@ -149,7 +167,7 @@ genFixer.addBox(3, -4, 2, 3, -4, 4, CHARCOAL);
 genFixer.addBox(3, 4, 2, 3, 4, 4, CHARCOAL);
 genFixer.addBox(2, -4, 4, 4, 4, 4, RUST);
 genFixer.addBox(-1, 2, 5, 1, 3, 5, BRASS);
-export const FIXER_DEN_VOXELS = genFixer.getVoxels();
+export const FIXER_DEN_VOXELS = FIXER_DEN_ASSET_VOXELS;
 
 // 5. Chief's Hut - layered roof, porch, and lantern poles.
 const genChief = new BuildingGenerator();
@@ -168,7 +186,7 @@ genChief.addBox(0, 0, 8, 0, 0, 8, WARM_LIGHT);
 addFrontSteps(genChief, 2, -5, 1, PALE_STONE, DUST);
 addLanternTree(genChief, -4, -3);
 addLanternTree(genChief, 4, -3);
-export const CHIEF_HUT_VOXELS = genChief.getVoxels();
+export const CHIEF_HUT_VOXELS = CHIEF_HUT_ASSET_VOXELS;
 
 // 6. Hotline Booth - richer utility kiosk with roof cap and call panel.
 const genHotline = new BuildingGenerator();
@@ -180,7 +198,7 @@ genHotline.addBox(-1, 1, 2, 1, 1, 4, GLASS);
 genHotline.addBox(0, -1, 2, 0, -1, 3, DEEP_GLASS);
 genHotline.addBox(-1, -1, 5, 1, 1, 5, OFF_WHITE);
 genHotline.addBox(0, 0, 6, 0, 0, 6, SIGNAL_RED);
-export const HOTLINE_BOOTH_VOXELS = genHotline.getVoxels();
+export const HOTLINE_BOOTH_VOXELS = HOTLINE_BOOTH_ASSET_VOXELS;
 
 // 7. Street Light - slim pole with warmer lamp head.
 const genStreetLight = new BuildingGenerator();
@@ -203,7 +221,7 @@ genHouseA.addBox(-3, -3, 5, 3, 3, 5, SLATE);
 genHouseA.addBox(-2, -2, 6, 2, 2, 6, SLATE);
 genHouseA.addBox(2, 1, 6, 2, 1, 8, CHARCOAL);
 addFrontSteps(genHouseA, 1, -4, 1, PALE_STONE, CHARCOAL);
-export const GENERIC_HOUSE_A_VOXELS = genHouseA.getVoxels();
+export const GENERIC_HOUSE_A_VOXELS = GENERIC_HOUSE_A_ASSET_VOXELS;
 
 // 9. Generic House B - stucco home with asymmetrical porch canopy.
 const genHouseB = new BuildingGenerator();
@@ -220,7 +238,7 @@ genHouseB.addBox(-3, -4, 4, 1, -3, 4, TIMBER);
 genHouseB.addBox(-2, -4, 3, -2, -4, 4, TIMBER);
 genHouseB.addBox(0, -4, 3, 0, -4, 4, TIMBER);
 addFrontSteps(genHouseB, 2, -4, 1, PALE_STONE, DUST);
-export const GENERIC_HOUSE_B_VOXELS = genHouseB.getVoxels();
+export const GENERIC_HOUSE_B_VOXELS = GENERIC_HOUSE_B_ASSET_VOXELS;
 
 // 9b. Generic House C - brick cottage with planter boxes.
 const genHouseC = new BuildingGenerator();
@@ -236,7 +254,7 @@ genHouseC.addBox(-2, -2, 6, 2, 2, 6, SLATE);
 genHouseC.addBox(-3, -4, 2, -2, -4, 2, MOSS);
 genHouseC.addBox(1, -4, 2, 2, -4, 2, MOSS);
 addFrontSteps(genHouseC, 1, -4, 1, PALE_STONE, CHARCOAL);
-export const GENERIC_HOUSE_C_VOXELS = genHouseC.getVoxels();
+export const GENERIC_HOUSE_C_VOXELS = GENERIC_HOUSE_C_ASSET_VOXELS;
 
 // 9c. Generic House D - industrial worker cabin with metal roof.
 const genHouseD = new BuildingGenerator();
@@ -250,7 +268,7 @@ genHouseD.addBox(-3, -3, 5, 3, 3, 5, CHARCOAL);
 genHouseD.addBox(-2, -2, 6, 2, 2, 6, CHARCOAL);
 genHouseD.addBox(-1, -1, 7, -1, -1, 7, SIGNAL_RED);
 addFrontSteps(genHouseD, 1, -4, 1, CONCRETE, CHARCOAL);
-export const GENERIC_HOUSE_D_VOXELS = genHouseD.getVoxels();
+export const GENERIC_HOUSE_D_VOXELS = GENERIC_HOUSE_D_ASSET_VOXELS;
 
 // 10. Generic Office - cleaner podium office with stepped crown.
 const genOffice = new BuildingGenerator();
@@ -278,14 +296,14 @@ genFactory.addBox(-4, -4, 5, 4, 4, 5, DUST);
 genFactory.addBox(0, 0, 6, 0, 0, 7, WARM_LIGHT);
 export const FACTORY_VOXELS = genFactory.getVoxels();
 
-// Stable aliases for legacy "asset" building slots. The original imported
-// JSON models were removed from the repo, so these names now resolve to
-// maintained in-repo voxel sets with similar silhouettes and gameplay roles.
-export const ASSET_BUILDING_A_VOXELS = INSPECTOR_HQ_VOXELS;
-export const ASSET_BUILDING_B_VOXELS = GENERIC_OFFICE_VOXELS;
-export const ASSET_BUILDING_C_VOXELS = LICENSING_OFFICE_VOXELS;
-export const ASSET_BUILDING_D_VOXELS = FACTORY_VOXELS;
-export const ASSET_BUILDING_E_VOXELS = GENERIC_HOUSE_D_VOXELS;
+// Stable aliases for legacy "asset" building slots. These now point at
+// normalized modular JSON assets from `assets/` so the existing world layout
+// can keep its IDs while rendering the authored building set again.
+export const ASSET_BUILDING_A_VOXELS = CITY_HALL_ASSET_VOXELS;
+export const ASSET_BUILDING_B_VOXELS = LIBRARY_ASSET_VOXELS;
+export const ASSET_BUILDING_C_VOXELS = POLICE_STATION_ASSET_VOXELS;
+export const ASSET_BUILDING_D_VOXELS = FIRE_STATION_ASSET_VOXELS;
+export const ASSET_BUILDING_E_VOXELS = HOUSE_TYPE_A_ASSET_VOXELS;
 
 // 12. Small Park - more like a civic patch than a placeholder square.
 const genPark = new BuildingGenerator();
@@ -297,7 +315,7 @@ addLanternTree(genPark, 3, 2);
 genPark.addBox(0, 2, 1, 2, 3, 1, TIMBER);
 genPark.addBox(-2, 2, 1, -1, 3, 1, TIMBER);
 genPark.addBox(-1, -1, 1, 1, 1, 1, BRASS);
-export const PARK_VOXELS = genPark.getVoxels();
+export const PARK_VOXELS = PARK_ASSET_VOXELS;
 
 // Street tiles – each tile spans 14 voxels (−7 … +6) along the travel
 // direction so that adjacent road cells connect seamlessly.  Three variants
