@@ -57,6 +57,7 @@ export const useRoomSession = ({
         ...next,
         room: {
           ...next.room,
+          revision: prev.room.revision,
           interactionLocks: prev.room.interactionLocks,
           players: {
             ...prev.room.players,

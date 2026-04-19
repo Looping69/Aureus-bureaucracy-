@@ -37,12 +37,14 @@ export const useMultiplayerTransport = ({
 }: UseMultiplayerTransportOptions) => {
   const socketRef = React.useRef<WebSocket | null>(null);
   const snapshotRef = React.useRef(roomSnapshot);
+  const latestRevisionRef = React.useRef(roomSnapshot.room.revision);
   const pendingCommandCountRef = React.useRef(0);
   const [status, setStatus] = React.useState<MultiplayerStatus>(enabled ? 'connecting' : 'disabled');
   const [lastError, setLastError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     snapshotRef.current = roomSnapshot;
+    latestRevisionRef.current = Math.max(latestRevisionRef.current, roomSnapshot.room.revision);
   }, [roomSnapshot]);
 
   React.useEffect(() => {
@@ -83,6 +85,10 @@ export const useMultiplayerTransport = ({
       if (!message) return;
 
       if (message.type === 'room_state') {
+        if (message.room.revision < latestRevisionRef.current) {
+          return;
+        }
+        latestRevisionRef.current = message.room.revision;
         pendingCommandCountRef.current = 0;
         applyServerRoomState(message.room);
         return;
@@ -139,16 +145,6 @@ export const useMultiplayerTransport = ({
         player,
       };
       socket.send(JSON.stringify(playerSync));
-
-      if (snapshot.room.hostPlayerId === snapshot.playerId) {
-        const hostSharedSync: ClientToServerMessage = {
-          type: 'host_shared_sync',
-          roomId,
-          playerId: snapshot.playerId,
-          shared: snapshot.room.shared,
-        };
-        socket.send(JSON.stringify(hostSharedSync));
-      }
     }, SYNC_INTERVAL_MS);
 
     return () => window.clearInterval(timer);

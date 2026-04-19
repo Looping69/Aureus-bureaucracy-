@@ -1,9 +1,11 @@
 import { applyOreExport } from '../game/economy';
+import { applyDailyEconomyTick } from '../game/economy';
 import {
   advanceMovementTick,
   createInitialMovementTickRuntime,
   MovementTickRuntimeState,
 } from '../game/ticks/movementTick';
+import { advanceBuildingDiscoveryTick } from '../game/ticks/buildingDiscoveryTick';
 import { advancePermitProcessingTick } from '../game/ticks/permitTick';
 import { advanceCityEventTick } from '../game/ticks/cityEventTick';
 import {
@@ -21,7 +23,7 @@ import { applyDialogueSocialConsequences } from '../game/actions/dialogueActions
 import { applyDialogueCommands } from '../game/dialogue/dialogueCommands';
 import { buildSpecialDialogueOptions } from '../game/dialogue/specialOptions';
 import { getNpcMoodInfluence, isNpcAvailableAtTime } from '../game/dialogue/status';
-import { applyMineTravel } from '../game/navigationActions';
+import { applyMineTravel, applyRestAction } from '../game/navigationActions';
 import { ClientUiState, MultiplayerCommand, PlayerId, RoomSnapshot, RoomState, RoomTransientEffects } from './types';
 import { GameTickNotification } from '../game/ticks/types';
 import { DialogueCommand, DialogueOption, GameState, RelationshipFeedback } from '../types';
@@ -298,6 +300,60 @@ export const applyRoomCommand = (
         room: releaseInteractionLock(room, playerId, command.resourceType, command.resourceId),
         notifications: [],
       };
+    case 'REST': {
+      const snapshot = buildServerSnapshot(room, playerId);
+      const state = buildGameStateFromRoomSnapshot(snapshot);
+      const home = state.buildings.player_home;
+      if (!home) {
+        return {
+          room,
+          notifications: [{
+            title: 'Unavailable',
+            msg: 'No home base is available for rest.',
+          }],
+        };
+      }
+
+      const restedState = applyRestAction(state, home.pos);
+      const result = applyDailyEconomyTick(restedState);
+      return {
+        room: mergePlayerStateIntoRoom(room, playerId, {
+          ...snapshot,
+          room: {
+            ...room,
+            shared: buildRoomSharedState(result.nextState),
+            players: {
+              ...room.players,
+              [playerId]: buildRoomPlayerState(
+                result.nextState,
+                playerId,
+                room.players[playerId]?.displayName,
+                room.players[playerId]?.connectedAt,
+              ),
+            },
+          },
+        }),
+        notifications: result.notification ? [result.notification] : [{
+          title: 'Rested',
+          msg: "A good night's sleep. You feel ready for more paperwork.",
+        }],
+      };
+    }
+    case 'UNLOCK_ENDING': {
+      if (room.shared.unlockedEndings.includes(command.endingId)) {
+        return { room, notifications: [] };
+      }
+      return {
+        room: {
+          ...room,
+          shared: {
+            ...room.shared,
+            unlockedEndings: [...room.shared.unlockedEndings, command.endingId],
+          },
+        },
+        notifications: [],
+      };
+    }
     case 'DIALOGUE_CHOICE': {
       const activeNpcId = room.players[playerId]?.activeNpcInteractionId;
       if (activeNpcId !== command.npcId) {
@@ -641,23 +697,31 @@ export const advanceRoomMovementTick = (
     const state = buildGameStateFromRoomSnapshot(snapshot);
     const runtime = runtimes.get(playerId) ?? createInitialMovementTickRuntime();
     const surfaceMap = buildWorldSurfaceMap(state.buildings, undefined, state.navigationZones);
-    const result = advanceMovementTick(state, runtime, surfaceMap);
+    const movementResult = advanceMovementTick(state, runtime, surfaceMap);
+    const discoveryResult = advanceBuildingDiscoveryTick(movementResult.nextState);
 
-    runtimes.set(playerId, result.nextRuntime);
-    if (result.nextState === state && result.notifications.length === 0) {
+    runtimes.set(playerId, movementResult.nextRuntime);
+    if (
+      discoveryResult.nextState === state &&
+      movementResult.notifications.length === 0 &&
+      discoveryResult.notifications.length === 0
+    ) {
       return;
     }
 
-    notificationsByPlayerId[playerId] = result.notifications;
+    notificationsByPlayerId[playerId] = [
+      ...movementResult.notifications,
+      ...discoveryResult.notifications,
+    ];
     nextRoom = mergePlayerStateIntoRoom(nextRoom, playerId, {
       ...snapshot,
       room: {
         ...nextRoom,
-        shared: buildRoomSharedState(result.nextState),
+        shared: buildRoomSharedState(discoveryResult.nextState),
         players: {
           ...nextRoom.players,
           [playerId]: buildRoomPlayerState(
-            result.nextState,
+            discoveryResult.nextState,
             playerId,
             nextRoom.players[playerId]?.displayName,
             nextRoom.players[playerId]?.connectedAt,

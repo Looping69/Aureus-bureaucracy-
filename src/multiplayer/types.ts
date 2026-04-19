@@ -81,6 +81,7 @@ export interface InteractionLock {
 
 export interface RoomState {
   id: RoomId;
+  revision: number;
   hostPlayerId: PlayerId;
   shared: RoomSharedState;
   players: Record<PlayerId, RoomPlayerState>;
@@ -111,6 +112,8 @@ export type RoomTransientEffects = {
 export type MultiplayerCommand =
   | { type: 'MOVE_TO'; destination: WorldPosition }
   | { type: 'DIRECT_MOVE'; destination: WorldPosition }
+  | { type: 'REST' }
+  | { type: 'UNLOCK_ENDING'; endingId: string }
   | { type: 'DIALOGUE_CHOICE'; npcId: string; nodeId: string; optionIndex: number; source: 'tree' | 'special' }
   | { type: 'OPEN_NPC_INTERACTION'; npcId: string }
   | { type: 'OPEN_PERMIT_INTERACTION'; permitId: string }

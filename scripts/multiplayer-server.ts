@@ -26,6 +26,33 @@ const send = (socket: WebSocket, message: ServerToClientMessage) => {
   socket.send(JSON.stringify(message));
 };
 
+const normalizeRoomState = (room: RoomState): RoomState => ({
+  ...room,
+  revision: room.revision ?? 0,
+  interactionLocks: room.interactionLocks ?? {},
+});
+
+const resolveHostPlayerId = (room: RoomState): string => {
+  const connectedIds = Object.entries(room.players)
+    .filter(([, player]) => player.connected)
+    .map(([playerId]) => playerId);
+
+  if (room.hostPlayerId && connectedIds.includes(room.hostPlayerId)) {
+    return room.hostPlayerId;
+  }
+
+  return connectedIds[0] ?? room.hostPlayerId;
+};
+
+const commitRoom = (session: RoomSession, nextRoom: RoomState) => {
+  const normalized = normalizeRoomState(nextRoom);
+  session.room = {
+    ...normalized,
+    hostPlayerId: resolveHostPlayerId(normalized),
+    revision: session.room.revision + 1,
+  };
+};
+
 const broadcastRoomState = (session: RoomSession) => {
   const message: ServerToClientMessage = {
     type: 'room_state',
@@ -39,7 +66,7 @@ const getOrCreateRoomSession = (roomId: string, templateRoom: RoomState): RoomSe
   if (existing) return existing;
 
   const created: RoomSession = {
-    room: templateRoom,
+    room: normalizeRoomState(templateRoom),
     clients: new Map(),
     movementRuntimes: new Map(),
   };
@@ -68,10 +95,9 @@ wss.on('connection', (socket) => {
       activePlayerId = message.playerId;
 
       session.clients.set(message.playerId, socket);
-      session.room = {
+      commitRoom(session, {
         ...session.room,
         hostPlayerId: session.room.hostPlayerId || message.playerId,
-        interactionLocks: session.room.interactionLocks ?? {},
         players: {
           ...session.room.players,
           [message.playerId]: {
@@ -81,7 +107,7 @@ wss.on('connection', (socket) => {
             lastInputAt: nowIso(),
           },
         },
-      };
+      });
 
       broadcastRoomState(session);
       return;
@@ -95,7 +121,7 @@ wss.on('connection', (socket) => {
       const current = session.room.players[message.playerId];
       if (!current) return;
 
-      session.room = {
+      commitRoom(session, {
         ...session.room,
         players: {
           ...session.room.players,
@@ -106,7 +132,7 @@ wss.on('connection', (socket) => {
             lastInputAt: nowIso(),
           },
         },
-      };
+      });
 
       broadcastRoomState(session);
       return;
@@ -114,7 +140,7 @@ wss.on('connection', (socket) => {
 
     if (message.type === 'room_command') {
       const result = applyRoomCommand(session.room, message.playerId, message.command);
-      session.room = result.room;
+      commitRoom(session, result.room);
       broadcastRoomState(session);
       if (result.effects) {
         const target = session.clients.get(message.playerId);
@@ -135,20 +161,6 @@ wss.on('connection', (socket) => {
       });
       return;
     }
-
-    if (message.type === 'host_shared_sync') {
-      if (session.room.hostPlayerId !== message.playerId) return;
-
-      session.room = {
-        ...session.room,
-        shared: {
-          ...session.room.shared,
-          ...message.shared,
-        },
-      };
-
-      broadcastRoomState(session);
-    }
   });
 
   socket.on('close', () => {
@@ -162,7 +174,7 @@ wss.on('connection', (socket) => {
       const interactionLocks = Object.fromEntries(
         Object.entries(session.room.interactionLocks).filter(([, lock]) => lock.ownerPlayerId !== activePlayerId),
       );
-      session.room = {
+      commitRoom(session, {
         ...session.room,
         interactionLocks,
         players: {
@@ -175,7 +187,7 @@ wss.on('connection', (socket) => {
             lastInputAt: nowIso(),
           },
         },
-      };
+      });
       broadcastRoomState(session);
     }
   });
@@ -186,10 +198,10 @@ setInterval(() => {
     if (session.clients.size === 0) return;
 
     const tick = advanceSharedWorldTick(session.room.shared);
-    session.room = {
+    commitRoom(session, {
       ...session.room,
       shared: tick.nextShared,
-    };
+    });
 
     broadcastRoomState(session);
 
@@ -208,7 +220,7 @@ setInterval(() => {
     if (session.clients.size === 0) return;
 
     const result = advanceRoomMovementTick(session.room, session.movementRuntimes);
-    session.room = result.room;
+    commitRoom(session, result.room);
     broadcastRoomState(session);
 
     Object.entries(result.notificationsByPlayerId).forEach(([playerId, notices]) => {
@@ -229,7 +241,7 @@ setInterval(() => {
     if (session.clients.size === 0) return;
 
     const result = advanceRoomPermitTick(session.room);
-    session.room = result.room;
+    commitRoom(session, result.room);
     broadcastRoomState(session);
 
     result.notifications.forEach((notice) => {
@@ -244,7 +256,7 @@ setInterval(() => {
     if (session.clients.size === 0) return;
 
     const result = advanceRoomCityEventTick(session.room);
-    session.room = result.room;
+    commitRoom(session, result.room);
     broadcastRoomState(session);
 
     Object.entries(result.notificationsByPlayerId).forEach(([playerId, notices]) => {

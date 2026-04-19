@@ -101,6 +101,7 @@ export const buildRoomSnapshotFromGameState = (
   return {
     room: {
       id: roomId,
+      revision: 0,
       hostPlayerId: playerId,
       shared: buildRoomSharedState(state),
       players: {

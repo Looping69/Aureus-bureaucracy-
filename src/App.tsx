@@ -188,8 +188,6 @@ export default function App() {
     applyRelationshipFeedbacks: appendRelationshipFeedbacks,
     pushNotification,
   });
-  const sharedAuthorityLocal = !multiplayerTransport.isConnected || multiplayerTransport.isHost;
-
   useEffect(() => {
     if (!gameStarted) {
       previousSceneRef.current = null;
@@ -234,13 +232,23 @@ export default function App() {
     const unlocked = getUnlockedEnding(state);
     if (!unlocked) return;
 
+    if (multiplayerTransport.isConnected) {
+      multiplayerTransport.sendCommand({ type: 'UNLOCK_ENDING', endingId: unlocked.id });
+      setState(prev => ({
+        ...prev,
+        activeEndingId: unlocked.id
+      }));
+      pushNotification({ title: 'Ending Unlocked', msg: unlocked.title });
+      return;
+    }
+
     setState(prev => ({
       ...prev,
       unlockedEndings: [...prev.unlockedEndings, unlocked.id],
       activeEndingId: unlocked.id
     }));
     pushNotification({ title: 'Ending Unlocked', msg: unlocked.title });
-  }, [pushNotification, state]);
+  }, [multiplayerTransport, pushNotification, state]);
 
   useEffect(() => {
     if (!gameStarted) {
@@ -275,7 +283,12 @@ export default function App() {
     };
   };
 
-  useBuildingDiscovery({ state, setState, setNotification: queueNotification, enabled: gameStarted });
+  useBuildingDiscovery({
+    state,
+    setState,
+    setNotification: queueNotification,
+    enabled: gameStarted && !multiplayerTransport.isConnected,
+  });
   useFeedbackCleanup(setState, gameStarted);
   useTimeAndCurfewLoop({
     setState,
@@ -380,6 +393,10 @@ export default function App() {
 
   const handleRest = () => {
     beginTrackedAction('rest');
+    if (multiplayerTransport.isConnected) {
+      multiplayerTransport.sendCommand({ type: 'REST' });
+      return;
+    }
     setState(prev => {
       const restedState = applyRestAction(prev, HOME_POS);
       const daily = applyDailyEconomyTick(restedState);
