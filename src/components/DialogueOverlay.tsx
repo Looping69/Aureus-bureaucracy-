@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, ShieldAlert, Heart, ChevronRight, FileText, Scale, Zap, MessageSquare, ArrowLeft, Clock, Smile, Frown } from 'lucide-react';
-import { DialogueCommand, GameState, NPC, DialogueNode, DialogueOption } from '../types';
+import { DialogueSelection, GameState, NPC, DialogueNode, DialogueOption } from '../types';
 import { DIALOGUE_TREES } from '../data';
 import { buildSpecialDialogueOptions } from '../game/dialogue/specialOptions';
 import { getDefaultDialogueText, getNpcMoodInfluence, isNpcAvailableAtTime } from '../game/dialogue/status';
@@ -10,7 +10,7 @@ export const DialogueOverlay: React.FC<{
   npc: NPC, 
   state: GameState,
   onClose: () => void,
-  onAction: (commands: DialogueCommand[]) => void,
+  onAction: (selection: DialogueSelection) => void,
 }> = ({ 
   npc, 
   state,
@@ -40,7 +40,13 @@ export const DialogueOverlay: React.FC<{
   }, [npc, state, moodInfluence]);
 
   const handleOptionClick = (opt: DialogueOption) => {
-    if (opt.action) onAction(opt.action(state));
+    onAction({
+      npcId: npc.id,
+      nodeId: currentNodeId,
+      optionIndex: currentNode?.options.findIndex((candidate) => candidate === opt) ?? -1,
+      source: 'tree',
+      commands: opt.action ? opt.action(state) : [],
+    });
     if (opt.nextNodeId) setCurrentNodeId(opt.nextNodeId);
     else onClose();
   };
@@ -199,7 +205,13 @@ export const DialogueOverlay: React.FC<{
                     key={i}
                     disabled={opt.condition && !opt.condition(state)}
                     onClick={() => {
-                      onAction(opt.action(state));
+                      onAction({
+                        npcId: npc.id,
+                        nodeId: currentNodeId,
+                        optionIndex: i,
+                        source: 'special',
+                        commands: opt.action(state),
+                      });
                       onClose();
                     }}
                     className="w-full p-3 text-left text-sm font-bold border border-black rounded-xl hover:bg-black hover:text-white transition-colors flex justify-between items-center disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-black"

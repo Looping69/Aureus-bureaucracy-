@@ -390,3 +390,13 @@ export interface DialogueOption {
   leverageRequired?: number;
   trustRequired?: number;
 }
+
+export type DialogueSelectionSource = 'tree' | 'special';
+
+export interface DialogueSelection {
+  npcId: string;
+  nodeId: string;
+  optionIndex: number;
+  source: DialogueSelectionSource;
+  commands: DialogueCommand[];
+}

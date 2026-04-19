@@ -19,10 +19,13 @@ import { applyMineSceneAction, applyMineTileInteraction } from '../game/actions/
 import { applyMiniGameCompletion, applyPermitOverlayAction } from '../game/actions/permitActions';
 import { applyDialogueSocialConsequences } from '../game/actions/dialogueActions';
 import { applyDialogueCommands } from '../game/dialogue/dialogueCommands';
+import { buildSpecialDialogueOptions } from '../game/dialogue/specialOptions';
+import { getNpcMoodInfluence, isNpcAvailableAtTime } from '../game/dialogue/status';
 import { applyMineTravel } from '../game/navigationActions';
 import { ClientUiState, MultiplayerCommand, PlayerId, RoomSnapshot, RoomState, RoomTransientEffects } from './types';
 import { GameTickNotification } from '../game/ticks/types';
-import { RelationshipFeedback } from '../types';
+import { DialogueCommand, DialogueOption, GameState, RelationshipFeedback } from '../types';
+import { DIALOGUE_TREES } from '../data';
 
 const EMPTY_UI_STATE: ClientUiState = {
   currentScene: 'WORLD',
@@ -101,19 +104,230 @@ export interface RoomCommandResult {
   effects?: RoomTransientEffects;
 }
 
+const interactionLockKey = (resourceType: 'npc' | 'permit', resourceId: string) =>
+  `${resourceType}:${resourceId}`;
+
+const releasePlayerInteractionLocks = (
+  room: RoomState,
+  playerId: PlayerId,
+): RoomState => {
+  const player = room.players[playerId];
+  if (!player) return room;
+
+  const interactionLocks = Object.fromEntries(
+    Object.entries(room.interactionLocks).filter(([, lock]) => lock.ownerPlayerId !== playerId),
+  );
+
+  return {
+    ...room,
+    interactionLocks,
+    players: {
+      ...room.players,
+      [playerId]: {
+        ...player,
+        activeNpcInteractionId: null,
+        activePermitInteractionId: null,
+      },
+    },
+  };
+};
+
+const claimInteractionLock = (
+  room: RoomState,
+  playerId: PlayerId,
+  resourceType: 'npc' | 'permit',
+  resourceId: string,
+): RoomCommandResult => {
+  const player = room.players[playerId];
+  if (!player) {
+    return { room, notifications: [] };
+  }
+
+  if (resourceType === 'npc' && !room.shared.npcs[resourceId]) {
+    return {
+      room,
+      notifications: [{
+        title: 'Unavailable',
+        msg: 'That conversation target no longer exists.',
+      }],
+    };
+  }
+
+  if (resourceType === 'permit' && !room.shared.permits[resourceId]) {
+    return {
+      room,
+      notifications: [{
+        title: 'Unavailable',
+        msg: 'That filing is no longer available.',
+      }],
+    };
+  }
+
+  const key = interactionLockKey(resourceType, resourceId);
+  const currentLock = room.interactionLocks[key];
+  if (currentLock && currentLock.ownerPlayerId !== playerId) {
+    return {
+      room,
+      notifications: [{
+        title: 'Desk Occupied',
+        msg:
+          resourceType === 'npc'
+            ? `${currentLock.ownerDisplayName} is already working that conversation.`
+            : `${currentLock.ownerDisplayName} is already working that filing.`,
+      }],
+    };
+  }
+
+  const clearedRoom = releasePlayerInteractionLocks(room, playerId);
+  const nextPlayer = clearedRoom.players[playerId];
+  const acquiredAt = new Date().toISOString();
+
+  return {
+    room: {
+      ...clearedRoom,
+      interactionLocks: {
+        ...clearedRoom.interactionLocks,
+        [key]: {
+          resourceType,
+          resourceId,
+          ownerPlayerId: playerId,
+          ownerDisplayName: nextPlayer.displayName,
+          acquiredAt,
+        },
+      },
+      players: {
+        ...clearedRoom.players,
+        [playerId]: {
+          ...nextPlayer,
+          activeNpcInteractionId: resourceType === 'npc' ? resourceId : null,
+          activePermitInteractionId: resourceType === 'permit' ? resourceId : null,
+        },
+      },
+    },
+    notifications: [],
+  };
+};
+
+const releaseInteractionLock = (
+  room: RoomState,
+  playerId: PlayerId,
+  resourceType: 'npc' | 'permit',
+  resourceId: string,
+): RoomState => {
+  const player = room.players[playerId];
+  if (!player) return room;
+
+  const key = interactionLockKey(resourceType, resourceId);
+  const currentLock = room.interactionLocks[key];
+  if (!currentLock || currentLock.ownerPlayerId !== playerId) {
+    return room;
+  }
+
+  const nextLocks = { ...room.interactionLocks };
+  delete nextLocks[key];
+
+  return {
+    ...room,
+    interactionLocks: nextLocks,
+    players: {
+      ...room.players,
+      [playerId]: {
+        ...player,
+        activeNpcInteractionId:
+          resourceType === 'npc' && player.activeNpcInteractionId === resourceId
+            ? null
+            : player.activeNpcInteractionId,
+        activePermitInteractionId:
+          resourceType === 'permit' && player.activePermitInteractionId === resourceId
+            ? null
+            : player.activePermitInteractionId,
+      },
+    },
+  };
+};
+
+const getResolvedDialogueOption = (
+  state: GameState,
+  command: Extract<MultiplayerCommand, { type: 'DIALOGUE_CHOICE' }>,
+): DialogueOption | null => {
+  const npc = state.npcs[command.npcId];
+  if (!npc) return null;
+  if (!isNpcAvailableAtTime(npc, state.time)) return null;
+
+  if (command.source === 'tree') {
+    const tree = DIALOGUE_TREES[command.npcId];
+    const node = tree?.[command.nodeId];
+    if (!node) return null;
+    return node.options[command.optionIndex] ?? null;
+  }
+
+  const moodInfluence = getNpcMoodInfluence(npc, state.time);
+  const options = buildSpecialDialogueOptions({
+    npc,
+    state,
+    moodInfluence,
+  });
+  return options[command.optionIndex] ?? null;
+};
+
+const isDialogueOptionAvailable = (
+  state: GameState,
+  npcId: string,
+  option: DialogueOption,
+): boolean => {
+  const npc = state.npcs[npcId];
+  if (!npc) return false;
+  if (option.condition && !option.condition(state)) return false;
+  if (option.trustRequired && npc.trustLevel < option.trustRequired) return false;
+  if (option.leverageRequired && npc.leverage < option.leverageRequired) return false;
+  return true;
+};
+
 export const applyRoomCommand = (
   room: RoomState,
   playerId: PlayerId,
   command: MultiplayerCommand,
 ): RoomCommandResult => {
   switch (command.type) {
-    case 'DIALOGUE_ACTION': {
+    case 'OPEN_NPC_INTERACTION':
+      return claimInteractionLock(room, playerId, 'npc', command.npcId);
+    case 'OPEN_PERMIT_INTERACTION':
+      return claimInteractionLock(room, playerId, 'permit', command.permitId);
+    case 'RELEASE_INTERACTION':
+      return {
+        room: releaseInteractionLock(room, playerId, command.resourceType, command.resourceId),
+        notifications: [],
+      };
+    case 'DIALOGUE_CHOICE': {
+      const activeNpcId = room.players[playerId]?.activeNpcInteractionId;
+      if (activeNpcId !== command.npcId) {
+        return {
+          room,
+          notifications: [{
+            title: 'Conversation Lost',
+            msg: 'You no longer own that conversation.',
+          }],
+        };
+      }
+
       const snapshot = buildServerSnapshot(room, playerId);
       const state = buildGameStateFromRoomSnapshot(snapshot);
+      const option = getResolvedDialogueOption(state, command);
+      if (!option || !isDialogueOptionAvailable(state, command.npcId, option)) {
+        return {
+          room,
+          notifications: [{
+            title: 'Dialogue Stale',
+            msg: 'That conversation option is no longer available.',
+          }],
+        };
+      }
+
+      const commands: DialogueCommand[] = option.action ? option.action(state) : [];
       const feedbackQueue: RelationshipFeedback[] = [];
       const nextState = applyDialogueSocialConsequences(
         state,
-        applyDialogueCommands(state, command.commands, feedbackQueue),
+        applyDialogueCommands(state, commands, feedbackQueue),
         feedbackQueue,
       );
       return {
@@ -138,6 +352,17 @@ export const applyRoomCommand = (
       };
     }
     case 'PERMIT_ACTION': {
+      const activePermitId = room.players[playerId]?.activePermitInteractionId;
+      if (activePermitId !== command.permitId) {
+        return {
+          room,
+          notifications: [{
+            title: 'Filing Lost',
+            msg: 'You no longer own that filing desk.',
+          }],
+        };
+      }
+
       const snapshot = buildServerSnapshot(room, playerId);
       const state = buildGameStateFromRoomSnapshot(snapshot);
       const result = applyPermitOverlayAction(
@@ -169,30 +394,50 @@ export const applyRoomCommand = (
       };
     }
     case 'COMPLETE_PERMIT_MINIGAME': {
+      const activePermitId = room.players[playerId]?.activePermitInteractionId;
+      if (!activePermitId) {
+        return {
+          room,
+          notifications: [{
+            title: 'Filing Lost',
+            msg: 'You no longer own that filing desk.',
+          }],
+        };
+      }
+
       const snapshot = buildServerSnapshot(room, playerId);
       const state = buildGameStateFromRoomSnapshot(snapshot);
       const result = applyMiniGameCompletion(state, command.results);
-      return {
-        room: mergePlayerStateIntoRoom(room, playerId, {
-          ...snapshot,
-          room: {
-            ...room,
-            shared: buildRoomSharedState(result.nextState),
-            players: {
-              ...room.players,
-              [playerId]: buildRoomPlayerState(
-                result.nextState,
-                playerId,
-                room.players[playerId]?.displayName,
-                room.players[playerId]?.connectedAt,
-              ),
-            },
+      const mergedRoom = mergePlayerStateIntoRoom(room, playerId, {
+        ...snapshot,
+        room: {
+          ...room,
+          shared: buildRoomSharedState(result.nextState),
+          players: {
+            ...room.players,
+            [playerId]: buildRoomPlayerState(
+              result.nextState,
+              playerId,
+              room.players[playerId]?.displayName,
+              room.players[playerId]?.connectedAt,
+            ),
           },
-        }),
+        },
+      });
+      return {
+        room: releaseInteractionLock(mergedRoom, playerId, 'permit', activePermitId),
         notifications: result.notifications,
       };
     }
     case 'CANCEL_PERMIT_MINIGAME': {
+      const activePermitId = room.players[playerId]?.activePermitInteractionId;
+      if (!activePermitId) {
+        return {
+          room,
+          notifications: [],
+        };
+      }
+
       const nextRoom = withUpdatedGameState(room, playerId, (state) => ({
         ...state,
         activePermitId: null,
@@ -200,7 +445,7 @@ export const applyRoomCommand = (
         pendingPermitAction: null,
       }));
       return {
-        room: nextRoom,
+        room: releaseInteractionLock(nextRoom, playerId, 'permit', activePermitId),
         notifications: [],
       };
     }

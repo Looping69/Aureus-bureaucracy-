@@ -1,5 +1,5 @@
 import { ExportStrategy } from '../game/economy';
-import { DialogueCommand, GameState, PendingPermitAction, RelationshipFeedback, WorldPosition } from '../types';
+import { GameState, PendingPermitAction, RelationshipFeedback, WorldPosition } from '../types';
 
 export type RoomId = string;
 export type PlayerId = string;
@@ -46,6 +46,8 @@ export type PlayerProgressState = Pick<
   | 'ftuePhase'
   | 'tutorialStep'
 > & {
+  activeNpcInteractionId: string | null;
+  activePermitInteractionId: string | null;
   activePermitWorkflowId: string | null;
   activeMiniGame: GameState['activeMiniGame'];
   pendingPermitAction: PendingPermitAction;
@@ -69,11 +71,20 @@ export interface RoomPlayerState extends PlayerProgressState {
   lastInputAt: string;
 }
 
+export interface InteractionLock {
+  resourceType: 'npc' | 'permit';
+  resourceId: string;
+  ownerPlayerId: PlayerId;
+  ownerDisplayName: string;
+  acquiredAt: string;
+}
+
 export interface RoomState {
   id: RoomId;
   hostPlayerId: PlayerId;
   shared: RoomSharedState;
   players: Record<PlayerId, RoomPlayerState>;
+  interactionLocks: Record<string, InteractionLock>;
 }
 
 export interface RoomSnapshot {
@@ -100,7 +111,10 @@ export type RoomTransientEffects = {
 export type MultiplayerCommand =
   | { type: 'MOVE_TO'; destination: WorldPosition }
   | { type: 'DIRECT_MOVE'; destination: WorldPosition }
-  | { type: 'DIALOGUE_ACTION'; commands: DialogueCommand[] }
+  | { type: 'DIALOGUE_CHOICE'; npcId: string; nodeId: string; optionIndex: number; source: 'tree' | 'special' }
+  | { type: 'OPEN_NPC_INTERACTION'; npcId: string }
+  | { type: 'OPEN_PERMIT_INTERACTION'; permitId: string }
+  | { type: 'RELEASE_INTERACTION'; resourceType: 'npc' | 'permit'; resourceId: string }
   | { type: 'TRAVEL_TO_MINE'; mineId: string }
   | { type: 'ENTER_BUILDING'; buildingId: string }
   | { type: 'INTERACT_NPC'; npcId: string }

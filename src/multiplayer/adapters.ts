@@ -60,6 +60,8 @@ export const buildRoomPlayerState = (
   lastCityEventHour: state.lastCityEventHour,
   ftuePhase: state.ftuePhase,
   tutorialStep: state.tutorialStep,
+  activeNpcInteractionId: state.activeNPCId,
+  activePermitInteractionId: state.activePermitId,
   activePermitWorkflowId:
     state.activeMiniGame === 'FORM_PROCESSING' || state.pendingPermitAction
       ? state.activePermitId
@@ -104,6 +106,7 @@ export const buildRoomSnapshotFromGameState = (
       players: {
         [playerId]: player,
       },
+      interactionLocks: {},
     },
     playerId,
     ui: buildClientUiState(state),
@@ -139,8 +142,11 @@ export const buildGameStateFromRoomSnapshot = (snapshot: RoomSnapshot): GameStat
     ftuePhase: player.ftuePhase,
     tutorialStep: player.tutorialStep,
     currentScene: snapshot.ui.currentScene,
-    activeNPCId: snapshot.ui.activeNPCId,
-    activePermitId: snapshot.ui.activePermitId ?? player.activePermitWorkflowId,
+    activeNPCId: player.activeNpcInteractionId ?? snapshot.ui.activeNPCId,
+    activePermitId:
+      player.activePermitInteractionId ??
+      player.activePermitWorkflowId ??
+      snapshot.ui.activePermitId,
     activeBuildingId: snapshot.ui.activeBuildingId,
     activeMiniGame: player.activeMiniGame,
     pendingPermitAction: player.pendingPermitAction,

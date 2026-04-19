@@ -71,6 +71,7 @@ wss.on('connection', (socket) => {
       session.room = {
         ...session.room,
         hostPlayerId: session.room.hostPlayerId || message.playerId,
+        interactionLocks: session.room.interactionLocks ?? {},
         players: {
           ...session.room.players,
           [message.playerId]: {
@@ -158,12 +159,18 @@ wss.on('connection', (socket) => {
     session.clients.delete(activePlayerId);
     const existing = session.room.players[activePlayerId];
     if (existing) {
+      const interactionLocks = Object.fromEntries(
+        Object.entries(session.room.interactionLocks).filter(([, lock]) => lock.ownerPlayerId !== activePlayerId),
+      );
       session.room = {
         ...session.room,
+        interactionLocks,
         players: {
           ...session.room.players,
           [activePlayerId]: {
             ...existing,
+            activeNpcInteractionId: null,
+            activePermitInteractionId: null,
             connected: false,
             lastInputAt: nowIso(),
           },

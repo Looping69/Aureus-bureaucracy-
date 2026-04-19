@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { Building, DialogueCommand, GameScene, GameState, GameWorldState, RelationshipFeedback, WorldPosition } from './types';
+import { Building, DialogueSelection, GameScene, GameState, GameWorldState, RelationshipFeedback, WorldPosition } from './types';
 import { BUILDINGS } from './data';
 
 // Components
@@ -462,15 +462,21 @@ export default function App() {
     setShowMinePicker(true);
   };
 
-  const handleDialogueAction = (commands: DialogueCommand[]) => {
+  const handleDialogueAction = (selection: DialogueSelection) => {
     beginTrackedAction('dialogue_action');
     if (multiplayerTransport.isConnected) {
-      multiplayerTransport.sendCommand({ type: 'DIALOGUE_ACTION', commands });
+      multiplayerTransport.sendCommand({
+        type: 'DIALOGUE_CHOICE',
+        npcId: selection.npcId,
+        nodeId: selection.nodeId,
+        optionIndex: selection.optionIndex,
+        source: selection.source,
+      });
       return;
     }
     setState(s => {
       queuedFeedbackRef.current = [];
-      const newState = applyDialogueCommands(s, commands, queuedFeedbackRef.current);
+      const newState = applyDialogueCommands(s, selection.commands, queuedFeedbackRef.current);
       const withConsequences = applyDialogueSocialConsequences(s, newState, queuedFeedbackRef.current);
       if (queuedFeedbackRef.current.length === 0) return withConsequences;
       return {
@@ -479,6 +485,25 @@ export default function App() {
       };
     });
   };
+
+  const handleSelectNpc = React.useCallback((id: string) => {
+    beginTrackedAction(`select_npc:${id}`);
+    if (multiplayerTransport.isConnected) {
+      multiplayerTransport.sendCommand({ type: 'OPEN_NPC_INTERACTION', npcId: id });
+      return;
+    }
+    setState((prev) => selectNpc(prev, id));
+  }, [multiplayerTransport]);
+
+  const handleSelectPermit = React.useCallback((id: string) => {
+    if (!hasUnlockedBureauFilings(state)) return;
+    beginTrackedAction(`select_permit:${id}`);
+    if (multiplayerTransport.isConnected) {
+      multiplayerTransport.sendCommand({ type: 'OPEN_PERMIT_INTERACTION', permitId: id });
+      return;
+    }
+    setState((prev) => selectPermit(prev, id));
+  }, [multiplayerTransport, state]);
 
   const handlePermitAction = (id: string, action: 'SUBMIT' | 'PAY' | 'FAST_TRACK') => {
     beginTrackedAction(`permit:${id}:${action}`);
@@ -496,12 +521,6 @@ export default function App() {
   const handleMiniGameComplete = (results: { accuracy: number; time: number }) => {
     beginTrackedAction('mini_game_complete');
     if (multiplayerTransport.isConnected) {
-      setState((prev) => ({
-        ...prev,
-        activePermitId: null,
-        activeMiniGame: null,
-        pendingPermitAction: null,
-      }));
       multiplayerTransport.sendCommand({ type: 'COMPLETE_PERMIT_MINIGAME', results });
       return;
     }
@@ -635,6 +654,10 @@ export default function App() {
   const handleWorldInteract = (npcId: string, bId: string) => {
     if (npcId !== 'none') {
       beginTrackedAction(`world_interact_npc:${npcId}`);
+      if (multiplayerTransport.isConnected) {
+        multiplayerTransport.sendCommand({ type: 'OPEN_NPC_INTERACTION', npcId });
+        return;
+      }
       setState(s => enterOfficeNpc(s, npcId));
       return;
     }
@@ -713,12 +736,8 @@ export default function App() {
                 beginTrackedAction('mine_world_collect');
                 setState(s => addOreToInventory(s, amount));
               }}
-              onSelectNPC={(id) => setState(s => selectNpc(s, id))}
-              onSelectPermit={(id) => {
-                if (!bureauFilingsUnlocked) return;
-                beginTrackedAction(`select_permit:${id}`);
-                setState(s => selectPermit(s, id));
-              }}
+              onSelectNPC={handleSelectNpc}
+              onSelectPermit={handleSelectPermit}
               onFoundItem={handleFoundItem}
               onTakePhoto={handleTakePhoto}
               onExplorationComplete={() => {
@@ -824,7 +843,17 @@ export default function App() {
                   key="dialogue-overlay"
                   npc={activeNPC}
                   state={state}
-                  onClose={() => setState(closeNpc)}
+                  onClose={() => {
+                    if (multiplayerTransport.isConnected && state.activeNPCId) {
+                      multiplayerTransport.sendCommand({
+                        type: 'RELEASE_INTERACTION',
+                        resourceType: 'npc',
+                        resourceId: state.activeNPCId,
+                      });
+                      return;
+                    }
+                    setState(closeNpc);
+                  }}
                   onAction={handleDialogueAction}
                 />
               )}
@@ -833,7 +862,17 @@ export default function App() {
                   key="permit-overlay"
                   permit={activePermit}
                   onAction={handlePermitAction}
-                  onClose={() => setState(closePermit)}
+                  onClose={() => {
+                    if (multiplayerTransport.isConnected && state.activePermitId) {
+                      multiplayerTransport.sendCommand({
+                        type: 'RELEASE_INTERACTION',
+                        resourceType: 'permit',
+                        resourceId: state.activePermitId,
+                      });
+                      return;
+                    }
+                    setState(closePermit);
+                  }}
                   tutorialStep={state.tutorialStep}
                 />
               )}
@@ -842,10 +881,11 @@ export default function App() {
                   key="form-minigame"
                   onComplete={handleMiniGameComplete}
                   onCancel={() => {
-                    setState(closeMiniGame);
                     if (multiplayerTransport.isConnected) {
                       multiplayerTransport.sendCommand({ type: 'CANCEL_PERMIT_MINIGAME' });
+                      return;
                     }
+                    setState(closeMiniGame);
                   }}
                 />
               )}
