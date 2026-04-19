@@ -464,3 +464,15 @@ Original prompt: Okay so there are still so many gaps in the gameplay we need to
     - `npm run build` (pass)
     - footprint overlap probe against live `BUILDINGS` set (pass: `count=0`)
     - visual browser captures in `output/world-expand-check/step-2-world.png` and `output/world-expand-check/step-3-world-minimized.png`
+
+- 2026-04-19 road/grid repair for modular city:
+  - Replaced the old sparse cross-road layout in `src/data.ts` with a connected 3x3 street grid using explicit horizontal and vertical road lines.
+  - Fixed the road-grid runtime projection bug so street segments no longer create accidental diagonal connectors between unrelated lines.
+  - Moved the worst non-road-facing buildings onto roadside lots and relocated decorative foliage cells that were colliding with building slots.
+  - Validation:
+    - `npm run lint` (pass)
+    - `npm run build` (pass)
+    - road connectivity probe (pass: `roads=115 connected=true`)
+    - building overlap probe (pass: `overlaps=0`)
+    - building-to-road distance probe stayed within close frontage range for all non-park buildings
+    - visual capture in `output/world-road-layout-check.png`
