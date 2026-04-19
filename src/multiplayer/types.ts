@@ -1,5 +1,5 @@
 import { ExportStrategy } from '../game/economy';
-import { GameState, PendingPermitAction, PermitStatus, WorldPosition } from '../types';
+import { DialogueCommand, GameState, PendingPermitAction, RelationshipFeedback, WorldPosition } from '../types';
 
 export type RoomId = string;
 export type PlayerId = string;
@@ -20,7 +20,6 @@ export type RoomSharedState = Pick<
   | 'mines'
   | 'worldEffects'
   | 'storyFlags'
-  | 'lastCityEventHour'
   | 'unlockedEndings'
 >;
 
@@ -43,9 +42,14 @@ export type PlayerProgressState = Pick<
   | 'playerPos'
   | 'targetPos'
   | 'path'
+  | 'lastCityEventHour'
   | 'ftuePhase'
   | 'tutorialStep'
->;
+> & {
+  activePermitWorkflowId: string | null;
+  activeMiniGame: GameState['activeMiniGame'];
+  pendingPermitAction: PendingPermitAction;
+};
 
 export type ClientUiState = Pick<
   GameState,
@@ -53,8 +57,6 @@ export type ClientUiState = Pick<
   | 'activeNPCId'
   | 'activePermitId'
   | 'activeBuildingId'
-  | 'activeMiniGame'
-  | 'pendingPermitAction'
   | 'activeEndingId'
   | 'tutorialMinimized'
 >;
@@ -91,23 +93,23 @@ export interface RemotePlayerView {
   connected: boolean;
 }
 
+export type RoomTransientEffects = {
+  relationshipFeedbacks?: RelationshipFeedback[];
+};
+
 export type MultiplayerCommand =
   | { type: 'MOVE_TO'; destination: WorldPosition }
   | { type: 'DIRECT_MOVE'; destination: WorldPosition }
-  | { type: 'REST' }
+  | { type: 'DIALOGUE_ACTION'; commands: DialogueCommand[] }
   | { type: 'TRAVEL_TO_MINE'; mineId: string }
   | { type: 'ENTER_BUILDING'; buildingId: string }
   | { type: 'INTERACT_NPC'; npcId: string }
   | { type: 'SET_SCENE'; scene: ClientUiState['currentScene'] }
-  | { type: 'SELECT_PERMIT'; permitId: string | null }
-  | { type: 'SET_PENDING_PERMIT_ACTION'; action: PendingPermitAction }
-  | {
-      type: 'RESOLVE_PERMIT';
-      permitId: string;
-      action: 'SUBMIT' | 'PAY' | 'FAST_TRACK';
-      nextStatus?: PermitStatus;
-    }
+  | { type: 'PERMIT_ACTION'; permitId: string; action: 'SUBMIT' | 'PAY' | 'FAST_TRACK' }
+  | { type: 'COMPLETE_PERMIT_MINIGAME'; results: { accuracy: number; time: number } }
+  | { type: 'CANCEL_PERMIT_MINIGAME' }
   | { type: 'MINE_TILE'; tileId: string }
   | { type: 'MINE_ACTION'; actionId: string }
+  | { type: 'OPERATION_ACTION'; actionId: 'PRESSURE_CLERKS' | 'SCOUT_BUYERS' | 'COMMUNITY_COVER' | 'LEAK_TO_PRESS' }
   | { type: 'EXPORT_ORE'; strategy: ExportStrategy }
   | { type: 'DISMISS_UI'; target: keyof ClientUiState };

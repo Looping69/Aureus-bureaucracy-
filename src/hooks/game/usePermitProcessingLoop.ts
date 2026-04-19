@@ -1,10 +1,7 @@
 import { useEffect } from 'react';
 import React from 'react';
-import { GameState, Permit } from '../../types';
-import { REJECTION_REASONS } from '../../data';
-import { approvePermit } from '../../game/permitProgression';
-import { isWorldEffectActive } from '../../game/dialogue/worldEffects';
-import { hasStoryFlag } from '../../game/dialogue/storyFlags';
+import { GameState } from '../../types';
+import { advancePermitProcessingTick } from '../../game/ticks/permitTick';
 
 interface UsePermitProcessingLoopArgs {
   setState: React.Dispatch<React.SetStateAction<GameState>>;
@@ -17,54 +14,9 @@ export const usePermitProcessingLoop = ({ setState, setNotification, enabled = t
     if (!enabled) return;
     const timer = setInterval(() => {
       setState(prev => {
-        const newPermits = { ...prev.permits };
-        let newMines = prev.mines;
-        let changed = false;
-
-        Object.values(newPermits).forEach((p: Permit) => {
-          const quietRouteBonus = hasStoryFlag(prev, 'vane_backchannel') || hasStoryFlag(prev, 'vox_embargo') ? 0.12 : 0;
-          const reformRouteBonus = hasStoryFlag(prev, 'reform_alliance') || hasStoryFlag(prev, 'inspector_deputized') ? 0.14 : 0;
-          const blacklistPenalty = hasStoryFlag(prev, 'inspector_blacklist') ? 0.2 : 0;
-          const publicPenalty = hasStoryFlag(prev, 'vox_exclusive') ? 0.1 : 0;
-          const permitTempoGate = 0.9
-            - (isWorldEffectActive(prev, 'bureauPull') ? 0.18 : 0)
-            - quietRouteBonus
-            - reformRouteBonus
-            + blacklistPenalty
-            + publicPenalty;
-
-          if (p.status === 'PENDING' && Math.random() > Math.min(0.97, Math.max(0.45, permitTempoGate))) {
-            const baseChance = 0.6
-              + (isWorldEffectActive(prev, 'bureauPull') ? 0.18 : 0)
-              - (isWorldEffectActive(prev, 'mediaHeat') ? 0.12 : 0)
-              + (isWorldEffectActive(prev, 'communityBacking') ? 0.05 : 0)
-              + quietRouteBonus
-              + reformRouteBonus
-              - blacklistPenalty
-              - publicPenalty;
-            const accuracyBonus = (p.accuracy || 0.5) * 0.4;
-            const approved = Math.random() < (baseChance + accuracyBonus);
-
-            newPermits[p.id] = {
-              ...p,
-              status: approved ? 'APPROVED' : 'REJECTED',
-              rejectionReason: approved ? undefined : REJECTION_REASONS[Math.floor(Math.random() * REJECTION_REASONS.length)]
-            };
-            changed = true;
-
-            if (approved) {
-              const progression = approvePermit(p.id, newPermits, newMines);
-              Object.assign(newPermits, progression.permits);
-              newMines = progression.mines;
-              progression.notifications.forEach((msg) => {
-                setNotification({ title: 'New Location Discovered', msg });
-              });
-            }
-          }
-        });
-
-        if (changed) return { ...prev, permits: newPermits, mines: newMines };
-        return prev;
+        const result = advancePermitProcessingTick(prev);
+        result.notifications.forEach((notification) => setNotification(notification));
+        return result.nextState;
       });
     }, 3000);
 

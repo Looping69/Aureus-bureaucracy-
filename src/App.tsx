@@ -171,6 +171,7 @@ export default function App() {
     roomSnapshot,
     remotePlayers,
     applyServerRoomState,
+    appendRelationshipFeedbacks,
   } = useRoomSession({
     state,
     setState,
@@ -184,6 +185,7 @@ export default function App() {
     roomId: multiplayerConfig.roomId,
     roomSnapshot,
     applyServerRoomState,
+    applyRelationshipFeedbacks: appendRelationshipFeedbacks,
     pushNotification,
   });
   const sharedAuthorityLocal = !multiplayerTransport.isConnected || multiplayerTransport.isHost;
@@ -284,14 +286,19 @@ export default function App() {
   usePermitProcessingLoop({
     setState,
     setNotification: queueNotification,
-    enabled: gameStarted && sharedAuthorityLocal,
+    enabled: gameStarted && !multiplayerTransport.isConnected,
   });
-  useMovementLoop({ setState, setNotification: queueNotification, homePos: HOME_POS, enabled: gameStarted });
+  useMovementLoop({
+    setState,
+    setNotification: queueNotification,
+    homePos: HOME_POS,
+    enabled: gameStarted && !multiplayerTransport.isConnected,
+  });
   useTutorialProgression(state, setState, queueNotification, gameStarted);
   useCityEventLoop({
     setState,
     setNotification: queueNotification,
-    enabled: gameStarted && sharedAuthorityLocal,
+    enabled: gameStarted && !multiplayerTransport.isConnected,
   });
 
   const handlePointerDown = (e: React.PointerEvent) => {
@@ -320,6 +327,10 @@ export default function App() {
 
   const handleMove = (pos: WorldPosition, options?: { ignoreDrag?: boolean }) => {
     if (!options?.ignoreDrag && dragDistanceRef.current > 10) return;
+    if (multiplayerTransport.isConnected) {
+      multiplayerTransport.sendCommand({ type: 'MOVE_TO', destination: pos });
+      return;
+    }
     setState(prev => {
       const path = findPath(
         prev.playerPos,
@@ -333,6 +344,10 @@ export default function App() {
   };
 
   const handleDirectMove = (pos: WorldPosition) => {
+    if (multiplayerTransport.isConnected) {
+      multiplayerTransport.sendCommand({ type: 'DIRECT_MOVE', destination: pos });
+      return;
+    }
     setState(prev => {
       // Reuse cached surface map when buildings haven't changed
       const cached = cachedSurfaceMapRef.current;
@@ -379,6 +394,10 @@ export default function App() {
 
   const handleMine = (tileId: string) => {
     beginTrackedAction(`mine_tile:${tileId}`);
+    if (multiplayerTransport.isConnected) {
+      multiplayerTransport.sendCommand({ type: 'MINE_TILE', tileId });
+      return;
+    }
     setState(prev => {
       const { nextState, notifications } = applyMineTileInteraction(prev, tileId);
       pushNotifications(notifications);
@@ -388,6 +407,10 @@ export default function App() {
 
   const handleMineAction = (action: string) => {
     beginTrackedAction(`mine_action:${action}`);
+    if (multiplayerTransport.isConnected) {
+      multiplayerTransport.sendCommand({ type: 'MINE_ACTION', actionId: action });
+      return;
+    }
     setState(prev => {
       const { nextState, notifications } = applyMineSceneAction(prev, action);
       pushNotifications(notifications);
@@ -396,6 +419,12 @@ export default function App() {
   };
 
   const handleTravel = (mineId: string) => {
+    if (multiplayerTransport.isConnected) {
+      beginTrackedAction(`travel:${mineId}`);
+      multiplayerTransport.sendCommand({ type: 'TRAVEL_TO_MINE', mineId });
+      setShowMinePicker(false);
+      return;
+    }
     const result = applyMineTravel(state, mineId);
     if (result.kind === 'invalid') return;
     if (result.kind === 'undiscovered' || result.kind === 'too_tired') {
@@ -435,6 +464,10 @@ export default function App() {
 
   const handleDialogueAction = (commands: DialogueCommand[]) => {
     beginTrackedAction('dialogue_action');
+    if (multiplayerTransport.isConnected) {
+      multiplayerTransport.sendCommand({ type: 'DIALOGUE_ACTION', commands });
+      return;
+    }
     setState(s => {
       queuedFeedbackRef.current = [];
       const newState = applyDialogueCommands(s, commands, queuedFeedbackRef.current);
@@ -449,6 +482,10 @@ export default function App() {
 
   const handlePermitAction = (id: string, action: 'SUBMIT' | 'PAY' | 'FAST_TRACK') => {
     beginTrackedAction(`permit:${id}:${action}`);
+    if (multiplayerTransport.isConnected) {
+      multiplayerTransport.sendCommand({ type: 'PERMIT_ACTION', permitId: id, action });
+      return;
+    }
     setState(prev => {
       const { nextState, notifications } = applyPermitOverlayAction(prev, id, action);
       pushNotifications(notifications);
@@ -458,6 +495,16 @@ export default function App() {
 
   const handleMiniGameComplete = (results: { accuracy: number; time: number }) => {
     beginTrackedAction('mini_game_complete');
+    if (multiplayerTransport.isConnected) {
+      setState((prev) => ({
+        ...prev,
+        activePermitId: null,
+        activeMiniGame: null,
+        pendingPermitAction: null,
+      }));
+      multiplayerTransport.sendCommand({ type: 'COMPLETE_PERMIT_MINIGAME', results });
+      return;
+    }
     setState(prev => {
       const { nextState, notifications } = applyMiniGameCompletion(prev, results);
       pushNotifications(notifications);
@@ -467,12 +514,16 @@ export default function App() {
 
   const handleOperationAction = React.useCallback((actionId: Parameters<typeof applyOperationAction>[1]) => {
     beginTrackedAction(`operation:${actionId}`);
+    if (multiplayerTransport.isConnected) {
+      multiplayerTransport.sendCommand({ type: 'OPERATION_ACTION', actionId });
+      return;
+    }
     setState((prev) => {
       const result = applyOperationAction(prev, actionId);
       pushNotification(result.notification);
       return result.nextState;
     });
-  }, [pushNotification]);
+  }, [multiplayerTransport, pushNotification]);
 
   const handleTakePhoto = (itemId: string) => {
     beginTrackedAction(`take_photo:${itemId}`);
@@ -790,7 +841,12 @@ export default function App() {
                 <FormMiniGame
                   key="form-minigame"
                   onComplete={handleMiniGameComplete}
-                  onCancel={() => setState(closeMiniGame)}
+                  onCancel={() => {
+                    setState(closeMiniGame);
+                    if (multiplayerTransport.isConnected) {
+                      multiplayerTransport.sendCommand({ type: 'CANCEL_PERMIT_MINIGAME' });
+                    }
+                  }}
                 />
               )}
               {state.activeEndingId && (
@@ -811,6 +867,11 @@ export default function App() {
                   onClose={() => setShowMarket(false)}
                   onSellAll={(strategy) => {
                     beginTrackedAction(`export_ore:${strategy}`);
+                    if (multiplayerTransport.isConnected) {
+                      multiplayerTransport.sendCommand({ type: 'EXPORT_ORE', strategy });
+                      setShowMarket(false);
+                      return;
+                    }
                     setState(s => {
                       const exported = applyOreExport(s, s.ore, strategy);
                       if (exported.notification) {

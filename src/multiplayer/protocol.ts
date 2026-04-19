@@ -1,4 +1,4 @@
-import { RoomPlayerState, RoomSharedState, RoomState } from './types';
+import { MultiplayerCommand, RoomPlayerState, RoomSharedState, RoomState, RoomTransientEffects } from './types';
 
 export type ClientToServerMessage =
   | {
@@ -20,12 +20,22 @@ export type ClientToServerMessage =
       roomId: string;
       playerId: string;
       shared: RoomSharedState;
+    }
+  | {
+      type: 'room_command';
+      roomId: string;
+      playerId: string;
+      command: MultiplayerCommand;
     };
 
 export type ServerToClientMessage =
   | {
       type: 'room_state';
       room: RoomState;
+    }
+  | {
+      type: 'room_effects';
+      effects: RoomTransientEffects;
     }
   | {
       type: 'server_notice';

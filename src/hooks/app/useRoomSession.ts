@@ -1,5 +1,5 @@
 import React from 'react';
-import { GameState } from '../../types';
+import { GameState, RelationshipFeedback } from '../../types';
 import {
   buildGameStateFromRoomSnapshot,
   buildRoomSnapshotFromGameState,
@@ -68,7 +68,11 @@ export const useRoomSession = ({
 
   const applyRoomSnapshot = React.useCallback((nextSnapshot: RoomSnapshot) => {
     setSnapshot(nextSnapshot);
-    setState(buildGameStateFromRoomSnapshot(nextSnapshot));
+    setState((prevState) => ({
+      ...buildGameStateFromRoomSnapshot(nextSnapshot),
+      feedbacks: prevState.feedbacks,
+      playerFeedbacks: prevState.playerFeedbacks,
+    }));
   }, [setState]);
 
   const applyServerRoomState = React.useCallback((room: RoomState) => {
@@ -77,9 +81,21 @@ export const useRoomSession = ({
         ...prev,
         room,
       };
-      setState(buildGameStateFromRoomSnapshot(nextSnapshot));
+      setState((prevState) => ({
+        ...buildGameStateFromRoomSnapshot(nextSnapshot),
+        feedbacks: prevState.feedbacks,
+        playerFeedbacks: prevState.playerFeedbacks,
+      }));
       return nextSnapshot;
     });
+  }, [setState]);
+
+  const appendRelationshipFeedbacks = React.useCallback((feedbacks: RelationshipFeedback[]) => {
+    if (feedbacks.length === 0) return;
+    setState((prevState) => ({
+      ...prevState,
+      feedbacks: [...prevState.feedbacks, ...feedbacks],
+    }));
   }, [setState]);
 
   const upsertRemoteSnapshot = React.useCallback((nextSnapshot: RoomSnapshot) => {
@@ -105,6 +121,7 @@ export const useRoomSession = ({
     remotePlayers,
     applyRoomSnapshot,
     applyServerRoomState,
+    appendRelationshipFeedbacks,
     upsertRemoteSnapshot,
   };
 };

@@ -1,6 +1,7 @@
 import React from 'react';
 import { NotificationMessage } from './useNotificationCenter';
-import { RoomSharedState, RoomSnapshot, RoomState } from '../../multiplayer/types';
+import { RelationshipFeedback } from '../../types';
+import { MultiplayerCommand, RoomSnapshot, RoomState } from '../../multiplayer/types';
 import { ClientToServerMessage, ServerToClientMessage } from '../../multiplayer/protocol';
 
 type MultiplayerStatus = 'disabled' | 'connecting' | 'connected' | 'error';
@@ -11,6 +12,7 @@ interface UseMultiplayerTransportOptions {
   roomId: string;
   roomSnapshot: RoomSnapshot;
   applyServerRoomState: (room: RoomState) => void;
+  applyRelationshipFeedbacks: (feedbacks: RelationshipFeedback[]) => void;
   pushNotification: (notification: NotificationMessage | null) => void;
 }
 
@@ -30,10 +32,12 @@ export const useMultiplayerTransport = ({
   roomId,
   roomSnapshot,
   applyServerRoomState,
+  applyRelationshipFeedbacks,
   pushNotification,
 }: UseMultiplayerTransportOptions) => {
   const socketRef = React.useRef<WebSocket | null>(null);
   const snapshotRef = React.useRef(roomSnapshot);
+  const pendingCommandCountRef = React.useRef(0);
   const [status, setStatus] = React.useState<MultiplayerStatus>(enabled ? 'connecting' : 'disabled');
   const [lastError, setLastError] = React.useState<string | null>(null);
 
@@ -79,7 +83,15 @@ export const useMultiplayerTransport = ({
       if (!message) return;
 
       if (message.type === 'room_state') {
+        pendingCommandCountRef.current = 0;
         applyServerRoomState(message.room);
+        return;
+      }
+
+      if (message.type === 'room_effects') {
+        if (message.effects.relationshipFeedbacks?.length) {
+          applyRelationshipFeedbacks(message.effects.relationshipFeedbacks);
+        }
         return;
       }
 
@@ -106,7 +118,7 @@ export const useMultiplayerTransport = ({
         socketRef.current = null;
       }
     };
-  }, [applyServerRoomState, enabled, pushNotification, roomId, wsUrl]);
+  }, [applyRelationshipFeedbacks, applyServerRoomState, enabled, pushNotification, roomId, wsUrl]);
 
   React.useEffect(() => {
     if (!enabled) return;
@@ -114,6 +126,7 @@ export const useMultiplayerTransport = ({
     const timer = window.setInterval(() => {
       const socket = socketRef.current;
       if (!socket || socket.readyState !== WebSocket.OPEN) return;
+      if (pendingCommandCountRef.current > 0) return;
 
       const snapshot = snapshotRef.current;
       const player = snapshot.room.players[snapshot.playerId];
@@ -145,6 +158,22 @@ export const useMultiplayerTransport = ({
   const isHost = roomSnapshot.room.hostPlayerId === roomSnapshot.playerId;
   const peerCount = Math.max(0, Object.keys(roomSnapshot.room.players).length - 1);
 
+  const sendCommand = React.useCallback((command: MultiplayerCommand) => {
+    const socket = socketRef.current;
+    if (!socket || socket.readyState !== WebSocket.OPEN) return false;
+
+    const snapshot = snapshotRef.current;
+    const message: ClientToServerMessage = {
+      type: 'room_command',
+      roomId,
+      playerId: snapshot.playerId,
+      command,
+    };
+    pendingCommandCountRef.current += 1;
+    socket.send(JSON.stringify(message));
+    return true;
+  }, [roomId]);
+
   return {
     enabled,
     status,
@@ -152,5 +181,6 @@ export const useMultiplayerTransport = ({
     isConnected,
     isHost,
     peerCount,
+    sendCommand,
   };
 };

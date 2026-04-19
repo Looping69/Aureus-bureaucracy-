@@ -46,6 +46,7 @@ export const addOreToInventory = (
 export const closeMiniGame = (state: GameState): GameState => ({
   ...state,
   activeMiniGame: null,
+  pendingPermitAction: null,
 });
 
 export const closeEnding = (state: GameState): GameState => ({

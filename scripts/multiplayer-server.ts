@@ -2,10 +2,18 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { advanceSharedWorldTick } from '../src/game/ticks/sharedWorldTick.ts';
 import { ClientToServerMessage, ServerToClientMessage } from '../src/multiplayer/protocol.ts';
 import { RoomState } from '../src/multiplayer/types.ts';
+import {
+  advanceRoomCityEventTick,
+  advanceRoomMovementTick,
+  advanceRoomPermitTick,
+  applyRoomCommand,
+} from '../src/multiplayer/serverRoom.ts';
+import { MovementTickRuntimeState } from '../src/game/ticks/movementTick.ts';
 
 type RoomSession = {
   room: RoomState;
   clients: Map<string, WebSocket>;
+  movementRuntimes: Map<string, MovementTickRuntimeState>;
 };
 
 const PORT = Number(process.env.MULTIPLAYER_PORT ?? 3010);
@@ -33,6 +41,7 @@ const getOrCreateRoomSession = (roomId: string, templateRoom: RoomState): RoomSe
   const created: RoomSession = {
     room: templateRoom,
     clients: new Map(),
+    movementRuntimes: new Map(),
   };
   rooms.set(roomId, created);
   return created;
@@ -102,6 +111,30 @@ wss.on('connection', (socket) => {
       return;
     }
 
+    if (message.type === 'room_command') {
+      const result = applyRoomCommand(session.room, message.playerId, message.command);
+      session.room = result.room;
+      broadcastRoomState(session);
+      if (result.effects) {
+        const target = session.clients.get(message.playerId);
+        if (target) {
+          send(target, {
+            type: 'room_effects',
+            effects: result.effects,
+          });
+        }
+      }
+      result.notifications.forEach((notice) => {
+        const target = session.clients.get(message.playerId);
+        if (!target) return;
+        send(target, {
+          type: 'server_notice',
+          notice,
+        });
+      });
+      return;
+    }
+
     if (message.type === 'host_shared_sync') {
       if (session.room.hostPlayerId !== message.playerId) return;
 
@@ -162,5 +195,62 @@ setInterval(() => {
     });
   });
 }, 1000);
+
+setInterval(() => {
+  rooms.forEach((session) => {
+    if (session.clients.size === 0) return;
+
+    const result = advanceRoomMovementTick(session.room, session.movementRuntimes);
+    session.room = result.room;
+    broadcastRoomState(session);
+
+    Object.entries(result.notificationsByPlayerId).forEach(([playerId, notices]) => {
+      const target = session.clients.get(playerId);
+      if (!target) return;
+      notices.forEach((notice) => {
+        send(target, {
+          type: 'server_notice',
+          notice,
+        });
+      });
+    });
+  });
+}, 70);
+
+setInterval(() => {
+  rooms.forEach((session) => {
+    if (session.clients.size === 0) return;
+
+    const result = advanceRoomPermitTick(session.room);
+    session.room = result.room;
+    broadcastRoomState(session);
+
+    result.notifications.forEach((notice) => {
+      const message: ServerToClientMessage = { type: 'server_notice', notice };
+      session.clients.forEach((socket) => send(socket, message));
+    });
+  });
+}, 3000);
+
+setInterval(() => {
+  rooms.forEach((session) => {
+    if (session.clients.size === 0) return;
+
+    const result = advanceRoomCityEventTick(session.room);
+    session.room = result.room;
+    broadcastRoomState(session);
+
+    Object.entries(result.notificationsByPlayerId).forEach(([playerId, notices]) => {
+      const target = session.clients.get(playerId);
+      if (!target) return;
+      notices.forEach((notice) => {
+        send(target, {
+          type: 'server_notice',
+          notice,
+        });
+      });
+    });
+  });
+}, 2500);
 
 console.log(`Aureus multiplayer room server listening on ws://127.0.0.1:${PORT}`);

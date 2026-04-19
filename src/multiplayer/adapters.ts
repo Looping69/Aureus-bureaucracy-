@@ -26,7 +26,6 @@ export const buildRoomSharedState = (state: GameState): RoomSharedState => ({
   mines: state.mines,
   worldEffects: state.worldEffects,
   storyFlags: state.storyFlags,
-  lastCityEventHour: state.lastCityEventHour,
   unlockedEndings: state.unlockedEndings,
 });
 
@@ -58,8 +57,15 @@ export const buildRoomPlayerState = (
   playerPos: state.playerPos,
   targetPos: state.targetPos,
   path: state.path,
+  lastCityEventHour: state.lastCityEventHour,
   ftuePhase: state.ftuePhase,
   tutorialStep: state.tutorialStep,
+  activePermitWorkflowId:
+    state.activeMiniGame === 'FORM_PROCESSING' || state.pendingPermitAction
+      ? state.activePermitId
+      : null,
+  activeMiniGame: state.activeMiniGame,
+  pendingPermitAction: state.pendingPermitAction,
 });
 
 export const buildClientUiState = (state: GameState): ClientUiState => ({
@@ -67,8 +73,6 @@ export const buildClientUiState = (state: GameState): ClientUiState => ({
   activeNPCId: state.activeNPCId,
   activePermitId: state.activePermitId,
   activeBuildingId: state.activeBuildingId,
-  activeMiniGame: state.activeMiniGame,
-  pendingPermitAction: state.pendingPermitAction,
   activeEndingId: state.activeEndingId,
   tutorialMinimized: state.tutorialMinimized,
 });
@@ -131,14 +135,15 @@ export const buildGameStateFromRoomSnapshot = (snapshot: RoomSnapshot): GameStat
     playerPos: player.playerPos,
     targetPos: player.targetPos,
     path: player.path,
+    lastCityEventHour: player.lastCityEventHour,
     ftuePhase: player.ftuePhase,
     tutorialStep: player.tutorialStep,
     currentScene: snapshot.ui.currentScene,
     activeNPCId: snapshot.ui.activeNPCId,
-    activePermitId: snapshot.ui.activePermitId,
+    activePermitId: snapshot.ui.activePermitId ?? player.activePermitWorkflowId,
     activeBuildingId: snapshot.ui.activeBuildingId,
-    activeMiniGame: snapshot.ui.activeMiniGame,
-    pendingPermitAction: snapshot.ui.pendingPermitAction,
+    activeMiniGame: player.activeMiniGame,
+    pendingPermitAction: player.pendingPermitAction,
     activeEndingId: snapshot.ui.activeEndingId,
     tutorialMinimized: snapshot.ui.tutorialMinimized,
     feedbacks: [],
