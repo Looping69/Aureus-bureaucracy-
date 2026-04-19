@@ -4,6 +4,7 @@ import { Pickaxe, Database, Users, ArrowLeft, Search, Lock, ShieldCheck, Radar }
 import { GameState } from '../types';
 import { ProgressGuide } from './ProgressGuide';
 import { RunCyclePanel } from './RunCyclePanel';
+import { HudActionButton, HudIconTile, HudPanel, HUD_BUTTON_BASE_CLASS } from './HudFrame';
 import { getSceneMetaVisibility } from '../game/shellView';
 
 export const MineScene = ({ 
@@ -32,6 +33,7 @@ export const MineScene = ({
   const hasClaimExpansion = state.permits['claim-expansion']?.status === 'APPROVED';
   const hasSafetyKit = state.upgrades.includes('mine-safety-kit');
   const hasOreScanner = state.upgrades.includes('mine-ore-scanner');
+  const canTriggerActions = Boolean(onAction);
 
   return (
     <div className="flex-1 overflow-auto p-4 grid-pattern flex flex-col">
@@ -42,31 +44,42 @@ export const MineScene = ({
         </div>
       )}
 
-      <div className="mb-6 flex justify-between items-start">
-        <button 
+      <div className="mb-6 flex flex-wrap items-start gap-2">
+        <HudActionButton
+          icon={ArrowLeft}
+          label="Leave"
+          detail="Return to route"
           onClick={onReturn}
-          className="p-2 bg-white border-2 border-black rounded-xl shadow-sm active:scale-90 transition-all"
-        >
-          <ArrowLeft size={20} />
-        </button>
-        <div className="text-right">
-          <h2 className="font-serif italic font-black text-xl leading-tight">{currentMine.name}</h2>
-          <p className="text-[10px] font-mono uppercase tracking-widest opacity-50">
-            {currentMine.location} • {currentMine.status}
-          </p>
-        </div>
+          className="w-11 justify-center px-2"
+        />
+        <HudPanel toneBorderClass="border-stone-600/80" className="flex min-w-[220px] flex-1 items-center gap-2 px-3 py-2">
+          <HudIconTile icon={Pickaxe} toneClass="bg-stone-300" />
+          <div className="min-w-0 flex-1">
+            <h2 className="truncate font-serif text-xl font-black italic leading-tight text-white">{currentMine.name}</h2>
+            <p className="mt-1 text-[10px] font-mono uppercase tracking-[0.2em] text-slate-400">
+              {currentMine.location} / {currentMine.status}
+            </p>
+          </div>
+        </HudPanel>
+        <HudPanel toneBorderClass="border-amber-600/80" className="ml-auto flex items-center gap-2 px-3 py-2">
+          <HudIconTile icon={Database} toneClass="bg-amber-400" />
+          <div className="flex flex-col leading-none">
+            <span className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-500">Stockpile</span>
+            <span className="mt-1 text-sm font-black text-amber-200">{state.ore.toLocaleString()}</span>
+          </div>
+        </HudPanel>
       </div>
 
       {isProspecting && (
-        <div className="mb-4 bg-blue-50 border-2 border-blue-200 p-3 rounded-xl flex justify-between items-center">
-          <div className="flex items-center gap-2 text-blue-800">
-            <Search size={16} />
-            <span className="text-xs font-black uppercase tracking-wider">Prospecting Mode</span>
+        <HudPanel toneBorderClass="border-sky-600/80" className="mb-4 flex items-center justify-between gap-3 px-3 py-3">
+          <div className="flex items-center gap-2 text-sky-100">
+            <HudIconTile icon={Search} toneClass="bg-sky-400" />
+            <span className="text-xs font-black uppercase tracking-[0.22em]">Prospecting Mode</span>
           </div>
-          <div className="text-xs font-mono font-bold">
+          <div className="text-xs font-mono font-bold text-sky-200">
             Samples: {currentMine.prospectingCount}/10
           </div>
-        </div>
+        </HudPanel>
       )}
 
       {isOperational && (
@@ -74,26 +87,53 @@ export const MineScene = ({
           <button 
             onClick={() => onAction?.('EXPORT_ORE')}
             title="Sell all ore. Payout depends on license and market influence; increases exposure."
-            className={`w-full min-h-[56px] px-3 py-2 rounded-xl border-2 font-black text-[10px] uppercase tracking-wider transition-all text-center
-              ${hasExportLicense ? 'bg-emerald-100 border-emerald-300 text-emerald-800 active:scale-95' : 'bg-slate-100 border-slate-300 text-slate-400 opacity-50'}`}
+            disabled={!hasExportLicense || !canTriggerActions}
+            className={`${HUD_BUTTON_BASE_CLASS} w-full min-h-[64px] border-emerald-600/80 px-3 py-3 text-left`}
           >
-            {hasExportLicense ? 'Export Ore' : <span className="flex items-center justify-center gap-1"><Lock size={10} /> Needs Permit</span>}
+            <div className="flex items-center gap-2">
+              <HudIconTile icon={Database} toneClass={hasExportLicense ? 'bg-emerald-400' : 'bg-slate-500'} />
+              <div className="min-w-0">
+                <div className="text-[10px] font-black uppercase tracking-[0.22em] text-white">Export Ore</div>
+                <div className="mt-1 text-[8px] font-mono uppercase tracking-[0.16em] text-slate-400">
+                  {hasExportLicense ? 'Moves stock into cash' : 'Needs export permit'}
+                </div>
+              </div>
+              {!hasExportLicense && <Lock size={12} className="ml-auto text-slate-500" />}
+            </div>
           </button>
           <button 
             onClick={() => onAction?.('WASH_PLANT')}
             title="Activate wash processing bonus for better ore yield on extraction."
-            className={`w-full min-h-[56px] px-3 py-2 rounded-xl border-2 font-black text-[10px] uppercase tracking-wider transition-all text-center
-              ${hasWashPlant ? 'bg-blue-100 border-blue-300 text-blue-800 active:scale-95' : 'bg-slate-100 border-slate-300 text-slate-400 opacity-50'}`}
+            disabled={!hasWashPlant || !canTriggerActions}
+            className={`${HUD_BUTTON_BASE_CLASS} w-full min-h-[64px] border-sky-600/80 px-3 py-3 text-left`}
           >
-            {hasWashPlant ? 'Use Wash Plant' : <span className="flex items-center justify-center gap-1"><Lock size={10} /> Needs Permit</span>}
+            <div className="flex items-center gap-2">
+              <HudIconTile icon={Search} toneClass={hasWashPlant ? 'bg-sky-400' : 'bg-slate-500'} />
+              <div className="min-w-0">
+                <div className="text-[10px] font-black uppercase tracking-[0.22em] text-white">Wash Plant</div>
+                <div className="mt-1 text-[8px] font-mono uppercase tracking-[0.16em] text-slate-400">
+                  {hasWashPlant ? 'Boost extraction yield' : 'Needs wash permit'}
+                </div>
+              </div>
+              {!hasWashPlant && <Lock size={12} className="ml-auto text-slate-500" />}
+            </div>
           </button>
           <button 
             onClick={() => onAction?.('EXPAND_CLAIM')}
             title="Add a new mine row. Useful after current tiles are depleted."
-            className={`w-full min-h-[56px] px-3 py-2 rounded-xl border-2 font-black text-[10px] uppercase tracking-wider transition-all text-center
-              ${hasClaimExpansion ? 'bg-purple-100 border-purple-300 text-purple-800 active:scale-95' : 'bg-slate-100 border-slate-300 text-slate-400 opacity-50'}`}
+            disabled={!hasClaimExpansion || !canTriggerActions}
+            className={`${HUD_BUTTON_BASE_CLASS} w-full min-h-[64px] border-fuchsia-600/80 px-3 py-3 text-left`}
           >
-            {hasClaimExpansion ? 'Expand Claim' : <span className="flex items-center justify-center gap-1"><Lock size={10} /> Needs Permit</span>}
+            <div className="flex items-center gap-2">
+              <HudIconTile icon={Pickaxe} toneClass={hasClaimExpansion ? 'bg-fuchsia-400' : 'bg-slate-500'} />
+              <div className="min-w-0">
+                <div className="text-[10px] font-black uppercase tracking-[0.22em] text-white">Expand Claim</div>
+                <div className="mt-1 text-[8px] font-mono uppercase tracking-[0.16em] text-slate-400">
+                  {hasClaimExpansion ? 'Open another extraction lane' : 'Needs claim expansion permit'}
+                </div>
+              </div>
+              {!hasClaimExpansion && <Lock size={12} className="ml-auto text-slate-500" />}
+            </div>
           </button>
         </div>
       )}
@@ -102,20 +142,38 @@ export const MineScene = ({
         <button
           onClick={() => onAction?.('BUY_SAFETY_KIT')}
           title="Cost: $450. Reduces mining energy strain and hazard penalties."
-          className={`w-full min-h-[56px] px-3 py-2 rounded-xl border-2 font-black text-[10px] uppercase tracking-wider transition-all flex items-center justify-center gap-1 text-center
-            ${hasSafetyKit ? 'bg-emerald-100 border-emerald-300 text-emerald-800' : 'bg-slate-100 border-slate-300 text-slate-700 active:scale-95'}`}
+          disabled={hasSafetyKit || !canTriggerActions}
+          className={`${HUD_BUTTON_BASE_CLASS} w-full min-h-[64px] border-emerald-600/80 px-3 py-3 text-left`}
         >
-          <ShieldCheck size={12} />
-          {hasSafetyKit ? 'Safety Kit Installed' : 'Buy Safety Kit ($450)'}
+          <div className="flex items-center gap-2">
+            <HudIconTile icon={ShieldCheck} toneClass={hasSafetyKit ? 'bg-emerald-400' : 'bg-emerald-300'} />
+            <div className="min-w-0">
+              <div className="text-[10px] font-black uppercase tracking-[0.22em] text-white">
+                {hasSafetyKit ? 'Safety Kit Installed' : 'Buy Safety Kit'}
+              </div>
+              <div className="mt-1 text-[8px] font-mono uppercase tracking-[0.16em] text-slate-400">
+                {hasSafetyKit ? 'Hazard buffer online' : '$450 / lowers mining strain'}
+              </div>
+            </div>
+          </div>
         </button>
         <button
           onClick={() => onAction?.('BUY_ORE_SCANNER')}
           title="Cost: $700. Reveals nearby tiles during prospecting and boosts rich-vein finds."
-          className={`w-full min-h-[56px] px-3 py-2 rounded-xl border-2 font-black text-[10px] uppercase tracking-wider transition-all flex items-center justify-center gap-1 text-center
-            ${hasOreScanner ? 'bg-sky-100 border-sky-300 text-sky-800' : 'bg-slate-100 border-slate-300 text-slate-700 active:scale-95'}`}
+          disabled={hasOreScanner || !canTriggerActions}
+          className={`${HUD_BUTTON_BASE_CLASS} w-full min-h-[64px] border-sky-600/80 px-3 py-3 text-left`}
         >
-          <Radar size={12} />
-          {hasOreScanner ? 'Ore Scanner Installed' : 'Buy Ore Scanner ($700)'}
+          <div className="flex items-center gap-2">
+            <HudIconTile icon={Radar} toneClass={hasOreScanner ? 'bg-sky-400' : 'bg-sky-300'} />
+            <div className="min-w-0">
+              <div className="text-[10px] font-black uppercase tracking-[0.22em] text-white">
+                {hasOreScanner ? 'Ore Scanner Installed' : 'Buy Ore Scanner'}
+              </div>
+              <div className="mt-1 text-[8px] font-mono uppercase tracking-[0.16em] text-slate-400">
+                {hasOreScanner ? 'Survey support active' : '$700 / reveals nearby tiles'}
+              </div>
+            </div>
+          </div>
         </button>
       </div>
 
@@ -166,10 +224,10 @@ export const MineScene = ({
         ))}
       </div>
 
-      <div className="mt-3 grid grid-cols-3 gap-2 text-[9px] font-mono uppercase tracking-wider opacity-70">
-        <div className="p-1.5 rounded-md bg-amber-100 border border-amber-200 text-center">Ore / Rich Vein</div>
-        <div className="p-1.5 rounded-md bg-red-100 border border-red-200 text-center">Unstable Tile</div>
-        <div className="p-1.5 rounded-md bg-slate-200 border border-slate-300 text-center">Rock / Hard Layer</div>
+      <div className="mt-3 grid grid-cols-3 gap-2 text-[9px] font-mono uppercase tracking-wider">
+        <HudPanel toneBorderClass="border-amber-600/80" className="px-2 py-1.5 text-center text-amber-200">Ore / Rich Vein</HudPanel>
+        <HudPanel toneBorderClass="border-rose-600/80" className="px-2 py-1.5 text-center text-rose-200">Unstable Tile</HudPanel>
+        <HudPanel toneBorderClass="border-slate-600/80" className="px-2 py-1.5 text-center text-slate-200">Rock / Hard Layer</HudPanel>
       </div>
 
       <div className="mt-8 space-y-4">
@@ -178,23 +236,25 @@ export const MineScene = ({
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             onClick={() => currentMine.chiefId && onInteract(currentMine.chiefId)}
-            className="w-full p-4 bg-amber-50 border-2 border-black rounded-2xl flex items-center gap-4 shadow-md hover:bg-amber-100 active:scale-95 transition-all"
+            className={`${HUD_BUTTON_BASE_CLASS} w-full border-amber-600/80 p-4`}
           >
-            <div className="w-12 h-12 rounded-xl bg-white border border-black/10 flex items-center justify-center">
-              <Users size={24} className="text-amber-600" />
-            </div>
+            <div className="flex items-center gap-4">
+              <span className="flex h-12 w-12 items-center justify-center rounded-xl border border-black/20 bg-amber-400">
+                <Users size={24} className="text-slate-950" />
+              </span>
             <div className="text-left">
-              <h4 className="font-black text-sm uppercase tracking-tight">Talk to Local Chief</h4>
-              <p className="text-[10px] opacity-60">"This land has been ours since the first dust fell."</p>
+                <h4 className="text-sm font-black uppercase tracking-tight text-white">Talk to Local Chief</h4>
+                <p className="text-[10px] text-slate-400">"This land has been ours since the first dust fell."</p>
+              </div>
             </div>
           </motion.button>
         )}
 
-        <div className="p-4 border border-dashed border-black/20 rounded-lg bg-white/30 text-center">
-          <p className="text-xs font-mono opacity-50 uppercase tracking-widest">
+        <HudPanel toneBorderClass="border-slate-600/80" className="p-4 text-center">
+          <p className="text-xs font-mono uppercase tracking-widest text-slate-400">
             {currentMine.id}: Active Claim
           </p>
-        </div>
+        </HudPanel>
       </div>
     </div>
   );

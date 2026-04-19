@@ -20,6 +20,7 @@ import { GameState, WorldHoverInfo, WorldPosition } from '../types';
 import { WORLD_CAMERA_AZIMUTH } from '../VoxelEngine';
 import { VoxelWorldContainer } from './VoxelWorldContainer';
 import { AnalogStick, AnalogStickVector } from './AnalogStick';
+import { HudActionButton, HudIconTile, HudPanel } from './HudFrame';
 import { buildWorldTerrainVoxels } from '../utils/worldSurface';
 import { WORLD_SIZE } from '../utils/voxelConstants';
 import { findPath } from '../utils/pathfinding';
@@ -431,68 +432,88 @@ export const MineWorldScene = ({
 
       {/* ── Exit + recenter buttons ──────────────────────────────────────── */}
       <div className="absolute bottom-4 right-4 flex flex-col gap-2">
-        <button
+        <HudActionButton
           onClick={() => { setRecenterTrigger(t => t + 1); }}
-          className="bg-black/70 text-white p-2 rounded-full active:scale-95 transition-all flex items-center justify-center shadow-lg backdrop-blur-sm"
+          icon={Package}
+          label="Center"
+          detail="Recenter camera"
+          className="w-11 justify-center px-2"
           title="Recenter"
-        >
-          <Package size={16} />
-        </button>
+        />
       </div>
 
       {/* ── Exit button (top-left) ───────────────────────────────────────── */}
-      <button
+      <HudActionButton
         onClick={onExit}
-        className="absolute top-3 left-3 z-[200] flex items-center gap-1 rounded-full bg-black/70 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-white shadow-lg backdrop-blur-sm active:scale-95 transition-all"
-      >
-        <ArrowLeft size={12} />
-        Leave
-      </button>
+        icon={ArrowLeft}
+        label="Leave"
+        detail="Exit shaft"
+        className="absolute left-3 top-3 z-[200] min-w-[112px]"
+      />
 
       {/* ── Resource HUD (carried + depot inventory) ─────────────────────── */}
       <div className="absolute top-3 right-3 z-[200] flex flex-col gap-1.5 items-end">
         {/* Carry bar */}
-        <div className="flex items-center gap-1.5 rounded-full bg-black/70 px-2.5 py-1.5 text-[10px] font-bold text-white shadow-lg backdrop-blur-sm">
-          <Weight size={10} className="text-amber-300" />
-          <span className="text-amber-200">{carried}/{MAX_CARRY}</span>
-          {/* Small capacity bar */}
-          <div className="w-12 h-1.5 rounded-full bg-white/20 overflow-hidden">
+        <HudPanel toneBorderClass={carried >= MAX_CARRY ? 'border-rose-600/80' : 'border-amber-600/80'} className="min-w-[172px] px-3 py-2">
+          <div className="flex items-center gap-2">
+            <HudIconTile icon={Weight} toneClass={carried >= MAX_CARRY ? 'bg-rose-400' : 'bg-amber-400'} />
+            <div className="flex min-w-0 flex-1 flex-col">
+              <span className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-500">Carry Load</span>
+              <span className="mt-1 text-sm font-black text-amber-200">{carried}/{MAX_CARRY}</span>
+            </div>
+            {carryType && (
+              <span className="text-[8px] font-mono uppercase tracking-[0.16em] text-slate-400">
+                {carryType === 'rawOre' ? 'ore' : carryType}
+              </span>
+            )}
+          </div>
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
             <div
-              className={`h-full rounded-full transition-all duration-300 ${carried >= MAX_CARRY ? 'bg-red-400' : 'bg-amber-400'}`}
+              className={`h-full rounded-full transition-all duration-300 ${carried >= MAX_CARRY ? 'bg-rose-400' : 'bg-amber-400'}`}
               style={{ width: `${(carried / MAX_CARRY) * 100}%` }}
             />
           </div>
-          {carryType && (
-            <span className="text-white/60 text-[9px] uppercase">{carryType === 'rawOre' ? 'ore' : carryType}</span>
-          )}
-        </div>
+        </HudPanel>
         {/* Depot inventory */}
-        <div className="flex items-center gap-1.5 rounded-full bg-black/70 px-2.5 py-1.5 text-[10px] font-bold text-white shadow-lg backdrop-blur-sm">
-          {inventory.rawOre > 0 && (
-            <span className="flex items-center gap-0.5 text-amber-300">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />{inventory.rawOre}
-            </span>
-          )}
-          {inventory.coal > 0 && (
-            <span className="flex items-center gap-0.5 text-gray-300">
-              <span className="w-1.5 h-1.5 rounded-full bg-gray-500 inline-block" />{inventory.coal}
-            </span>
-          )}
-          {inventory.gems > 0 && (
-            <span className="flex items-center gap-0.5 text-purple-300">
-              <span className="w-1.5 h-1.5 rounded-full bg-purple-400 inline-block" />{inventory.gems}
-            </span>
-          )}
-          {inventory.refinedMetal > 0 && (
-            <span className="flex items-center gap-0.5 text-yellow-200">
-              <Zap size={10} />{inventory.refinedMetal}
-            </span>
-          )}
-          <span className="text-white/40">|</span>
-          <span className="flex items-center gap-0.5 text-emerald-300">
-            <Boxes size={10} />{state.ore}
-          </span>
-        </div>
+        <HudPanel toneBorderClass="border-emerald-600/80" className="px-3 py-2">
+          <div className="flex items-center gap-2">
+            <HudIconTile icon={Boxes} toneClass="bg-emerald-400" />
+            <div className="flex flex-col">
+              <span className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-500">Mine Stores</span>
+              <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] font-bold text-white">
+                {inventory.rawOre > 0 && (
+                  <span className="flex items-center gap-1 text-amber-300">
+                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-400" />
+                    {inventory.rawOre}
+                  </span>
+                )}
+                {inventory.coal > 0 && (
+                  <span className="flex items-center gap-1 text-slate-300">
+                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-slate-500" />
+                    {inventory.coal}
+                  </span>
+                )}
+                {inventory.gems > 0 && (
+                  <span className="flex items-center gap-1 text-purple-300">
+                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-purple-400" />
+                    {inventory.gems}
+                  </span>
+                )}
+                {inventory.refinedMetal > 0 && (
+                  <span className="flex items-center gap-1 text-yellow-200">
+                    <Zap size={10} />
+                    {inventory.refinedMetal}
+                  </span>
+                )}
+                <span className="text-slate-600">/</span>
+                <span className="flex items-center gap-1 text-emerald-300">
+                  <Boxes size={10} />
+                  {state.ore}
+                </span>
+              </div>
+            </div>
+          </div>
+        </HudPanel>
       </div>
 
       {/* ── Flying resource particles ────────────────────────────────────── */}
@@ -623,7 +644,7 @@ export const MineWorldScene = ({
 
       {/* ── Legend overlay (top-center, compact) ───────────────────────── */}
       <div className="absolute top-10 inset-x-4 z-[100] flex justify-center pointer-events-none">
-        <div className="flex gap-1 flex-wrap justify-center">
+        <HudPanel toneBorderClass="border-slate-700/80" className="pointer-events-none flex gap-1.5 flex-wrap justify-center px-2 py-1.5">
           {[
             { color: 'bg-amber-500', label: 'Ore' },
             { color: 'bg-gray-700',  label: 'Coal' },
@@ -631,12 +652,12 @@ export const MineWorldScene = ({
             { color: 'bg-orange-600',label: 'Smelter' },
             { color: 'bg-emerald-600',label: 'Storage' },
           ].map(({ color, label }) => (
-            <span key={label} className={`flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[8px] font-bold text-white uppercase tracking-wider ${color}/80 backdrop-blur-sm`}>
-              <span className="w-1 h-1 rounded-full bg-white/80 inline-block" />
+            <span key={label} className={`flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[8px] font-bold text-white uppercase tracking-wider ${color}/80`}>
+              <span className="inline-block h-1 w-1 rounded-full bg-white/80" />
               {label}
             </span>
           ))}
-        </div>
+        </HudPanel>
       </div>
     </div>
   );

@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import { Search, BookOpen, Trash2, Map, Box } from 'lucide-react';
 import { GameState, OfficeItem } from '../types';
 import { OFFICE_ITEMS } from '../data';
+import { HudActionButton, HudIconTile, HudPanel } from './HudFrame';
 
 const ICON_MAP: Record<string, any> = {
   BookOpen,
@@ -31,17 +32,21 @@ export const OfficeExploration = ({
   return (
     <div className="flex-1 flex flex-col bg-slate-100 relative overflow-hidden">
       {/* Office Header */}
-      <div className="p-4 bg-white border-b-2 border-black flex justify-between items-center z-10">
-        <div>
-          <h2 className="font-serif italic font-black text-xl">{building.name}</h2>
-          <p className="text-[10px] font-mono uppercase tracking-widest opacity-50">Exploration Phase</p>
-        </div>
-        <button 
+      <div className="z-10 flex flex-wrap items-start gap-2 border-b border-black/10 bg-slate-200/60 p-3 backdrop-blur-sm">
+        <HudPanel toneBorderClass="border-slate-700/80" className="flex min-w-[220px] flex-1 items-center gap-2 px-3 py-2">
+          <HudIconTile icon={Search} toneClass="bg-amber-400" />
+          <div className="min-w-0">
+            <h2 className="truncate font-serif text-xl font-black italic text-white">{building.name}</h2>
+            <p className="mt-1 text-[10px] font-mono uppercase tracking-[0.2em] text-slate-400">Exploration Phase</p>
+          </div>
+        </HudPanel>
+        <HudActionButton
           onClick={onComplete}
-          className="bg-black text-white px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-zinc-800 transition-all active:scale-95 shadow-lg"
-        >
-          Go to Desk
-        </button>
+          icon={Map}
+          label="Go to Desk"
+          detail="Return to office"
+          className="ml-auto min-w-[124px]"
+        />
       </div>
 
       {/* Exploration Area */}
