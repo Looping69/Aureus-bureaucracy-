@@ -42,6 +42,24 @@ const clickNavAction = async (page, label) => {
   }, label);
 };
 
+const clickDialogClose = async (page, headingText) => {
+  await page.evaluate((targetHeading) => {
+    const overlay = [...document.querySelectorAll('.fixed')]
+      .find((element) => element.textContent?.includes(targetHeading));
+    if (!(overlay instanceof HTMLElement)) {
+      throw new Error(`Dialogue overlay not found for ${targetHeading}.`);
+    }
+
+    const closeButton = [...overlay.querySelectorAll('button')]
+      .find((button) => !(button.textContent ?? '').trim());
+    if (!(closeButton instanceof HTMLElement)) {
+      throw new Error(`Close button not found for ${targetHeading} dialogue.`);
+    }
+
+    closeButton.click();
+  }, headingText);
+};
+
 const clearAllSaves = async (page) => {
   await page.evaluate(({ saveKey, legacyKeys }) => {
     [saveKey, ...legacyKeys].forEach((key) => window.localStorage.removeItem(key));
@@ -122,6 +140,11 @@ const waitForWorldHud = async (page) => {
   await page.waitForTimeout(400);
 };
 
+const waitForOfficeScene = async (page, buildingName = 'Bureau of Extraction') => {
+  await page.getByText(new RegExp(buildingName, 'i')).first().waitFor({ state: 'visible', timeout: 30000 });
+  await page.waitForTimeout(400);
+};
+
 const waitForGameShell = async (page) => {
   await page.getByText('Aureus: Below').first().waitFor({ state: 'visible', timeout: 30000 });
   await page.locator('[aria-label="Expand navigation panel"], [aria-label="Collapse navigation panel"]').first().waitFor({
@@ -164,14 +187,14 @@ const continueSavedRun = async (page) => {
   await removeBlockingNotificationOverlay(page);
 };
 
-const startJourney = async (page) => {
+const startRun = async (page) => {
   await page.waitForTimeout(250);
-  await page.getByRole('button', { name: /Start Journey/i }).waitFor({ state: 'visible', timeout: 30000 });
+  await page.getByRole('button', { name: /Start Run/i }).waitFor({ state: 'visible', timeout: 30000 });
   await page.evaluate(() => {
     const startButton = [...document.querySelectorAll('button')].find((el) =>
-      el.textContent?.includes('Start Journey')
+      el.textContent?.includes('Start Run')
     );
-    if (!(startButton instanceof HTMLElement)) throw new Error('Start Journey button not found.');
+    if (!(startButton instanceof HTMLElement)) throw new Error('Start Run button not found.');
     startButton.click();
   });
   await page.waitForTimeout(600);
@@ -202,7 +225,7 @@ const run = async () => {
     const page = await context.newPage();
     page.setDefaultTimeout(30000);
 
-    console.log('Scenario 1: tutorial -> mine travel');
+    console.log('Scenario 1: new run boot -> controls -> mine travel');
     await page.goto(APP_URL);
     await clearAllSaves(page);
     await page.reload();
@@ -210,9 +233,9 @@ const run = async () => {
     await page.getByText(/World Files/i).first().waitFor({ state: 'visible', timeout: 30000 });
 
     await page.getByRole('button', { name: /World 1/i }).click();
-    await startJourney(page);
-    const startJourneyStillVisible = await page.getByRole('button', { name: /Start Journey/i }).count();
-    assert(startJourneyStillVisible === 0, 'Expected the tutorial CTA to dismiss after starting the journey.');
+    await startRun(page);
+    const startRunStillVisible = await page.getByRole('button', { name: /Start Run/i }).count();
+    assert(startRunStillVisible === 0, 'Expected the FTUE CTA to dismiss after starting the run.');
     await waitForWorldHud(page);
 
     const outOfBoundsLabelCount = await page.locator('text=/Out of bounds/i').count();
@@ -220,6 +243,8 @@ const run = async () => {
 
     const savedAfterStart = await readSavedState(page);
     assert(!!savedAfterStart, 'Expected autosave to exist after starting a new run.');
+    assert(savedAfterStart.ftuePhase === 'reach_bureau', `Expected FTUE phase reach_bureau after starting the run, got ${savedAfterStart.ftuePhase}.`);
+    assert(savedAfterStart.currentScene === 'WORLD', `Expected current scene WORLD after starting the run, got ${savedAfterStart.currentScene}.`);
 
     const movementStick = page.locator('[aria-label="Movement stick"]');
     await movementStick.waitFor({ state: 'visible', timeout: 30000 });
@@ -259,7 +284,145 @@ const run = async () => {
     assert(savedAfterMineTravel.currentScene === 'MINE', `Expected save state scene=MINE after Mine navigation, got ${savedAfterMineTravel.currentScene}.`);
     assert(savedAfterMineTravel.activeMineId === 'iron-vein', `Expected activeMineId=iron-vein after Mine navigation, got ${savedAfterMineTravel.activeMineId}.`);
 
-    console.log('Regression smoke passed: title screen -> FTUE start -> world controls -> mine navigation.');
+    console.log('Scenario 2: archive restore resumes the latest file');
+    const restoredPage = await context.newPage();
+    restoredPage.setDefaultTimeout(30000);
+    await restoredPage.goto(APP_URL);
+    await continueSavedRun(restoredPage);
+    await waitForMineSceneReady(restoredPage);
+    const restoredState = await readSavedState(restoredPage);
+    assert(!!restoredState, 'Expected save state to remain available after archive restore.');
+    assert(restoredState.currentScene === 'MINE', `Expected restored save state scene=MINE, got ${restoredState.currentScene}.`);
+    await restoredPage.close();
+    await page.close();
+
+    console.log('Scenario 3: seeded Bureau FTUE flow unlocks and starts Form 17-B');
+    const seedPage = await context.newPage();
+    seedPage.setDefaultTimeout(30000);
+    await seedPage.goto(APP_URL);
+    await writeSavedState(seedPage, {
+      ...savedAfterStart,
+      currentScene: 'OFFICE',
+      activeBuildingId: 'licensing_office',
+      activeNPCId: null,
+      activePermitId: null,
+      activeMiniGame: null,
+      pendingPermitAction: null,
+      time: 10,
+      ftuePhase: 'talk_vane',
+      tutorialStep: 2,
+      tutorialMinimized: false,
+      knownNpcIds: Array.from(new Set([...(savedAfterStart.knownNpcIds ?? []), 'licensing'])),
+      buildings: {
+        ...savedAfterStart.buildings,
+        licensing_office: {
+          ...savedAfterStart.buildings.licensing_office,
+          isDiscovered: true,
+        },
+      },
+      objectives: [
+        {
+          id: 'talk-vane',
+          text: 'Talk to Officer Vane now.',
+          isCompleted: false,
+          type: 'TALK',
+          targetId: 'licensing',
+        },
+      ],
+      permits: {
+        ...savedAfterStart.permits,
+        'extraction-intent': {
+          ...savedAfterStart.permits['extraction-intent'],
+          status: 'LOCKED',
+          rejectionReason: undefined,
+          accuracy: undefined,
+        },
+      },
+    });
+    await seedPage.close();
+
+    const bureauPage = await context.newPage();
+    bureauPage.setDefaultTimeout(30000);
+    await bureauPage.goto(APP_URL);
+    await continueSavedRun(bureauPage);
+    await waitForOfficeScene(bureauPage);
+
+    await bureauPage.getByRole('button', { name: /Officer Vane/i }).click();
+    await bureauPage.getByRole('button', { name: /I need a permit to start digging\./i }).click();
+    await bureauPage.waitForFunction(({ key, slotId }) => {
+      const raw = window.localStorage.getItem(key);
+      if (!raw) return false;
+      const parsed = JSON.parse(raw);
+      const state = parsed?.slots?.[slotId]?.state;
+      return state?.permits?.['extraction-intent']?.status === 'AVAILABLE';
+    }, { key: SAVE_KEY, slotId: DEFAULT_SLOT_ID }, { timeout: 15000 });
+    await bureauPage.waitForFunction(({ key, slotId }) => {
+      const raw = window.localStorage.getItem(key);
+      if (!raw) return false;
+      const parsed = JSON.parse(raw);
+      const state = parsed?.slots?.[slotId]?.state;
+      return state?.ftuePhase === 'open_form_17b';
+    }, { key: SAVE_KEY, slotId: DEFAULT_SLOT_ID }, { timeout: 15000 });
+    const unlockedPermitState = await readSavedState(bureauPage);
+    assert(!!unlockedPermitState, 'Expected save state to exist after speaking to Officer Vane.');
+    assert(
+      unlockedPermitState.permits['extraction-intent']?.status === 'AVAILABLE',
+      `Expected Extraction Intent to unlock after talking to Vane, got ${unlockedPermitState.permits['extraction-intent']?.status}.`,
+    );
+    assert(
+      unlockedPermitState.ftuePhase === 'open_form_17b',
+      `Expected FTUE phase open_form_17b after Vane dialogue, got ${unlockedPermitState.ftuePhase}.`,
+    );
+
+    await clickButtonByText(bureauPage, "I'll get right on it.");
+    await clickDialogClose(bureauPage, 'Officer Vane');
+    await bureauPage.getByRole('button', { name: /Extraction Intent/i }).click();
+    await bureauPage.waitForFunction(({ key, slotId }) => {
+      const raw = window.localStorage.getItem(key);
+      if (!raw) return false;
+      const parsed = JSON.parse(raw);
+      const state = parsed?.slots?.[slotId]?.state;
+      return state?.activePermitId === 'extraction-intent' && state?.ftuePhase === 'submit_form_17b';
+    }, { key: SAVE_KEY, slotId: DEFAULT_SLOT_ID }, { timeout: 15000 });
+
+    const openedPermitState = await readSavedState(bureauPage);
+    assert(
+      openedPermitState?.activePermitId === 'extraction-intent',
+      `Expected Extraction Intent to be the active permit after opening it, got ${openedPermitState?.activePermitId}.`,
+    );
+    assert(
+      openedPermitState?.ftuePhase === 'submit_form_17b',
+      `Expected FTUE phase submit_form_17b after opening Extraction Intent, got ${openedPermitState?.ftuePhase}.`,
+    );
+
+    await bureauPage.getByRole('button', { name: /Standard Filing/i }).click();
+    await bureauPage.waitForFunction(({ key, slotId }) => {
+      const raw = window.localStorage.getItem(key);
+      if (!raw) return false;
+      const parsed = JSON.parse(raw);
+      const state = parsed?.slots?.[slotId]?.state;
+      return (
+        state?.pendingPermitAction === 'SUBMIT' &&
+        state?.activeMiniGame === 'FORM_PROCESSING' &&
+        state?.ftuePhase === 'ftue_complete'
+      );
+    }, { key: SAVE_KEY, slotId: DEFAULT_SLOT_ID }, { timeout: 15000 });
+    const submittedPermitState = await readSavedState(bureauPage);
+    assert(
+      submittedPermitState?.pendingPermitAction === 'SUBMIT',
+      `Expected pending permit action SUBMIT after filing Extraction Intent, got ${submittedPermitState?.pendingPermitAction}.`,
+    );
+    assert(
+      submittedPermitState?.activeMiniGame === 'FORM_PROCESSING',
+      `Expected Form Processing minigame to start after filing, got ${submittedPermitState?.activeMiniGame}.`,
+    );
+    assert(
+      submittedPermitState?.ftuePhase === 'ftue_complete',
+      `Expected FTUE phase ftue_complete after filing starts, got ${submittedPermitState?.ftuePhase}.`,
+    );
+    await bureauPage.close();
+
+    console.log('Regression smoke passed: boot, save archive restore, Bureau FTUE filing chain, and mine navigation.');
   } finally {
     if (browser) await browser.close();
     if (viteServer) await viteServer.close();

@@ -436,3 +436,21 @@ Original prompt: Okay so there are still so many gaps in the gameplay we need to
   - Added selectable World 1-4 startup profiles and wired save/bootstrap state to remember the chosen world.
   - Locked bureau filings behind the Officer Vane conversation so forms do not surface early.
   - Reduced world-renderer waste by skipping duplicate initial terrain/pickup syncs and instancing pickup meshes in VoxelEngine.
+
+- 2026-04-19 regression harness refresh:
+  - Rebuilt `scripts/smoke-regression.mjs` around the current shell/FTUE contract instead of the dead `Start Journey` flow.
+  - Scenario coverage now includes:
+    - new run boot on World 1,
+    - FTUE start via `Start Run`,
+    - analog stick movement persistence,
+    - mine navigation,
+    - archive restore from the start screen,
+    - seeded Bureau FTUE flow through Officer Vane and Form 17-B submission start.
+  - Hardened the Bureau scenario against flake by:
+    - seeding from a fresh non-playing page so autosave cannot overwrite the test fixture,
+    - setting Bureau office time inside Vane's work hours,
+    - waiting for debounced autosaves before asserting saved-state transitions.
+  - Validation:
+    - `npm run smoke:regression` (pass)
+    - `npm run lint` (pass)
+    - `npm run build` (pass)
