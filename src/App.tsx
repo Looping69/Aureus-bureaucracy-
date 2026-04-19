@@ -74,8 +74,11 @@ import {
 import { useAppChrome } from './hooks/app/useAppChrome';
 import { useGameSession } from './hooks/app/useGameSession';
 import { useNotificationCenter } from './hooks/app/useNotificationCenter';
+import { useRoomSession } from './hooks/app/useRoomSession';
+import { useMultiplayerTransport } from './hooks/app/useMultiplayerTransport';
 import { shouldShowCompactFtueHud } from './game/shellView';
 import { WORLD_PROFILES } from './game/worldProfiles';
+import { resolveMultiplayerClientConfig } from './multiplayer/clientConfig';
 
 // --- Main App ---
 
@@ -85,6 +88,7 @@ export default function App() {
   const HOME_POS = getBuildingAccessPosition(BUILDINGS.player_home);
   const hydrateBuildings = React.useCallback(buildHydratedBuildings, []);
   const plannerEnabled = import.meta.env.DEV;
+  const multiplayerConfig = React.useMemo(() => resolveMultiplayerClientConfig(), []);
 
   const [state, setState] = useState<GameState>(() => buildInitialGameState());
   const {
@@ -163,6 +167,26 @@ export default function App() {
     }, [resetChrome, resetNotifications]),
     resetDebugState,
   });
+  const {
+    roomSnapshot,
+    remotePlayers,
+    applyServerRoomState,
+  } = useRoomSession({
+    state,
+    setState,
+    roomId: multiplayerConfig.roomId,
+    playerId: multiplayerConfig.playerId,
+    displayName: multiplayerConfig.displayName,
+  });
+  const multiplayerTransport = useMultiplayerTransport({
+    enabled: multiplayerConfig.enabled,
+    wsUrl: multiplayerConfig.wsUrl,
+    roomId: multiplayerConfig.roomId,
+    roomSnapshot,
+    applyServerRoomState,
+    pushNotification,
+  });
+  const sharedAuthorityLocal = !multiplayerTransport.isConnected || multiplayerTransport.isHost;
 
   useEffect(() => {
     if (!gameStarted) {
@@ -251,11 +275,24 @@ export default function App() {
 
   useBuildingDiscovery({ state, setState, setNotification: queueNotification, enabled: gameStarted });
   useFeedbackCleanup(setState, gameStarted);
-  useTimeAndCurfewLoop({ setState, setNotification: queueNotification, homePos: HOME_POS, enabled: gameStarted });
-  usePermitProcessingLoop({ setState, setNotification: queueNotification, enabled: gameStarted });
+  useTimeAndCurfewLoop({
+    setState,
+    setNotification: queueNotification,
+    homePos: HOME_POS,
+    enabled: gameStarted && !multiplayerTransport.isConnected,
+  });
+  usePermitProcessingLoop({
+    setState,
+    setNotification: queueNotification,
+    enabled: gameStarted && sharedAuthorityLocal,
+  });
   useMovementLoop({ setState, setNotification: queueNotification, homePos: HOME_POS, enabled: gameStarted });
   useTutorialProgression(state, setState, queueNotification, gameStarted);
-  useCityEventLoop({ setState, setNotification: queueNotification, enabled: gameStarted });
+  useCityEventLoop({
+    setState,
+    setNotification: queueNotification,
+    enabled: gameStarted && sharedAuthorityLocal,
+  });
 
   const handlePointerDown = (e: React.PointerEvent) => {
     isDraggingRef.current = true;
@@ -594,6 +631,7 @@ export default function App() {
 
             <GameSceneRouter
               state={state}
+              remotePlayers={remotePlayers}
               showMinePicker={showMinePicker}
               showDebug={showDebugPanel}
               plannerEnabled={plannerEnabled}
@@ -700,6 +738,10 @@ export default function App() {
               stateUpdates={stateUpdateCount}
               lastAction={lastActionName}
               lastActionMs={lastActionMs}
+              multiplayerStatus={multiplayerConfig.enabled ? multiplayerTransport.status : undefined}
+              multiplayerRoomId={multiplayerConfig.enabled ? multiplayerConfig.roomId : undefined}
+              multiplayerPeerCount={multiplayerTransport.peerCount}
+              multiplayerIsHost={multiplayerTransport.isHost}
               onResetStateCounter={() => setStateUpdateCount(0)}
               isOpen={showDebugPanel}
               onToggle={() => setShowDebugPanel(v => !v)}

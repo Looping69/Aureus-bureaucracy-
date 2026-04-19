@@ -7,6 +7,7 @@ import { MineSceneFallback } from './MineSceneFallback';
 import { LightLoadingOverlay } from './LightLoadingOverlay';
 import { OperationActionId } from '../game/runCycle';
 import { getRenderableScene } from '../game/scenePolicy';
+import { RemotePlayerView } from '../multiplayer/types';
 
 const WorldScene = React.lazy(() =>
   import('./WorldScene').then((module) => ({ default: module.WorldScene }))
@@ -58,6 +59,7 @@ interface GameSceneRouterProps {
   onTravelTo: (buildingId: string) => void;
   onBackToDirectory: () => void;
   onOperationAction: (actionId: OperationActionId) => void;
+  remotePlayers?: RemotePlayerView[];
   suppressInitialWorldFallback?: boolean;
   showInitialWorldLoadingOverlay?: boolean;
   onInitialWorldReady?: () => void;
@@ -113,6 +115,7 @@ export const GameSceneRouter: React.FC<GameSceneRouterProps> = ({
   onTravelTo,
   onBackToDirectory,
   onOperationAction,
+  remotePlayers = [],
   suppressInitialWorldFallback = false,
   showInitialWorldLoadingOverlay = true,
   onInitialWorldReady,
@@ -196,6 +199,7 @@ export const GameSceneRouter: React.FC<GameSceneRouterProps> = ({
                 showInitialLoadingOverlay={showInitialWorldLoadingOverlay}
                 onInitialSceneReady={onInitialWorldReady}
                 onInitialLoadingProgress={onInitialWorldLoadingProgress}
+                remotePlayers={remotePlayers}
               />
             </React.Suspense>
           </motion.div>

@@ -41,6 +41,7 @@ interface NpcMovementState {
 export class EntityManager {
   private scene: THREE.Scene;
   public player: VoxelCharacter;
+  public remotePlayers: Map<string, VoxelCharacter> = new Map();
   public buildings: Map<string, VoxelBuilding> = new Map();
   public npcs: Map<string, VoxelCharacter> = new Map();
   public entityGroup: THREE.Group;
@@ -65,6 +66,57 @@ export class EntityManager {
       this.lightPool.push(light);
       this.scene.add(light);
     }
+  }
+
+  private getRemotePlayerPalette(playerId: string) {
+    const palettes = Object.values(NPC_PALETTES);
+    const hash = Array.from(playerId).reduce((sum, char) => ((sum * 31) + char.charCodeAt(0)) >>> 0, 7);
+    return palettes[hash % palettes.length];
+  }
+
+  public syncRemotePlayers(players: Array<{ id: string; position: WorldPosition; carriedOre?: number }>) {
+    const activeIds = new Set(players.map((player) => player.id));
+
+    this.remotePlayers.forEach((character, playerId) => {
+      if (activeIds.has(playerId)) return;
+      this.entityGroup.remove(character.group);
+      this.remotePlayers.delete(playerId);
+    });
+
+    players.forEach((player) => {
+      let character = this.remotePlayers.get(player.id);
+      if (!character) {
+        character = new VoxelCharacter(this.getRemotePlayerPalette(player.id));
+        character.group.userData.remotePlayerId = player.id;
+        this.remotePlayers.set(player.id, character);
+        this.entityGroup.add(character.group);
+      }
+
+      character.group.position.set(
+        player.position.x - WORLD_HALF_SIZE,
+        CONFIG.FLOOR_Y + 0.5,
+        player.position.y - WORLD_HALF_SIZE,
+      );
+      character.setCarriedAmount(player.carriedOre ?? 0);
+    });
+  }
+
+  public updateRemotePlayer(
+    playerId: string,
+    position: WorldPosition,
+    isMoving: boolean,
+    carriedOre = 0,
+  ) {
+    const character = this.remotePlayers.get(playerId);
+    if (!character) return;
+
+    character.group.position.set(
+      position.x - WORLD_HALF_SIZE,
+      CONFIG.FLOOR_Y + 0.5,
+      position.y - WORLD_HALF_SIZE,
+    );
+    character.setMoving(isMoving);
+    character.setCarriedAmount(carriedOre);
   }
 
   public addBuilding(buildingData: Building) {
@@ -316,6 +368,7 @@ export class EntityManager {
 
   public update(deltaTime: number, time: number) {
     this.player.update(deltaTime);
+    this.remotePlayers.forEach((player) => player.update(deltaTime));
     this.npcs.forEach(npc => npc.update(deltaTime));
 
     // Advance NPC commuting
@@ -357,6 +410,7 @@ export class EntityManager {
 
   public cleanup() {
     this.entityGroup.clear();
+    this.remotePlayers.clear();
     this.buildings.clear();
     this.npcMovement.clear();
     this.lightPool.forEach(l => this.scene.remove(l));

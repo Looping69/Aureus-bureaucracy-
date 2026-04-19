@@ -5,6 +5,7 @@ import { useCameraControls } from '../hooks/useCameraControls';
 import { WORLD_HALF_SIZE } from '../utils/voxelConstants';
 import { buildWorldSurfaceMap, getWorldSurfaceHeight } from '../utils/worldSurface';
 import { LoadingScreen } from './LoadingScreen';
+import { RemotePlayerView } from '../multiplayer/types';
 
 interface VoxelWorldProps {
   voxels: VoxelData[];
@@ -27,6 +28,7 @@ interface VoxelWorldProps {
   showLoadingOverlay?: boolean;
   onReady?: () => void;
   onProgress?: (progress: number, phase: string) => void;
+  remotePlayers?: RemotePlayerView[];
   /** When true the player character plays the WORKING (pickaxe-swing) animation */
   playerWorking?: boolean;
   /** Number of ore blocks visually stacked on the player's back (0..MAX_CARRY) */
@@ -54,6 +56,7 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
   showLoadingOverlay = true,
   onReady,
   onProgress,
+  remotePlayers = [],
   playerWorking,
   playerCarried
 }) => {
@@ -152,6 +155,13 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
         targetPos ? targetPos.x - WORLD_HALF_SIZE : undefined, 
         targetPos ? targetPos.y - WORLD_HALF_SIZE : undefined,
         path
+      );
+      engineRef.current.entities.syncRemotePlayers(
+        remotePlayers.map((player) => ({
+          id: player.id,
+          position: player.playerPos,
+          carriedOre: player.carriedOre,
+        })),
       );
       reportProgress(97, 'Authorizing sector access...');
 
@@ -258,6 +268,26 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
       );
     }
   }, [playerPos, playerSurfaceY, isMoving, targetPos, path]);
+
+  useEffect(() => {
+    if (!engineRef.current) return;
+    engineRef.current.entities.syncRemotePlayers(
+      remotePlayers.map((player) => ({
+        id: player.id,
+        position: player.playerPos,
+        carriedOre: player.carriedOre,
+      })),
+    );
+
+    remotePlayers.forEach((player) => {
+      engineRef.current?.entities.updateRemotePlayer(
+        player.id,
+        player.playerPos,
+        player.isMoving,
+        player.carriedOre,
+      );
+    });
+  }, [remotePlayers]);
 
   useEffect(() => {
     if (engineRef.current) {

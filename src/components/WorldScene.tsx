@@ -14,6 +14,7 @@ import { useContinuousAnalogMovement } from '../hooks/game/useContinuousAnalogMo
 import { BUREAU_BUILDING_ID, isFtueWorldFunnelPhase } from '../game/ftue';
 import { buildStreetPickupVoxels } from '../game/streetPickups';
 import { formatWeatherLabel, getWeatherMovementMultiplier, getWeatherToneClassName, getWeatherWarningCopy, isSevereWeather } from '../game/weatherSystem';
+import { RemotePlayerView } from '../multiplayer/types';
 
 const BUILDING_ENTRY_TYPES = new Set(['OFFICE', 'HOME', 'MINE_ENTRANCE', 'PUB', 'HOTLINE']);
 
@@ -29,7 +30,8 @@ export const WorldScene = ({
   showDebug = false,
   showInitialLoadingOverlay = true,
   onInitialSceneReady,
-  onInitialLoadingProgress
+  onInitialLoadingProgress,
+  remotePlayers = []
 }: { 
   state: GameState, 
   onMove: (pos: WorldPosition, options?: { ignoreDrag?: boolean }) => void,
@@ -39,7 +41,8 @@ export const WorldScene = ({
   showDebug?: boolean,
   showInitialLoadingOverlay?: boolean,
   onInitialSceneReady?: () => void,
-  onInitialLoadingProgress?: (progress: number, phase: string) => void
+  onInitialLoadingProgress?: (progress: number, phase: string) => void,
+  remotePlayers?: RemotePlayerView[]
 }) => {
   const [hoverInfo, setHoverInfo] = React.useState<WorldHoverInfo | null>(null);
   const [pendingSelection, setPendingSelection] = React.useState<WorldHoverInfo | null>(null);
@@ -299,6 +302,7 @@ export const WorldScene = ({
         showLoadingOverlay={showInitialLoadingOverlay}
         onReady={onInitialSceneReady}
         onProgress={onInitialLoadingProgress}
+        remotePlayers={remotePlayers}
       />
 
       {showDebug && (

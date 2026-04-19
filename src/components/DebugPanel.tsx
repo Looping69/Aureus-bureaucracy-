@@ -8,6 +8,10 @@ interface DebugPanelProps {
   stateUpdates: number;
   lastAction: string;
   lastActionMs: number;
+  multiplayerStatus?: string;
+  multiplayerRoomId?: string;
+  multiplayerPeerCount?: number;
+  multiplayerIsHost?: boolean;
   onResetStateCounter: () => void;
   isOpen: boolean;
   onToggle: () => void;
@@ -19,6 +23,10 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({
   stateUpdates,
   lastAction,
   lastActionMs,
+  multiplayerStatus,
+  multiplayerRoomId,
+  multiplayerPeerCount = 0,
+  multiplayerIsHost = false,
   onResetStateCounter,
   isOpen,
   onToggle,
@@ -66,6 +74,15 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({
             <div>Energy: <span className="font-black">{state.energy.toFixed(1)}</span></div>
             <div>Money: <span className="font-black">${state.money}</span></div>
           </div>
+
+          {multiplayerStatus && (
+            <div className="mt-2 bg-black/40 rounded-lg p-2 text-[11px]">
+              <div>Room: <span className="font-black">{multiplayerRoomId ?? 'offline'}</span></div>
+              <div>Status: <span className="font-black">{multiplayerStatus}</span></div>
+              <div>Peers: <span className="font-black">{multiplayerPeerCount}</span></div>
+              <div>Role: <span className="font-black">{multiplayerIsHost ? 'HOST' : 'CLIENT'}</span></div>
+            </div>
+          )}
 
           <button
             onClick={onResetStateCounter}
