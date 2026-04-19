@@ -20,11 +20,9 @@ const MineWorldScene = React.lazy(() =>
 const OfficeScene = React.lazy(() =>
   import('./OfficeScene').then((module) => ({ default: module.OfficeScene }))
 );
-const CityPlanner = import.meta.env.DEV
-  ? React.lazy(() =>
-      import('./CityPlanner').then((module) => ({ default: module.CityPlanner }))
-    )
-  : null;
+const CityPlanner = React.lazy(() =>
+  import('./CityPlanner').then((module) => ({ default: module.CityPlanner }))
+);
 
 interface GameSceneRouterProps {
   state: GameState;
@@ -199,7 +197,7 @@ export const GameSceneRouter: React.FC<GameSceneRouterProps> = ({
               />
             </React.Suspense>
           </motion.div>
-        ) : renderableScene === 'CITY_PLANNER' && CityPlanner ? (
+        ) : renderableScene === 'CITY_PLANNER' ? (
           <motion.div
             key="planner"
             initial={{ opacity: 0 }}

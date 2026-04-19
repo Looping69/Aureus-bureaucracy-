@@ -84,7 +84,7 @@ const getWorldMapBuildings = (buildings: GameWorldState['buildings']) => buildin
 export default function App() {
   const HOME_POS = getBuildingAccessPosition(BUILDINGS.player_home);
   const hydrateBuildings = React.useCallback(buildHydratedBuildings, []);
-  const plannerEnabled = import.meta.env.DEV;
+  const plannerEnabled = true;
 
   const [state, setState] = useState<GameState>(() => buildInitialGameState());
   const {
@@ -525,6 +525,8 @@ export default function App() {
     );
   }
 
+  const isPlannerScene = state.currentScene === 'CITY_PLANNER';
+
   const handleTravelTo = (buildingId: string) => {
     setState(prev => enterOfficeBuilding(prev, buildingId));
   };
@@ -565,6 +567,83 @@ export default function App() {
     setState(s => enterOfficeBuilding(s, bId));
   };
 
+  const sceneRouter = (
+    <GameSceneRouter
+      state={state}
+      showMinePicker={showMinePicker}
+      showDebug={showDebugPanel}
+      plannerEnabled={plannerEnabled}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onWheel={handleWheel}
+      onMove={handleMove}
+      onDirectMove={handleDirectMove}
+      onMine={handleMine}
+      onMineAction={handleMineAction}
+      onOpenMine={openMineScene}
+      onRest={handleRest}
+      onRecenter={handleRecenter}
+      onSelectMine={handleTravel}
+      onCloseMinePicker={() => setShowMinePicker(false)}
+      onWorldInteract={handleWorldInteract}
+      onApplyAuthoring={(world) => setState(s => applyPlannerWorld(s, world))}
+      onClosePlanner={() => {
+        if (isPlannerHomeSession) {
+          handleExitPlannerToHome();
+          return;
+        }
+        setState(returnToWorldScene);
+      }}
+      onReturnMineToWorld={() => setState(returnToWorldScene)}
+      onCollectMineResource={(amount) => {
+        beginTrackedAction('mine_world_collect');
+        setState(s => addOreToInventory(s, amount));
+      }}
+      onSelectNPC={(id) => setState(s => selectNpc(s, id))}
+      onSelectPermit={(id) => {
+        if (!bureauFilingsUnlocked) return;
+        beginTrackedAction(`select_permit:${id}`);
+        setState(s => selectPermit(s, id));
+      }}
+      onFoundItem={handleFoundItem}
+      onTakePhoto={handleTakePhoto}
+      onExplorationComplete={() => {
+        beginTrackedAction('exploration_complete');
+        setState(closeOfficeExploration);
+      }}
+      onStartExploration={() => {
+        beginTrackedAction('exploration_start');
+        setState(openOfficeExploration);
+      }}
+      onTravelTo={handleTravelTo}
+      onBackToDirectory={() => {
+        beginTrackedAction('back_to_directory');
+        setState(returnOfficeToDirectory);
+      }}
+      onOperationAction={handleOperationAction}
+      suppressInitialWorldFallback={!hasCompletedInitialWorldBoot}
+      showInitialWorldLoadingOverlay={false}
+      onInitialWorldReady={handleInitialWorldReady}
+      onInitialWorldLoadingProgress={handleInitialWorldLoadingProgress}
+      onInitialSceneMounted={handleInitialSceneMounted}
+    />
+  );
+
+  if (isPlannerScene) {
+    return (
+      <div className="relative min-h-[100dvh] overflow-hidden bg-slate-950">
+        {sceneRouter}
+        <LoadingScreen
+          visible={startupLoading.visible}
+          progress={startupLoading.progress}
+          phase={startupLoading.phase}
+        />
+        <LightLoadingOverlay visible={showSceneTransitionLoading} />
+      </div>
+    );
+  }
+
   return (
     <div className="relative min-h-[100dvh] overflow-hidden bg-[#c8d0dc]">
       <div className="pointer-events-none absolute inset-0 opacity-70">
@@ -592,66 +671,7 @@ export default function App() {
               compactFtueHud={isCompactFtueHud}
             />
 
-            <GameSceneRouter
-              state={state}
-              showMinePicker={showMinePicker}
-              showDebug={showDebugPanel}
-              plannerEnabled={plannerEnabled}
-              onPointerDown={handlePointerDown}
-              onPointerMove={handlePointerMove}
-              onPointerUp={handlePointerUp}
-              onWheel={handleWheel}
-              onMove={handleMove}
-              onDirectMove={handleDirectMove}
-              onMine={handleMine}
-              onMineAction={handleMineAction}
-              onOpenMine={openMineScene}
-              onRest={handleRest}
-              onRecenter={handleRecenter}
-              onSelectMine={handleTravel}
-              onCloseMinePicker={() => setShowMinePicker(false)}
-              onWorldInteract={handleWorldInteract}
-              onApplyAuthoring={(world) => setState(s => applyPlannerWorld(s, world))}
-              onClosePlanner={() => {
-                if (isPlannerHomeSession) {
-                  handleExitPlannerToHome();
-                  return;
-                }
-                setState(returnToWorldScene);
-              }}
-              onReturnMineToWorld={() => setState(returnToWorldScene)}
-              onCollectMineResource={(amount) => {
-                beginTrackedAction('mine_world_collect');
-                setState(s => addOreToInventory(s, amount));
-              }}
-              onSelectNPC={(id) => setState(s => selectNpc(s, id))}
-              onSelectPermit={(id) => {
-                if (!bureauFilingsUnlocked) return;
-                beginTrackedAction(`select_permit:${id}`);
-                setState(s => selectPermit(s, id));
-              }}
-              onFoundItem={handleFoundItem}
-              onTakePhoto={handleTakePhoto}
-              onExplorationComplete={() => {
-                beginTrackedAction('exploration_complete');
-                setState(closeOfficeExploration);
-              }}
-              onStartExploration={() => {
-                beginTrackedAction('exploration_start');
-                setState(openOfficeExploration);
-              }}
-              onTravelTo={handleTravelTo}
-              onBackToDirectory={() => {
-                beginTrackedAction('back_to_directory');
-                setState(returnOfficeToDirectory);
-              }}
-              onOperationAction={handleOperationAction}
-              suppressInitialWorldFallback={!hasCompletedInitialWorldBoot}
-              showInitialWorldLoadingOverlay={false}
-              onInitialWorldReady={handleInitialWorldReady}
-              onInitialWorldLoadingProgress={handleInitialWorldLoadingProgress}
-              onInitialSceneMounted={handleInitialSceneMounted}
-            />
+            {sceneRouter}
 
             <LoadingScreen
               visible={startupLoading.visible}

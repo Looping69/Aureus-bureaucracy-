@@ -476,3 +476,12 @@ Original prompt: Okay so there are still so many gaps in the gameplay we need to
     - building overlap probe (pass: `overlaps=0`)
     - building-to-road distance probe stayed within close frontage range for all non-park buildings
     - visual capture in `output/world-road-layout-check.png`
+
+- 2026-04-19 production editor access + desktop planner shell:
+  - Removed the dev-only planner gate in `src/App.tsx` and `src/components/GameSceneRouter.tsx` so the world editor is reachable in production builds from the start screen and the in-game utility drawer.
+  - Split the app shell in `src/App.tsx` so `CITY_PLANNER` renders outside the mobile handset frame; gameplay keeps the phone shell, but the editor now takes the full desktop viewport.
+  - Validation:
+    - `npm run lint` (pass)
+    - `npm run build` (pass)
+    - production preview DOM check confirmed start-screen editor access exists and planner viewport fills `1440x960`
+    - visual capture in `output/editor-production-fullscreen-check.png`
