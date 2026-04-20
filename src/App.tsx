@@ -510,31 +510,6 @@ export default function App() {
     });
   };
 
-  if (!gameStarted) {
-    if (homeScreenView === 'archive') {
-      return (
-        <SaveArchiveScreen
-          saveSlots={saveSlots}
-          onBack={handleBackToStartMenu}
-          onLoadSlot={handleLoadSaveSlot}
-        />
-      );
-    }
-
-    return (
-      <StartScreen
-        hasSave={hasSave}
-        worldProfiles={WORLD_PROFILES}
-        onStartWorld={handleStartNewGame}
-        onContinue={handleOpenArchiveBrowser}
-        onOpenPlanner={handleOpenPlannerFromHome}
-        showPlannerAccess={plannerEnabled}
-      />
-    );
-  }
-
-  const isPlannerScene = state.currentScene === 'CITY_PLANNER';
-
   const handleTravelTo = (buildingId: string) => {
     setState(prev => enterOfficeBuilding(prev, buildingId));
   };
@@ -575,16 +550,16 @@ export default function App() {
     setState(s => enterOfficeBuilding(s, bId));
   };
 
-  const handleEnterBuilding = React.useCallback((buildingId: string) => {
+  const handleEnterBuilding = (buildingId: string) => {
     const building = state.buildings[buildingId];
     if (!building || pendingWorldEntryBuildingId) {
       return;
     }
 
     setPendingWorldEntryBuildingId(buildingId);
-  }, [pendingWorldEntryBuildingId, state.buildings]);
+  };
 
-  const handleWorldEntryTransitionComplete = React.useCallback((buildingId: string) => {
+  const handleWorldEntryTransitionComplete = (buildingId: string) => {
     const building = state.buildings[buildingId];
     setPendingWorldEntryBuildingId((current) => (current === buildingId ? null : current));
 
@@ -600,7 +575,32 @@ export default function App() {
 
     beginTrackedAction(`world_interact_building:${buildingId}`);
     setState((prev) => enterOfficeBuilding(prev, buildingId));
-  }, [state.buildings]);
+  };
+
+  if (!gameStarted) {
+    if (homeScreenView === 'archive') {
+      return (
+        <SaveArchiveScreen
+          saveSlots={saveSlots}
+          onBack={handleBackToStartMenu}
+          onLoadSlot={handleLoadSaveSlot}
+        />
+      );
+    }
+
+    return (
+      <StartScreen
+        hasSave={hasSave}
+        worldProfiles={WORLD_PROFILES}
+        onStartWorld={handleStartNewGame}
+        onContinue={handleOpenArchiveBrowser}
+        onOpenPlanner={handleOpenPlannerFromHome}
+        showPlannerAccess={plannerEnabled}
+      />
+    );
+  }
+
+  const isPlannerScene = state.currentScene === 'CITY_PLANNER';
 
   const sceneRouter = (
     <GameSceneRouter

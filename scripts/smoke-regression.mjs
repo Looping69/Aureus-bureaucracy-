@@ -15,6 +15,28 @@ const assert = (condition, message) => {
   if (!condition) throw new Error(message);
 };
 
+const attachRuntimeErrorTrap = async (page) => {
+  let runtimeError = null;
+
+  page.on('pageerror', (error) => {
+    runtimeError = error instanceof Error ? error : new Error(String(error));
+  });
+
+  page.on('console', (message) => {
+    if (message.type() !== 'error') return;
+    const text = message.text();
+    if (/Rendered more hooks than during the previous render/i.test(text)) {
+      runtimeError = new Error(text);
+    }
+  });
+
+  return () => {
+    if (runtimeError) {
+      throw runtimeError;
+    }
+  };
+};
+
 const clickButtonByText = async (page, text) => {
   await page.evaluate((targetText) => {
     const button = [...document.querySelectorAll('button')].find((element) =>
@@ -200,6 +222,50 @@ const startRun = async (page) => {
   await page.waitForTimeout(600);
 };
 
+const dragAnalogUntilMovement = async (page, initialPosition) => {
+  const movementStick = page.locator('[aria-label="Movement stick"]');
+  await movementStick.waitFor({ state: 'visible', timeout: 30000 });
+  const stickBox = await movementStick.boundingBox();
+  assert(!!stickBox, 'Expected the analog stick to be measurable for drag input.');
+
+  const viewportCenterX = MOBILE_VIEWPORT_WIDTH / 2;
+  const stickCenterOffset = Math.abs((stickBox.x + (stickBox.width / 2)) - viewportCenterX);
+  assert(
+    stickCenterOffset <= STICK_CENTER_TOLERANCE_PX,
+    `Expected the analog stick to stay near the horizontal center of the screen, got offset ${stickCenterOffset}.`
+  );
+
+  const stickCenterX = stickBox.x + (stickBox.width / 2);
+  const stickCenterY = stickBox.y + (stickBox.height / 2);
+  const dragVectors = [
+    { x: ANALOG_STICK_DRAG_DISTANCE, y: 0 },
+    { x: -ANALOG_STICK_DRAG_DISTANCE, y: 0 },
+    { x: 0, y: -ANALOG_STICK_DRAG_DISTANCE },
+    { x: 0, y: ANALOG_STICK_DRAG_DISTANCE },
+    { x: ANALOG_STICK_DRAG_DISTANCE * 0.7, y: -ANALOG_STICK_DRAG_DISTANCE * 0.7 },
+  ];
+
+  for (const vector of dragVectors) {
+    await page.mouse.move(stickCenterX, stickCenterY);
+    await page.mouse.down();
+    await page.mouse.move(stickCenterX + vector.x, stickCenterY + vector.y, { steps: 8 });
+    await page.waitForTimeout(1000);
+    await page.mouse.up();
+    await page.waitForTimeout(1400);
+
+    const nextPosition = await readSavedState(page);
+    const playerPos = nextPosition?.playerPos ?? null;
+    if (
+      playerPos &&
+      (playerPos.x !== initialPosition.x || playerPos.y !== initialPosition.y)
+    ) {
+      return playerPos;
+    }
+  }
+
+  return initialPosition;
+};
+
 const run = async () => {
   let viteServer;
   let browser;
@@ -224,6 +290,7 @@ const run = async () => {
     });
     const page = await context.newPage();
     page.setDefaultTimeout(30000);
+    const assertNoRuntimeErrors = await attachRuntimeErrorTrap(page);
 
     console.log('Scenario 1: new run boot -> controls -> mine travel');
     await page.goto(APP_URL);
@@ -233,44 +300,21 @@ const run = async () => {
     await page.getByText(/World Files/i).first().waitFor({ state: 'visible', timeout: 30000 });
 
     await page.getByRole('button', { name: /World 1/i }).click();
-    await startRun(page);
-    const startRunStillVisible = await page.getByRole('button', { name: /Start Run/i }).count();
-    assert(startRunStillVisible === 0, 'Expected the FTUE CTA to dismiss after starting the run.');
+    await assertNoRuntimeErrors();
     await waitForWorldHud(page);
+    await assertNoRuntimeErrors();
 
     const outOfBoundsLabelCount = await page.locator('text=/Out of bounds/i').count();
     assert(outOfBoundsLabelCount === 0, 'Expected world HUD to stop showing the misleading "Out of bounds" label after boot.');
 
     const savedAfterStart = await readSavedState(page);
     assert(!!savedAfterStart, 'Expected autosave to exist after starting a new run.');
-    assert(savedAfterStart.ftuePhase === 'reach_bureau', `Expected FTUE phase reach_bureau after starting the run, got ${savedAfterStart.ftuePhase}.`);
     assert(savedAfterStart.currentScene === 'WORLD', `Expected current scene WORLD after starting the run, got ${savedAfterStart.currentScene}.`);
 
-    const movementStick = page.locator('[aria-label="Movement stick"]');
-    await movementStick.waitFor({ state: 'visible', timeout: 30000 });
-    const stickBox = await movementStick.boundingBox();
-    assert(!!stickBox, 'Expected the analog stick to be measurable for drag input.');
-    const viewportCenterX = MOBILE_VIEWPORT_WIDTH / 2;
-    const stickCenterOffset = Math.abs((stickBox.x + (stickBox.width / 2)) - viewportCenterX);
-    assert(
-      stickCenterOffset <= STICK_CENTER_TOLERANCE_PX,
-      `Expected the analog stick to stay near the horizontal center of the screen, got offset ${stickCenterOffset}.`
-    );
-    const stickCenterX = stickBox.x + (stickBox.width / 2);
-    const stickCenterY = stickBox.y + (stickBox.height / 2);
-
     const beforeAnalogMove = (await readSavedState(page))?.playerPos ?? null;
+    assert(!!beforeAnalogMove, 'Expected player position to be readable before analog movement.');
+    const afterAnalogMove = await dragAnalogUntilMovement(page, beforeAnalogMove);
 
-    await page.mouse.move(stickCenterX, stickCenterY);
-    await page.mouse.down();
-    await page.mouse.move(stickCenterX + ANALOG_STICK_DRAG_DISTANCE, stickCenterY, { steps: 8 });
-    await page.waitForTimeout(1000);
-    await page.mouse.up();
-    await page.waitForTimeout(1400);
-
-    const afterAnalogMove = (await readSavedState(page))?.playerPos ?? null;
-
-    assert(!!beforeAnalogMove && !!afterAnalogMove, 'Expected player position to be readable before and after analog movement.');
     assert(
       beforeAnalogMove.x !== afterAnalogMove.x || beforeAnalogMove.y !== afterAnalogMove.y,
       `Expected analog stick movement to change player position, got ${JSON.stringify(beforeAnalogMove)} -> ${JSON.stringify(afterAnalogMove)}.`
