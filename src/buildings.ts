@@ -353,6 +353,8 @@ const genStreetNS = new BuildingGenerator();
 genStreetNS.addBox(-4, -7, 0, 4, 6, 0, PAVEMENT);      // sidewalk base
 genStreetNS.addBox(-2, -7, 0, 2, 6, 0, ASPHALT);       // carriageway
 genStreetNS.addBox(0, -7, 0, 0, 6, 0, OFF_WHITE);      // centre line
+genStreetNS.addBox(-6, -7, 0, -5, 6, 0, '#63756a');    // verge left
+genStreetNS.addBox(5, -7, 0, 6, 6, 0, '#63756a');      // verge right
 genStreetNS.addBox(-4, -7, 0, -3, 6, 0, CURB);         // left curb
 genStreetNS.addBox(3, -7, 0, 4, 6, 0, CURB);           // right curb
 export const ROAD_NS_VOXELS = genStreetNS.getVoxels();
@@ -362,6 +364,8 @@ const genStreetEW = new BuildingGenerator();
 genStreetEW.addBox(-7, -4, 0, 6, 4, 0, PAVEMENT);
 genStreetEW.addBox(-7, -2, 0, 6, 2, 0, ASPHALT);
 genStreetEW.addBox(-7, 0, 0, 6, 0, 0, OFF_WHITE);      // centre line along X
+genStreetEW.addBox(-7, -6, 0, 6, -5, 0, '#63756a');    // verge top
+genStreetEW.addBox(-7, 5, 0, 6, 6, 0, '#63756a');      // verge bottom
 genStreetEW.addBox(-7, -4, 0, 6, -3, 0, CURB);         // top curb
 genStreetEW.addBox(-7, 3, 0, 6, 4, 0, CURB);           // bottom curb
 export const ROAD_EW_VOXELS = genStreetEW.getVoxels();
@@ -373,6 +377,10 @@ genStreetX.addBox(-2, -7, 0, 2, 6, 0, ASPHALT);        // NS carriageway
 genStreetX.addBox(-7, -2, 0, 6, 2, 0, ASPHALT);        // EW carriageway
 genStreetX.addBox(0, -7, 0, 0, 6, 0, OFF_WHITE);       // NS centre line
 genStreetX.addBox(-7, 0, 0, 6, 0, 0, OFF_WHITE);       // EW centre line
+genStreetX.addBox(-7, -7, 0, -5, 6, 0, '#63756a');
+genStreetX.addBox(4, -7, 0, 6, 6, 0, '#63756a');
+genStreetX.addBox(-7, -7, 0, 6, -5, 0, '#63756a');
+genStreetX.addBox(-7, 4, 0, 6, 6, 0, '#63756a');
 // curbs in the four corners only
 genStreetX.addBox(-7, -7, 0, -3, -3, 0, CURB);
 genStreetX.addBox(3, -7, 0, 6, -3, 0, CURB);

@@ -15,10 +15,11 @@ import { WorldEnvironmentSystem } from './lighting/WorldEnvironmentSystem';
 import { configureWorldRenderer } from './lighting/WorldRenderAdapter';
 import backgroundData from '../background.json';
 
-export const WORLD_CAMERA_AZIMUTH = Math.PI / 4;
-const WORLD_CAMERA_OFFSET = new THREE.Vector3(20, 30, 20);
+const WORLD_CAMERA_OFFSET = new THREE.Vector3(24, 32, 16);
+export const WORLD_CAMERA_AZIMUTH = Math.atan2(WORLD_CAMERA_OFFSET.x, WORLD_CAMERA_OFFSET.z);
 const WORLD_CAMERA_DISTANCE = WORLD_CAMERA_OFFSET.length();
 const WORLD_CAMERA_POLAR = Math.acos(WORLD_CAMERA_OFFSET.y / WORLD_CAMERA_DISTANCE);
+const WORLD_CAMERA_AZIMUTH_SPREAD = 0.55;
 
 export class VoxelEngine {
   private static readonly ANALOG_MOVE_CONVERGE_THRESHOLD = 0.05;
@@ -77,6 +78,8 @@ export class VoxelEngine {
   private onVoxelEdit?: (newData: VoxelData[]) => void;
   private onHoverPosition?: (pos: WorldHoverInfo | null) => void;
   private onSelect?: (target: WorldHoverInfo, tapCount: number) => void;
+  private onCameraAzimuthChange?: (azimuth: number) => void;
+  private lastReportedCameraAzimuth = WORLD_CAMERA_AZIMUTH;
   
   private animationId: number = 0;
   private lastTime: number = 0;
@@ -110,7 +113,8 @@ export class VoxelEngine {
     onCountChange: (count: number) => void,
     onVoxelEdit?: (newData: VoxelData[]) => void,
     onHoverPosition?: (pos: WorldHoverInfo | null) => void,
-    onSelect?: (target: WorldHoverInfo, tapCount: number) => void
+    onSelect?: (target: WorldHoverInfo, tapCount: number) => void,
+    onCameraAzimuthChange?: (azimuth: number) => void
   ) {
     this.container = container;
     this.onStateChange = onStateChange;
@@ -118,6 +122,7 @@ export class VoxelEngine {
     this.onVoxelEdit = onVoxelEdit;
     this.onHoverPosition = onHoverPosition;
     this.onSelect = onSelect;
+    this.onCameraAzimuthChange = onCameraAzimuthChange;
 
     // Init Three.js
     this.scene = new THREE.Scene();
@@ -156,18 +161,19 @@ export class VoxelEngine {
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.08;
     this.controls.enablePan = false;
-    this.controls.enableRotate = false;
+    this.controls.enableRotate = true;
     this.controls.autoRotate = false;
     this.controls.target.set(0, 0, 0);
     this.controls.minPolarAngle = WORLD_CAMERA_POLAR;
     this.controls.maxPolarAngle = WORLD_CAMERA_POLAR;
-    this.controls.minAzimuthAngle = WORLD_CAMERA_AZIMUTH;
-    this.controls.maxAzimuthAngle = WORLD_CAMERA_AZIMUTH;
+    this.controls.minAzimuthAngle = WORLD_CAMERA_AZIMUTH - WORLD_CAMERA_AZIMUTH_SPREAD;
+    this.controls.maxAzimuthAngle = WORLD_CAMERA_AZIMUTH + WORLD_CAMERA_AZIMUTH_SPREAD;
     this.controls.minDistance = 10;
     this.controls.maxDistance = 100;
     this.controls.zoomSpeed = 1.2;
     this.controls.rotateSpeed = 0.6;
     this.controls.update();
+    this.reportCameraAzimuth(true);
     this.enforceCameraBounds();
 
     // Target Indicator
@@ -429,6 +435,7 @@ export class VoxelEngine {
     this.camera.position.copy(this.currentCameraFocus).add(WORLD_CAMERA_OFFSET);
     this.enforceCameraBounds();
     this.controls.update();
+    this.reportCameraAzimuth(true);
   }
 
   public setObjectiveTarget(target: WorldHoverInfo | null) {
@@ -476,7 +483,11 @@ export class VoxelEngine {
       this.controls.maxDistance
     );
     spherical.phi = WORLD_CAMERA_POLAR;
-    spherical.theta = WORLD_CAMERA_AZIMUTH;
+    spherical.theta = THREE.MathUtils.clamp(
+      spherical.theta,
+      this.controls.minAzimuthAngle,
+      this.controls.maxAzimuthAngle
+    );
 
     offset.setFromSpherical(spherical);
     this.camera.position.copy(this.controls.target).add(offset);
@@ -485,6 +496,20 @@ export class VoxelEngine {
     if (this.camera.position.y < minimumHeight) {
       this.camera.position.y = minimumHeight;
     }
+  }
+
+  private getCameraAzimuth() {
+    const offset = this.camera.position.clone().sub(this.controls.target);
+    return new THREE.Spherical().setFromVector3(offset).theta;
+  }
+
+  private reportCameraAzimuth(force: boolean = false) {
+    const azimuth = this.getCameraAzimuth();
+    if (!force && Math.abs(azimuth - this.lastReportedCameraAzimuth) < 0.0025) {
+      return;
+    }
+    this.lastReportedCameraAzimuth = azimuth;
+    this.onCameraAzimuthChange?.(azimuth);
   }
 
   private clampCameraTargetToWorldBounds() {
@@ -1614,8 +1639,9 @@ export class VoxelEngine {
 
     this.updateCameraFollow(deltaTime);
     this.environment.update(this.time, this.weather, this.currentCameraFocus, deltaTime);
-    this.enforceCameraBounds();
     this.controls.update();
+    this.enforceCameraBounds();
+    this.reportCameraAzimuth();
     this.physicsWorld.step(1 / 60, deltaTime, 3);
     this.updatePhysics(deltaTime);
     this.entities.update(deltaTime, this.time);
@@ -1651,6 +1677,27 @@ export class VoxelEngine {
     if (this.controls) {
         this.controls.autoRotate = enabled;
     }
+  }
+
+  public setCameraAzimuthCallback(callback?: (azimuth: number) => void) {
+    this.onCameraAzimuthChange = callback;
+    this.reportCameraAzimuth(true);
+  }
+
+  public rotateCamera(delta: number) {
+    const offset = this.camera.position.clone().sub(this.controls.target);
+    const spherical = new THREE.Spherical().setFromVector3(offset);
+    spherical.theta = THREE.MathUtils.clamp(
+      spherical.theta + delta,
+      this.controls.minAzimuthAngle,
+      this.controls.maxAzimuthAngle
+    );
+    spherical.phi = WORLD_CAMERA_POLAR;
+    offset.setFromSpherical(spherical);
+    this.camera.position.copy(this.controls.target).add(offset);
+    this.enforceCameraBounds();
+    this.controls.update();
+    this.reportCameraAzimuth(true);
   }
 
   public getJsonData(): string {

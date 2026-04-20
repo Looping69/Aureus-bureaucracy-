@@ -23,6 +23,7 @@ interface VoxelWorldProps {
   onCountChange: (count: number) => void;
   onHoverPosition?: (pos: WorldHoverInfo | null) => void;
   onSelect?: (target: WorldHoverInfo, tapCount: number) => void;
+  onCameraAzimuthChange?: (azimuth: number) => void;
   objectiveTarget?: WorldHoverInfo | null;
   showLoadingOverlay?: boolean;
   onReady?: () => void;
@@ -50,6 +51,7 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
   onCountChange,
   onHoverPosition,
   onSelect,
+  onCameraAzimuthChange,
   objectiveTarget,
   showLoadingOverlay = true,
   onReady,
@@ -114,7 +116,8 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
         onCountChange,
         undefined, // onVoxelEdit
         onHoverPosition,
-        onSelect
+        onSelect,
+        onCameraAzimuthChange
       );
       reportProgress(18, 'Allocating render systems...');
 
@@ -264,6 +267,12 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
       engineRef.current.setObjectiveTarget(objectiveTarget ?? null);
     }
   }, [objectiveTarget]);
+
+  useEffect(() => {
+    if (engineRef.current) {
+      engineRef.current.setCameraAzimuthCallback(onCameraAzimuthChange);
+    }
+  }, [onCameraAzimuthChange]);
 
   useEffect(() => {
     if (engineRef.current) {

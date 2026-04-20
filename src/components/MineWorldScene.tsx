@@ -120,6 +120,7 @@ export const MineWorldScene = ({
 
   const [analogInput, setAnalogInput]   = React.useState<AnalogStickVector>({ x: 0, y: 0, magnitude: 0, active: false });
   const [recenterTrigger, setRecenterTrigger] = React.useState(0);
+  const [cameraAzimuth, setCameraAzimuth] = React.useState(WORLD_CAMERA_AZIMUTH);
   const [hoverInfo, setHoverInfo]       = React.useState<WorldHoverInfo | null>(null);
   const hoverRafRef = React.useRef<number | null>(null);
   const pendingHoverRef = React.useRef<WorldHoverInfo | null>(null);
@@ -136,7 +137,7 @@ export const MineWorldScene = ({
     authoritativePosition: playerPos,
     movementSpeed: state.movementSpeed ?? 1,
     surfaceMap: terrainData.surfaceMap,
-    cameraAzimuth: WORLD_CAMERA_AZIMUTH,
+    cameraAzimuth,
     bounds: { min: 0, max: WORLD_SIZE - 1 },
     onInputStart: (roundedPos) => {
       setPath([]);
@@ -422,6 +423,7 @@ export const MineWorldScene = ({
         onCountChange={() => {}}
         onHoverPosition={handleHoverPosition}
         onSelect={handleWorldSelect}
+        onCameraAzimuthChange={setCameraAzimuth}
         showLoadingOverlay={false}
         playerWorking={isWorking}
         playerCarried={carried}

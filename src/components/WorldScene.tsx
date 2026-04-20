@@ -46,6 +46,7 @@ export const WorldScene = ({
   const [buildingPromptId, setBuildingPromptId] = React.useState<string | null>(null);
   const [recenterTrigger, setRecenterTrigger] = React.useState(0);
   const [analogInput, setAnalogInput] = React.useState<AnalogStickVector>({ x: 0, y: 0, magnitude: 0, active: false });
+  const [cameraAzimuth, setCameraAzimuth] = React.useState(WORLD_CAMERA_AZIMUTH);
   const pendingHoverPosRef = React.useRef<WorldHoverInfo | null>(null);
   const hoverRafRef = React.useRef<number | null>(null);
   const bureauAutoEnterRef = React.useRef(false);
@@ -111,7 +112,7 @@ export const WorldScene = ({
     authoritativePosition: state.playerPos,
     movementSpeed: (state.movementSpeed ?? 1) * movementMultiplier,
     surfaceMap: terrainData.surfaceMap,
-    cameraAzimuth: WORLD_CAMERA_AZIMUTH,
+    cameraAzimuth,
     bounds: { min: 0, max: WORLD_SIZE - 1 },
     onInputStart: onDirectMove,
     onRoundedPositionChange: onDirectMove,
@@ -295,6 +296,7 @@ export const WorldScene = ({
         onCountChange={noopCountChange}
         onHoverPosition={handleHoverPosition}
         onSelect={handleWorldSelect}
+        onCameraAzimuthChange={setCameraAzimuth}
         objectiveTarget={objectiveTarget}
         showLoadingOverlay={showInitialLoadingOverlay}
         onReady={onInitialSceneReady}
@@ -352,7 +354,10 @@ export const WorldScene = ({
         </AnimatePresence>
       </div>
 
-      <div className="absolute bottom-4 right-4">
+      <div className="absolute bottom-4 right-4 flex flex-col items-end gap-2">
+        <div className="rounded-full border border-black/15 bg-white/88 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-slate-700 shadow-lg backdrop-blur-sm">
+          Drag or Q/E to rotate
+        </div>
         <button 
           onClick={(e) => {
             e.stopPropagation();
