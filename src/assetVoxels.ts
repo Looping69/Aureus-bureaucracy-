@@ -63,17 +63,44 @@ const normalizeAssetVoxels = (asset: AssetFile) => {
   }));
 };
 
-export const PLAYER_HOUSE_ASSET_VOXELS = normalizeAssetVoxels(playerHouseAsset);
+const scaleNormalizedAssetVoxels = (
+  voxels: ReturnType<typeof normalizeAssetVoxels>,
+  footprintScale: number,
+  heightScale: number = footprintScale
+) => {
+  const scaled = new Map<string, { id: number; x: number; y: number; z: number; c: string }>();
+
+  voxels.forEach((voxel) => {
+    const nextVoxel = {
+      ...voxel,
+      x: Math.round(voxel.x * footprintScale),
+      y: Math.round(voxel.y * footprintScale),
+      z: Math.max(0, Math.round(voxel.z * heightScale)),
+    };
+    scaled.set(`${nextVoxel.x}:${nextVoxel.y}:${nextVoxel.z}`, nextVoxel);
+  });
+
+  return Array.from(scaled.values()).map((voxel, index) => ({
+    ...voxel,
+    id: index,
+  }));
+};
+
+export const PLAYER_HOUSE_ASSET_VOXELS = scaleNormalizedAssetVoxels(
+  normalizeAssetVoxels(playerHouseAsset),
+  0.8,
+  0.84
+);
 export const LICENSING_OFFICE_ASSET_VOXELS = normalizeAssetVoxels(licensingOfficeAsset);
 export const UNION_HALL_ASSET_VOXELS = normalizeAssetVoxels(unionHallAsset);
 export const INSPECTOR_HQ_ASSET_VOXELS = normalizeAssetVoxels(inspectorHqAsset);
 export const FIXER_DEN_ASSET_VOXELS = normalizeAssetVoxels(fixerDenAsset);
 export const CHIEF_HUT_ASSET_VOXELS = normalizeAssetVoxels(chiefHutAsset);
 export const HOTLINE_BOOTH_ASSET_VOXELS = normalizeAssetVoxels(hotlineBoothAsset);
-export const GENERIC_HOUSE_A_ASSET_VOXELS = normalizeAssetVoxels(genericHouseAAsset);
-export const GENERIC_HOUSE_B_ASSET_VOXELS = normalizeAssetVoxels(genericHouseBAsset);
-export const GENERIC_HOUSE_C_ASSET_VOXELS = normalizeAssetVoxels(genericHouseCAsset);
-export const GENERIC_HOUSE_D_ASSET_VOXELS = normalizeAssetVoxels(genericHouseDAsset);
+export const GENERIC_HOUSE_A_ASSET_VOXELS = scaleNormalizedAssetVoxels(normalizeAssetVoxels(genericHouseAAsset), 0.84, 0.88);
+export const GENERIC_HOUSE_B_ASSET_VOXELS = scaleNormalizedAssetVoxels(normalizeAssetVoxels(genericHouseBAsset), 0.84, 0.88);
+export const GENERIC_HOUSE_C_ASSET_VOXELS = scaleNormalizedAssetVoxels(normalizeAssetVoxels(genericHouseCAsset), 0.84, 0.88);
+export const GENERIC_HOUSE_D_ASSET_VOXELS = scaleNormalizedAssetVoxels(normalizeAssetVoxels(genericHouseDAsset), 0.84, 0.88);
 export const PARK_ASSET_VOXELS = normalizeAssetVoxels(parkAsset);
 export const CITY_HALL_ASSET_VOXELS = normalizeAssetVoxels(cityHallAsset);
 export const LIBRARY_ASSET_VOXELS = normalizeAssetVoxels(libraryAsset);

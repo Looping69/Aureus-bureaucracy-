@@ -1455,27 +1455,31 @@ const normalizeWorldLayout = (buildings: Record<string, Building>) => {
 const occupiedCityCells = new Set<string>();
 
 // ── Road network ─────────────────────────────────────────────────────
-// The modular asset set needs more frontage than the old sparse cross-road
-// offered, so the city now uses a connected 3x3 street grid. Buildings sit on
-// roadside lots instead of floating inside oversized blocks.
+// The city now uses a clear district plan: an outer collector ring and a dense
+// inner street grid. Homes occupy perimeter lots like suburbs, while civic and
+// commercial buildings sit inside the core blocks closer to the center.
 const cityRoadLines: CityCell[][] = [
-  createCityLine({ x: 0, y: 2 }, { x: 10, y: 2 }),
+  createCityLine({ x: 0, y: 1 }, { x: 10, y: 1 }),
+  createCityLine({ x: 0, y: 3 }, { x: 10, y: 3 }),
   createCityLine({ x: 0, y: 5 }, { x: 10, y: 5 }),
-  createCityLine({ x: 0, y: 8 }, { x: 10, y: 8 }),
-  createCityLine({ x: 2, y: 0 }, { x: 2, y: 10 }),
-  createCityLine({ x: 5, y: 0 }, { x: 5, y: 9 }),
-  createCityLine({ x: 8, y: 0 }, { x: 8, y: 10 }),
+  createCityLine({ x: 0, y: 7 }, { x: 10, y: 7 }),
+  createCityLine({ x: 0, y: 9 }, { x: 10, y: 9 }),
+  createCityLine({ x: 1, y: 0 }, { x: 1, y: 10 }),
+  createCityLine({ x: 3, y: 0 }, { x: 3, y: 10 }),
+  createCityLine({ x: 5, y: 0 }, { x: 5, y: 10 }),
+  createCityLine({ x: 7, y: 0 }, { x: 7, y: 10 }),
+  createCityLine({ x: 9, y: 0 }, { x: 9, y: 10 }),
 ];
 
-const cityStreets: Record<string, Building> = createPlacedRoadGrid(cityRoadLines, [2, 5, 8], [2, 5, 8], occupiedCityCells);
+const cityStreets: Record<string, Building> = createPlacedRoadGrid(cityRoadLines, [1, 3, 5, 7, 9], [1, 3, 5, 7, 9], occupiedCityCells);
 
 // ── Building placement ───────────────────────────────────────────────
-// Buildings are placed on lots that face the street grid above.
-// (Y increases upward in the diagram; top row = y 10.)
+// Perimeter even-numbered cells form the suburban rim.
+// Interior even-numbered cells form the civic / commercial core.
 
 const baseBuildings: Record<string, Building> = {
   player_home: createPlacedBuilding(
-    { x: 3, y: 9 },
+    { x: 2, y: 8 },
     {
       id: 'player_home',
       npcId: 'none',
@@ -1487,7 +1491,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   licensing_office: createPlacedBuilding(
-    { x: 7, y: 4 },
+    { x: 6, y: 4 },
     {
       id: 'licensing_office',
       npcId: 'licensing',
@@ -1500,7 +1504,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   union_hall: createPlacedBuilding(
-    { x: 7, y: 7 },
+    { x: 8, y: 4 },
     {
       id: 'union_hall',
       npcId: 'union',
@@ -1513,7 +1517,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   inspector_hq: createPlacedBuilding(
-    { x: 9, y: 1 },
+    { x: 6, y: 2 },
     {
       id: 'inspector_hq',
       npcId: 'inspector',
@@ -1526,7 +1530,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   fixer_den: createPlacedBuilding(
-    { x: 9, y: 9 },
+    { x: 8, y: 8 },
     {
       id: 'fixer_den',
       npcId: 'fixer',
@@ -1538,7 +1542,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   hotline_booth: createPlacedBuilding(
-    { x: 1, y: 4 },
+    { x: 2, y: 4 },
     {
       id: 'hotline_booth',
       npcId: 'journalist',
@@ -1550,7 +1554,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   chief_hut: createPlacedBuilding(
-    { x: 1, y: 3 },
+    { x: 0, y: 2 },
     {
       id: 'chief_hut',
       npcId: 'chief',
@@ -1562,7 +1566,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   mine_entrance: createPlacedBuilding(
-    { x: 5, y: 10 },
+    { x: 4, y: 10 },
     {
       id: 'mine_entrance',
       npcId: 'none',
@@ -1573,7 +1577,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   central_park: createPlacedBuilding(
-    { x: 3, y: 7 },
+    { x: 4, y: 4 },
     {
       id: 'central_park',
       npcId: 'none',
@@ -1588,7 +1592,7 @@ const baseBuildings: Record<string, Building> = {
 
   // ── Extra buildings ────────────────────────────────────────────────
   house_south_a: createPlacedBuilding(
-    { x: 3, y: 1 },
+    { x: 4, y: 8 },
     {
       id: 'house_south_a',
       npcId: 'none',
@@ -1600,7 +1604,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   house_south_b: createPlacedBuilding(
-    { x: 7, y: 1 },
+    { x: 6, y: 8 },
     {
       id: 'house_south_b',
       npcId: 'none',
@@ -1612,7 +1616,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   office_east: createPlacedBuilding(
-    { x: 9, y: 3 },
+    { x: 8, y: 2 },
     {
       id: 'office_east',
       npcId: 'none',
@@ -1624,7 +1628,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   factory_west: createPlacedBuilding(
-    { x: 1, y: 6 },
+    { x: 4, y: 6 },
     {
       id: 'factory_west',
       npcId: 'none',
@@ -1636,7 +1640,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   house_north_a: createPlacedBuilding(
-    { x: 7, y: 9 },
+    { x: 2, y: 0 },
     {
       id: 'house_north_a',
       npcId: 'none',
@@ -1648,7 +1652,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   house_west_c: createPlacedBuilding(
-    { x: 1, y: 9 },
+    { x: 4, y: 0 },
     {
       id: 'house_west_c',
       npcId: 'none',
@@ -1662,7 +1666,7 @@ const baseBuildings: Record<string, Building> = {
 
   // ── NPC residential houses ─────────────────────────────────────────
   house_nw_d: createPlacedBuilding(
-    { x: 4, y: 9 },
+    { x: 6, y: 0 },
     {
       id: 'house_nw_d',
       npcId: 'resident_a',
@@ -1674,7 +1678,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   house_ne_c: createPlacedBuilding(
-    { x: 6, y: 9 },
+    { x: 8, y: 0 },
     {
       id: 'house_ne_c',
       npcId: 'resident_b',
@@ -1686,7 +1690,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   house_sw_e: createPlacedBuilding(
-    { x: 4, y: 3 },
+    { x: 0, y: 6 },
     {
       id: 'house_sw_e',
       npcId: 'resident_c',
@@ -1698,7 +1702,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   house_east_f: createPlacedBuilding(
-    { x: 9, y: 7 },
+    { x: 10, y: 6 },
     {
       id: 'house_east_f',
       npcId: 'resident_d',
@@ -1724,7 +1728,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   tree_se_1: createPlacedBuilding(
-    { x: 10, y: 0 },
+    { x: 10, y: 10 },
     {
       id: 'tree_se_1',
       npcId: 'none',
@@ -1736,7 +1740,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   garden_east: createPlacedBuilding(
-    { x: 10, y: 7 },
+    { x: 10, y: 4 },
     {
       id: 'garden_east',
       npcId: 'none',
@@ -1748,7 +1752,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   tree_ne_1: createPlacedBuilding(
-    { x: 10, y: 10 },
+    { x: 10, y: 0 },
     {
       id: 'tree_ne_1',
       npcId: 'none',
@@ -1760,7 +1764,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   bush_w_1: createPlacedBuilding(
-    { x: 0, y: 4 },
+    { x: 0, y: 8 },
     {
       id: 'bush_w_1',
       npcId: 'none',
@@ -1784,7 +1788,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   garden_center: createPlacedBuilding(
-    { x: 4, y: 6 },
+    { x: 2, y: 6 },
     {
       id: 'garden_center',
       npcId: 'none',
@@ -1796,7 +1800,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   tree_mid_east: createPlacedBuilding(
-    { x: 7, y: 6 },
+    { x: 8, y: 10 },
     {
       id: 'tree_mid_east',
       npcId: 'none',
@@ -1812,7 +1816,7 @@ const baseBuildings: Record<string, Building> = {
 
   // ── Large civic filler buildings ───────────────────────────────────
   asset_tower_a: createPlacedBuilding(
-    { x: 0, y: 3 },
+    { x: 2, y: 2 },
     {
       id: 'asset_tower_a',
       npcId: 'none',
@@ -1824,7 +1828,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   asset_block_b: createPlacedBuilding(
-    { x: 3, y: 6 },
+    { x: 4, y: 2 },
     {
       id: 'asset_block_b',
       npcId: 'none',
@@ -1836,7 +1840,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   asset_hall_c: createPlacedBuilding(
-    { x: 9, y: 6 },
+    { x: 8, y: 6 },
     {
       id: 'asset_hall_c',
       npcId: 'none',
@@ -1848,7 +1852,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   asset_depot_d: createPlacedBuilding(
-    { x: 10, y: 4 },
+    { x: 6, y: 6 },
     {
       id: 'asset_depot_d',
       npcId: 'none',
@@ -1860,7 +1864,7 @@ const baseBuildings: Record<string, Building> = {
     occupiedCityCells
   ),
   asset_quarters_e: createPlacedBuilding(
-    { x: 6, y: 3 },
+    { x: 10, y: 2 },
     {
       id: 'asset_quarters_e',
       npcId: 'none',
