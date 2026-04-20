@@ -33,6 +33,7 @@ export class MinHeap<T> {
   private bubbleUp(index: number) {
     const { heap, compare } = this;
     while (index > 0) {
+      // Parent is at floor((index - 1) / 2)
       const parentIndex = (index - 1) >> 1;
       if (compare(heap[index], heap[parentIndex]) >= 0) break;
       [heap[index], heap[parentIndex]] = [heap[parentIndex], heap[index]];
