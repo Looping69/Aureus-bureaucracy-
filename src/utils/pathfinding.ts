@@ -6,6 +6,7 @@ import {
   type SurfaceTile,
   type WorldSurfaceMap,
 } from './worldSurface';
+import { MinHeap } from './MinHeap';
 
 export interface PathNode {
   x: number;
@@ -24,6 +25,8 @@ export interface PathTileFilterContext {
 export interface FindPathOptions {
   tileFilter?: (context: PathTileFilterContext) => boolean;
   nearestTileFilter?: (context: PathTileFilterContext) => boolean;
+  /** Pre-built surface map – avoids a redundant buildWorldSurfaceMap call. */
+  surfaceMap?: WorldSurfaceMap;
 }
 
 const STRAIGHT_COST = 1;
@@ -166,7 +169,7 @@ const findPathOnGrid = (
   surfaceMap: WorldSurfaceMap,
   tileFilter?: (context: PathTileFilterContext) => boolean
 ): WorldPosition[] => {
-  const openList: PathNode[] = [];
+  const openHeap = new MinHeap<PathNode>((a, b) => a.f - b.f);
   const openMap = new Map<string, PathNode>();
   const closed = new Set<string>();
 
@@ -187,21 +190,19 @@ const findPathOnGrid = (
   };
   startNode.f = startNode.g + startNode.h;
 
-  openList.push(startNode);
+  openHeap.push(startNode);
   openMap.set(keyFor(start.x, start.y), startNode);
 
-  while (openList.length > 0) {
-    let currentIndex = 0;
-    for (let i = 1; i < openList.length; i++) {
-      if (openList[i].f < openList[currentIndex].f) {
-        currentIndex = i;
-      }
-    }
+  while (openHeap.size > 0) {
+    const current = openHeap.pop()!;
+    const currentKey = keyFor(current.x, current.y);
 
-    const current = openList[currentIndex];
-    openList.splice(currentIndex, 1);
-    openMap.delete(keyFor(current.x, current.y));
-    closed.add(keyFor(current.x, current.y));
+    // Skip stale entries (node was already superseded by a better path)
+    if (closed.has(currentKey)) {
+      continue;
+    }
+    openMap.delete(currentKey);
+    closed.add(currentKey);
 
     if (current.x === end.x && current.y === end.y) {
       return reconstructPath(current);
@@ -247,7 +248,7 @@ const findPathOnGrid = (
       const g = current.g + direction.cost + nextSurface.cost + heightDelta * 0.4;
       const existing = openMap.get(nextKey);
 
-      if (!existing) {
+      if (!existing || g < existing.g) {
         const node: PathNode = {
           x: nextX,
           y: nextY,
@@ -257,12 +258,8 @@ const findPathOnGrid = (
           parent: current,
         };
         node.f = node.g + node.h;
-        openList.push(node);
+        openHeap.push(node);
         openMap.set(nextKey, node);
-      } else if (g < existing.g) {
-        existing.g = g;
-        existing.f = existing.g + existing.h;
-        existing.parent = current;
       }
     }
   }
@@ -278,7 +275,7 @@ export const findPath = (
   navigationZones: NavigationZone[] = [],
   options: FindPathOptions = {}
 ): WorldPosition[] => {
-  const surfaceMap = buildWorldSurfaceMap(buildings, mapSize, navigationZones);
+  const surfaceMap = options.surfaceMap ?? buildWorldSurfaceMap(buildings, mapSize, navigationZones);
   const blocked = buildBlockedTiles(surfaceMap);
 
   const startTile = getNearestAllowedTile(

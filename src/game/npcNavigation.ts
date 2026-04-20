@@ -231,6 +231,7 @@ export const buildNpcPedestrianPath = (
   const surfaceMap = buildWorldSurfaceMap(buildings, mapSize, navigationZones);
 
   return findPath(routeStart, routeEnd, buildings, mapSize, navigationZones, {
+    surfaceMap,
     tileFilter: ({ tile }) => isNpcPedestrianTile(tile, buildings, allowedBuildingIds, surfaceMap),
     nearestTileFilter: ({ tile }) => isNpcPedestrianTile(tile, buildings, allowedBuildingIds, surfaceMap),
   });
