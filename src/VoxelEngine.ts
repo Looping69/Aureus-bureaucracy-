@@ -14,6 +14,7 @@ import { BuildingFootprint } from './utils/worldNavigation';
 import { WorldEnvironmentSystem } from './lighting/WorldEnvironmentSystem';
 import { configureWorldRenderer } from './lighting/WorldRenderAdapter';
 import backgroundData from '../background.json';
+import { toLogicalWorldY, toRenderedWorldY, WORLD_RENDER_Y_OFFSET } from './game/worldPresentation';
 
 const WORLD_CAMERA_OFFSET = new THREE.Vector3(24, 32, 16);
 export const WORLD_CAMERA_AZIMUTH = Math.atan2(WORLD_CAMERA_OFFSET.x, WORLD_CAMERA_OFFSET.z);
@@ -111,6 +112,10 @@ export class VoxelEngine {
   private introCameraActive: boolean = false;
   private introCameraElapsed: number = 0;
 
+  private getRenderedFocus(source: THREE.Vector3) {
+    return source.clone().setY(toRenderedWorldY(source.y));
+  }
+
   constructor(
     container: HTMLElement, 
     onStateChange: (state: AppState) => void,
@@ -136,8 +141,10 @@ export class VoxelEngine {
     });
 
     this.terrainGroup = new THREE.Group();
+    this.terrainGroup.position.y = WORLD_RENDER_Y_OFFSET;
     this.scene.add(this.terrainGroup);
     this.pickupGroup = new THREE.Group();
+    this.pickupGroup.position.y = WORLD_RENDER_Y_OFFSET;
     this.scene.add(this.pickupGroup);
     this.pickupGeometry = new THREE.BoxGeometry(CONFIG.VOXEL_SIZE, CONFIG.VOXEL_SIZE, CONFIG.VOXEL_SIZE);
     this.pickupMaterial = new THREE.MeshStandardMaterial({
@@ -152,7 +159,7 @@ export class VoxelEngine {
     const height = this.container.clientHeight || window.innerHeight;
 
     this.camera = new THREE.PerspectiveCamera(50, width / height, 0.5, 2000);
-    this.camera.position.copy(WORLD_CAMERA_OFFSET);
+    this.camera.position.copy(new THREE.Vector3(WORLD_CAMERA_OFFSET.x, toRenderedWorldY(WORLD_CAMERA_OFFSET.y), WORLD_CAMERA_OFFSET.z));
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     this.renderer.setClearColor(0x000000, 0); // Transparent background
@@ -200,7 +207,7 @@ export class VoxelEngine {
     const planeMat = new THREE.MeshBasicMaterial({ color: 0xe2e8f0 });
     this.floor = new THREE.Mesh(new THREE.PlaneGeometry(WORLD_SIZE * 4, WORLD_SIZE * 4), planeMat);
     this.floor.rotation.x = -Math.PI / 2;
-    this.floor.position.y = CONFIG.FLOOR_Y - 3.01; // Just below terrain + edge buildings
+    this.floor.position.y = toRenderedWorldY(CONFIG.FLOOR_Y - 3.01); // Just below terrain + edge buildings
     this.scene.add(this.floor);
     this.environment = new WorldEnvironmentSystem(this.scene, this.floor, this.renderer);
 
@@ -214,7 +221,7 @@ export class VoxelEngine {
       0x94a3b8,
       0x64748b
     );
-    this.worldGrid.position.set(-0.5, CONFIG.FLOOR_Y + 0.02, -0.5);
+    this.worldGrid.position.set(-0.5, toRenderedWorldY(CONFIG.FLOOR_Y + 0.02), -0.5);
     const gridMaterial = this.worldGrid.material as THREE.Material | THREE.Material[];
     const materials = Array.isArray(gridMaterial) ? gridMaterial : [gridMaterial];
     materials.forEach((material) => {
@@ -230,6 +237,7 @@ export class VoxelEngine {
     // boundary so that the edges of the playable area look like a distant
     // cityscape / industrial horizon fading into fog.
     this.edgeGroup = new THREE.Group();
+    this.edgeGroup.position.y = WORLD_RENDER_Y_OFFSET;
     this.buildEdgeDecorations();
     this.scene.add(this.edgeGroup);
 
@@ -280,6 +288,7 @@ export class VoxelEngine {
 
     // Entities (Player, Buildings, etc)
     this.entities = new EntityManager(this.scene);
+    this.entities.entityGroup.position.y = WORLD_RENDER_Y_OFFSET;
 
     // Events - store bound references for cleanup
     this.boundPointerMove = this.onPointerMove.bind(this);
@@ -382,8 +391,9 @@ export class VoxelEngine {
       this.entities.player.group.position.copy(this.currentPlayerPos);
       this.targetCameraFocus.copy(this.currentPlayerPos);
       this.currentCameraFocus.copy(this.currentPlayerPos);
-      this.controls.target.copy(this.currentCameraFocus);
-      this.camera.position.copy(this.currentCameraFocus).add(
+      const renderedFocus = this.getRenderedFocus(this.currentCameraFocus);
+      this.controls.target.copy(renderedFocus);
+      this.camera.position.copy(renderedFocus).add(
         WORLD_CAMERA_OFFSET.clone().multiplyScalar(WORLD_CAMERA_INTRO_START_MULTIPLIER)
       );
       this.introCameraElapsed = 0;
@@ -399,12 +409,12 @@ export class VoxelEngine {
       if (Math.abs(dx) > 0.01 || Math.abs(dz) > 0.01) {
         this.targetRotationY = Math.atan2(-dx, -dz);
       }
-      this.targetIndicator.position.set(targetX, CONFIG.FLOOR_Y + 0.05, targetZ);
+      this.targetIndicator.position.set(targetX, toRenderedWorldY(CONFIG.FLOOR_Y + 0.05), targetZ);
       this.targetIndicator.visible = true;
 
       if (path && path.length > 0) {
-        const points = [new THREE.Vector3(x, CONFIG.FLOOR_Y + 0.1, z)];
-        path.forEach(p => points.push(new THREE.Vector3(p.x - WORLD_HALF_SIZE, CONFIG.FLOOR_Y + 0.1, p.y - WORLD_HALF_SIZE)));
+        const points = [new THREE.Vector3(x, toRenderedWorldY(CONFIG.FLOOR_Y + 0.1), z)];
+        path.forEach(p => points.push(new THREE.Vector3(p.x - WORLD_HALF_SIZE, toRenderedWorldY(CONFIG.FLOOR_Y + 0.1), p.y - WORLD_HALF_SIZE)));
         
         // Dispose old geometry and create new one to avoid "Buffer size too small" warning
         this.pathLine.geometry.dispose();
@@ -445,8 +455,9 @@ export class VoxelEngine {
     this.cancelIntroCameraAnimation();
     this.targetCameraFocus.copy(this.currentPlayerPos);
     this.currentCameraFocus.copy(this.currentPlayerPos);
-    this.controls.target.copy(this.currentCameraFocus);
-    this.camera.position.copy(this.currentCameraFocus).add(WORLD_CAMERA_OFFSET);
+    const renderedFocus = this.getRenderedFocus(this.currentCameraFocus);
+    this.controls.target.copy(renderedFocus);
+    this.camera.position.copy(renderedFocus).add(WORLD_CAMERA_OFFSET);
     this.enforceCameraBounds();
     this.controls.update();
     this.reportCameraAzimuth(true);
@@ -458,7 +469,11 @@ export class VoxelEngine {
       return;
     }
 
-    this.objectiveSelector.position.set(target.x - WORLD_HALF_SIZE, target.z + 0.06, target.y - WORLD_HALF_SIZE);
+    this.objectiveSelector.position.set(
+      target.x - WORLD_HALF_SIZE,
+      toRenderedWorldY(target.z) + 0.06,
+      target.y - WORLD_HALF_SIZE
+    );
     this.objectiveSelector.visible = true;
   }
 
@@ -484,7 +499,7 @@ export class VoxelEngine {
       deltaTime
     );
 
-    this.controls.target.copy(this.currentCameraFocus);
+    this.controls.target.copy(this.getRenderedFocus(this.currentCameraFocus));
 
     if (!this.introCameraActive) {
       return;
@@ -506,7 +521,7 @@ export class VoxelEngine {
         )
       );
 
-    this.camera.position.copy(this.currentCameraFocus).add(introOffset);
+    this.camera.position.copy(this.getRenderedFocus(this.currentCameraFocus)).add(introOffset);
 
     if (progress >= 1) {
       this.introCameraActive = false;
@@ -831,7 +846,7 @@ export class VoxelEngine {
     return {
       x: Math.round(pos.x + WORLD_HALF_SIZE),
       y: Math.round(pos.z + WORLD_HALF_SIZE),
-      z: Math.round(pos.y),
+      z: Math.round(toLogicalWorldY(pos.y)),
       renderX: Math.round(pos.x),
       renderZ: Math.round(pos.z),
       renderY: Math.round(pos.y),
@@ -938,7 +953,11 @@ export class VoxelEngine {
       return;
     }
 
-    this.hoverSelector.position.set(target.x - WORLD_HALF_SIZE, target.z + 0.03, target.y - WORLD_HALF_SIZE);
+    this.hoverSelector.position.set(
+      target.x - WORLD_HALF_SIZE,
+      toRenderedWorldY(target.z) + 0.03,
+      target.y - WORLD_HALF_SIZE
+    );
     this.hoverSelector.visible = true;
   }
 

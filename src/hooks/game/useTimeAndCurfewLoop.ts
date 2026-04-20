@@ -4,8 +4,7 @@ import { GameState } from '../../types';
 import { applyDailyEconomyTick } from '../../game/economy';
 import { applyExhaustionCollapse } from '../../game/exhaustion';
 import { advanceWeatherState, getWeatherAmbientEffects } from '../../game/weatherSystem';
-
-const DAY_NIGHT_TIME_SCALE = 0.08;
+import { getAmbientTimeStep } from '../../game/worldPresentation';
 
 interface UseTimeAndCurfewLoopArgs {
   setState: React.Dispatch<React.SetStateAction<GameState>>;
@@ -19,7 +18,7 @@ export const useTimeAndCurfewLoop = ({ setState, setNotification, homePos, enabl
     if (!enabled) return;
     const timer = setInterval(() => {
       setState(prev => {
-        const ambientTimeStep = (prev.time >= 20 || prev.time < 6 ? 0.2 : 0.04) * DAY_NIGHT_TIME_SCALE;
+        const ambientTimeStep = getAmbientTimeStep(prev.time);
         let newTime = prev.time + ambientTimeStep;
         let newDay = prev.day;
         let newExposure = prev.meters.exposure;
