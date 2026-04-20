@@ -30,3 +30,5 @@
 2026-04-20: Removed the bottom-right rotate hint pill from `src/components/WorldScene.tsx` to keep the world HUD cleaner while leaving camera rotation controls intact.
 2026-04-20: Increased passive in-game time pace via shared `src/game/worldPresentation.ts` helper and lifted the rendered world stack by 1 voxel in `src/VoxelEngine.ts` so terrain/overlays stop sitting visually below the baseline. Added regression coverage in `src/game/worldPresentation.test.ts`.
 2026-04-20: Lifted generated terrain heights by one step in `src/utils/worldSurface.ts` so sunken grass lots render closer to the road/building plane instead of disappearing at the isometric camera angle.
+2026-04-20: Corrected lowered terrain visuals in src/utils/worldSurface.ts so CLIFF tiles keep a grassy top surface instead of rendering grey stone across the entire lowered lot.
+2026-04-20: Unified natural terrain palettes in `src/utils/worldSurface.ts` so ground, park, and cliff tiles all render as green earth across every visible layer regardless of elevation.

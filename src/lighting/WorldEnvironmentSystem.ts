@@ -4,7 +4,11 @@ import { getCelestialPosition, getDaylightFactor, getMoonlightFactor, getTwiligh
 
 const SUN_DISTANCE = 150;
 const SHADOW_CAMERA_HALF_EXTENT = 90;
-const PRECIPITATION_COUNT = 420;
+const PRECIPITATION_COUNT = 900;
+const PRECIPITATION_BASE_SPREAD = 22;
+const PRECIPITATION_STORM_SPREAD = 28;
+const PRECIPITATION_MIN_HEIGHT = 10;
+const PRECIPITATION_MAX_HEIGHT = 34;
 
 export class WorldEnvironmentSystem {
   private scene: THREE.Scene;
@@ -42,6 +46,7 @@ export class WorldEnvironmentSystem {
   };
   private focus = new THREE.Vector3();
   private lightningFlash = 0;
+  private precipitationActive = false;
 
   constructor(scene: THREE.Scene, floor: THREE.Mesh, _renderer: THREE.WebGLRenderer) {
     this.scene = scene;
@@ -115,28 +120,35 @@ export class WorldEnvironmentSystem {
   }
 
   private createPrecipitationSystem() {
-    const geometry = new THREE.BoxGeometry(0.06, 1.4, 0.06);
+    const geometry = new THREE.BoxGeometry(0.12, 2.4, 0.12);
     const material = new THREE.MeshBasicMaterial({
       color: 0x8fcbff,
       transparent: true,
-      opacity: 0.55,
+      opacity: 0.7,
       fog: false,
     });
     const mesh = new THREE.InstancedMesh(geometry, material, PRECIPITATION_COUNT);
     mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     mesh.visible = false;
+    mesh.frustumCulled = false;
 
     for (let index = 0; index < PRECIPITATION_COUNT; index += 1) {
-      this.precipitationDummy.position.set(
-        (Math.random() - 0.5) * 50,
-        Math.random() * 75,
-        (Math.random() - 0.5) * 50,
-      );
-      this.precipitationDummy.updateMatrix();
-      mesh.setMatrixAt(index, this.precipitationDummy.matrix);
+      this.resetPrecipitationParticle(mesh, index, true);
     }
 
     return mesh;
+  }
+
+  private resetPrecipitationParticle(mesh: THREE.InstancedMesh, index: number, randomizeHeight: boolean) {
+    const spread = this.weather.current === 'STORM' ? PRECIPITATION_STORM_SPREAD : PRECIPITATION_BASE_SPREAD;
+    this.precipitationDummy.position.set(
+      this.focus.x + ((Math.random() - 0.5) * spread * 2),
+      (randomizeHeight ? Math.random() : 1) * (PRECIPITATION_MAX_HEIGHT - PRECIPITATION_MIN_HEIGHT) + PRECIPITATION_MIN_HEIGHT,
+      this.focus.z + ((Math.random() - 0.5) * spread * 2),
+    );
+    this.precipitationDummy.scale.setScalar(this.weather.current === 'STORM' ? 1.2 : 1);
+    this.precipitationDummy.updateMatrix();
+    mesh.setMatrixAt(index, this.precipitationDummy.matrix);
   }
 
   private calculateTargets(timeOfDay: number, weather: WeatherState) {
@@ -296,11 +308,18 @@ export class WorldEnvironmentSystem {
       this.weather.current === 'STORM' ||
       this.weather.current === 'ACID_RAIN';
     this.precipitationSystem.visible = rainyWeather;
+    if (rainyWeather && !this.precipitationActive) {
+      for (let index = 0; index < this.precipitationSystem.count; index += 1) {
+        this.resetPrecipitationParticle(this.precipitationSystem, index, true);
+      }
+      this.precipitationSystem.instanceMatrix.needsUpdate = true;
+    }
+    this.precipitationActive = rainyWeather;
     if (!rainyWeather) return;
 
     const material = this.precipitationSystem.material as THREE.MeshBasicMaterial;
     material.color.setHex(this.weather.current === 'ACID_RAIN' ? 0xb4ff59 : 0x96d7ff);
-    material.opacity = this.weather.current === 'STORM' ? 0.8 : (0.45 + this.weather.intensity * 0.25);
+    material.opacity = this.weather.current === 'STORM' ? 0.92 : (0.62 + this.weather.intensity * 0.24);
 
     const fallSpeed =
       this.weather.current === 'STORM'
@@ -308,7 +327,7 @@ export class WorldEnvironmentSystem {
         : this.weather.current === 'ACID_RAIN'
           ? 44
           : 34;
-    const spread = this.weather.current === 'STORM' ? 44 : 36;
+    const spread = this.weather.current === 'STORM' ? PRECIPITATION_STORM_SPREAD : PRECIPITATION_BASE_SPREAD;
 
     for (let index = 0; index < this.precipitationSystem.count; index += 1) {
       this.precipitationSystem.getMatrixAt(index, this.precipitationDummy.matrix);
@@ -322,7 +341,7 @@ export class WorldEnvironmentSystem {
       this.precipitationDummy.position.x -= dt * (this.weather.current === 'STORM' ? 6 : 3);
 
       if (this.precipitationDummy.position.y < -4) {
-        this.precipitationDummy.position.y = 60 + Math.random() * 20;
+        this.precipitationDummy.position.y = PRECIPITATION_MIN_HEIGHT + Math.random() * (PRECIPITATION_MAX_HEIGHT - PRECIPITATION_MIN_HEIGHT);
         this.precipitationDummy.position.x = this.focus.x + ((Math.random() - 0.5) * spread * 2);
         this.precipitationDummy.position.z = this.focus.z + ((Math.random() - 0.5) * spread * 2);
       }
