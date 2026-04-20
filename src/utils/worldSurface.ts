@@ -35,6 +35,7 @@ export interface WorldSurfaceMap {
 const MAX_SURFACE_HEIGHT = 0;
 const MIN_SURFACE_HEIGHT = -3;
 const TERRAIN_LAYERS = 4;
+const TERRAIN_HEIGHT_LIFT = 1;
 
 const WALKABLE_COSTS: Record<SurfaceKind, number> = {
   GROUND: 1.65,
@@ -85,7 +86,7 @@ const terrainHeightAt = (x: number, y: number, mapSize: number = WORLD_SIZE) => 
     Math.cos((x - y) * 0.11) * 0.25 +
     Math.sin((x * 0.07) + (y * 0.05)) * 0.2;
 
-  return quantizeHeight(tier + wobble);
+  return quantizeHeight(tier + wobble + TERRAIN_HEIGHT_LIFT);
 };
 
 const isInsideFootprint = (

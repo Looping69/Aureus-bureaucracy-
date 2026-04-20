@@ -29,3 +29,4 @@
 2026-04-20: Added a one-shot spawn camera intro in `src/VoxelEngine.ts` so the world now opens far out and zooms cleanly into the player before normal camera control takes over.
 2026-04-20: Removed the bottom-right rotate hint pill from `src/components/WorldScene.tsx` to keep the world HUD cleaner while leaving camera rotation controls intact.
 2026-04-20: Increased passive in-game time pace via shared `src/game/worldPresentation.ts` helper and lifted the rendered world stack by 1 voxel in `src/VoxelEngine.ts` so terrain/overlays stop sitting visually below the baseline. Added regression coverage in `src/game/worldPresentation.test.ts`.
+2026-04-20: Lifted generated terrain heights by one step in `src/utils/worldSurface.ts` so sunken grass lots render closer to the road/building plane instead of disappearing at the isometric camera angle.
