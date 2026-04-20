@@ -117,6 +117,7 @@ export default function App() {
   const [lastActionMs, setLastActionMs] = useState(0);
   const [showSceneTransitionLoading, setShowSceneTransitionLoading] = useState(false);
   const [tutorialUnreadCount, setTutorialUnreadCount] = useState(0);
+  const [pendingWorldEntryBuildingId, setPendingWorldEntryBuildingId] = useState<string | null>(null);
   const queuedFeedbackRef = useRef<RelationshipFeedback[]>([]);
   const isDraggingRef = useRef(false);
   const dragDistanceRef = useRef(0);
@@ -168,6 +169,7 @@ export default function App() {
     if (!gameStarted) {
       previousSceneRef.current = null;
       setShowSceneTransitionLoading(false);
+      setPendingWorldEntryBuildingId(null);
       return;
     }
 
@@ -193,6 +195,12 @@ export default function App() {
 
     return () => window.clearTimeout(timer);
   }, [gameStarted, hasCompletedInitialWorldBoot, state.currentScene]);
+
+  useEffect(() => {
+    if (state.currentScene !== 'WORLD' && pendingWorldEntryBuildingId) {
+      setPendingWorldEntryBuildingId(null);
+    }
+  }, [pendingWorldEntryBuildingId, state.currentScene]);
 
   useEffect(() => {
     setStateUpdateCount(c => c + 1);
@@ -567,6 +575,33 @@ export default function App() {
     setState(s => enterOfficeBuilding(s, bId));
   };
 
+  const handleEnterBuilding = React.useCallback((buildingId: string) => {
+    const building = state.buildings[buildingId];
+    if (!building || pendingWorldEntryBuildingId) {
+      return;
+    }
+
+    setPendingWorldEntryBuildingId(buildingId);
+  }, [pendingWorldEntryBuildingId, state.buildings]);
+
+  const handleWorldEntryTransitionComplete = React.useCallback((buildingId: string) => {
+    const building = state.buildings[buildingId];
+    setPendingWorldEntryBuildingId((current) => (current === buildingId ? null : current));
+
+    if (!building) {
+      return;
+    }
+
+    if (building.type === 'MINE_ENTRANCE') {
+      beginTrackedAction(`enter_mine_world:${buildingId}`);
+      setState((prev) => enterMineWorldScene(prev, buildingId));
+      return;
+    }
+
+    beginTrackedAction(`world_interact_building:${buildingId}`);
+    setState((prev) => enterOfficeBuilding(prev, buildingId));
+  }, [state.buildings]);
+
   const sceneRouter = (
     <GameSceneRouter
       state={state}
@@ -587,6 +622,7 @@ export default function App() {
       onSelectMine={handleTravel}
       onCloseMinePicker={() => setShowMinePicker(false)}
       onWorldInteract={handleWorldInteract}
+      onEnterBuilding={handleEnterBuilding}
       onApplyAuthoring={(world) => setState(s => applyPlannerWorld(s, world))}
       onClosePlanner={() => {
         if (isPlannerHomeSession) {
@@ -627,6 +663,8 @@ export default function App() {
       onInitialWorldReady={handleInitialWorldReady}
       onInitialWorldLoadingProgress={handleInitialWorldLoadingProgress}
       onInitialSceneMounted={handleInitialSceneMounted}
+      entryTransitionBuildingId={pendingWorldEntryBuildingId}
+      onEntryTransitionComplete={handleWorldEntryTransitionComplete}
     />
   );
 

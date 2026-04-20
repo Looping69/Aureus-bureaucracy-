@@ -1,8 +1,8 @@
 import { BUILDINGS, INITIAL_NPCS } from '../src/data';
 import { WORLD_SIZE } from '../src/utils/voxelConstants';
-import { findPath } from '../src/utils/pathfinding';
 import { getBuildingAccessPosition, getBuildingFootprint } from '../src/utils/worldNavigation';
 import { buildWorldSurfaceMap, getWorldSurfaceTile } from '../src/utils/worldSurface';
+import { buildNpcPedestrianPath } from '../src/game/npcNavigation';
 
 const overlaps = (
   a: { minX: number; maxX: number; minY: number; maxY: number },
@@ -55,15 +55,16 @@ Object.values(INITIAL_NPCS).forEach((npc) => {
     return;
   }
 
-  const path = findPath(
-    getBuildingAccessPosition(home),
-    getBuildingAccessPosition(work),
+  const pedestrianPath = buildNpcPedestrianPath(
+    npc,
     BUILDINGS,
     WORLD_SIZE,
-    []
+    [],
+    getBuildingAccessPosition(home),
+    getBuildingAccessPosition(work),
   );
 
-  if (path.length === 0) {
+  if (pedestrianPath.length === 0) {
     issues.push(`no-path:${npc.id}`);
   }
 });

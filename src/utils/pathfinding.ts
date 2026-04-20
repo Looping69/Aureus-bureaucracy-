@@ -2,8 +2,8 @@ import { Building, NavigationZone, WorldPosition } from '../types';
 import { WORLD_SIZE } from './voxelConstants';
 import {
   buildWorldSurfaceMap,
-  getNearestWalkableTile,
   getWorldSurfaceTile,
+  type SurfaceTile,
   type WorldSurfaceMap,
 } from './worldSurface';
 
@@ -14,6 +14,16 @@ export interface PathNode {
   h: number;
   f: number;
   parent: PathNode | null;
+}
+
+export interface PathTileFilterContext {
+  tile: SurfaceTile;
+  surfaceMap: WorldSurfaceMap;
+}
+
+export interface FindPathOptions {
+  tileFilter?: (context: PathTileFilterContext) => boolean;
+  nearestTileFilter?: (context: PathTileFilterContext) => boolean;
 }
 
 const STRAIGHT_COST = 1;
@@ -64,6 +74,22 @@ const buildBlockedTiles = (surfaceMap: WorldSurfaceMap) => {
   return blocked;
 };
 
+const matchesTileFilter = (
+  tile: SurfaceTile | null,
+  surfaceMap: WorldSurfaceMap,
+  tileFilter?: (context: PathTileFilterContext) => boolean
+) => {
+  if (!tile) {
+    return false;
+  }
+
+  if (!tileFilter) {
+    return true;
+  }
+
+  return tileFilter({ tile, surfaceMap });
+};
+
 const isInBounds = (x: number, y: number, mapSize: number) =>
   x >= 0 && x < mapSize && y >= 0 && y < mapSize;
 
@@ -72,14 +98,52 @@ const canOccupyTile = (
   y: number,
   blocked: Set<string>,
   mapSize: number,
-  surfaceMap: WorldSurfaceMap
+  surfaceMap: WorldSurfaceMap,
+  tileFilter?: (context: PathTileFilterContext) => boolean
 ) => {
   if (!isInBounds(x, y, mapSize) || blocked.has(keyFor(x, y))) {
     return false;
   }
 
   const tile = getWorldSurfaceTile(surfaceMap, x, y);
-  return Boolean(tile?.walkable);
+  return Boolean(tile?.walkable) && matchesTileFilter(tile, surfaceMap, tileFilter);
+};
+
+const getNearestAllowedTile = (
+  target: WorldPosition,
+  surfaceMap: WorldSurfaceMap,
+  maxRadius: number = 12,
+  tileFilter?: (context: PathTileFilterContext) => boolean
+) => {
+  const startTile = getWorldSurfaceTile(surfaceMap, target.x, target.y);
+  if (startTile?.walkable && matchesTileFilter(startTile, surfaceMap, tileFilter)) {
+    return startTile;
+  }
+
+  for (let radius = 1; radius <= maxRadius; radius += 1) {
+    const ring: SurfaceTile[] = [];
+
+    for (let dx = -radius; dx <= radius; dx += 1) {
+      const top = getWorldSurfaceTile(surfaceMap, target.x + dx, target.y - radius);
+      const bottom = getWorldSurfaceTile(surfaceMap, target.x + dx, target.y + radius);
+      if (top) ring.push(top);
+      if (bottom) ring.push(bottom);
+    }
+
+    for (let dy = -radius + 1; dy <= radius - 1; dy += 1) {
+      const left = getWorldSurfaceTile(surfaceMap, target.x - radius, target.y + dy);
+      const right = getWorldSurfaceTile(surfaceMap, target.x + radius, target.y + dy);
+      if (left) ring.push(left);
+      if (right) ring.push(right);
+    }
+
+    const candidate = ring.find((tile) => tile.walkable && matchesTileFilter(tile, surfaceMap, tileFilter));
+    if (candidate) {
+      return candidate;
+    }
+  }
+
+  return null;
 };
 
 const reconstructPath = (node: PathNode) => {
@@ -99,7 +163,8 @@ const findPathOnGrid = (
   end: WorldPosition,
   blocked: Set<string>,
   mapSize: number,
-  surfaceMap: WorldSurfaceMap
+  surfaceMap: WorldSurfaceMap,
+  tileFilter?: (context: PathTileFilterContext) => boolean
 ): WorldPosition[] => {
   const openList: PathNode[] = [];
   const openMap = new Map<string, PathNode>();
@@ -156,7 +221,7 @@ const findPathOnGrid = (
         continue;
       }
 
-      if (!canOccupyTile(nextX, nextY, blocked, mapSize, surfaceMap)) {
+      if (!canOccupyTile(nextX, nextY, blocked, mapSize, surfaceMap, tileFilter)) {
         continue;
       }
 
@@ -172,8 +237,8 @@ const findPathOnGrid = (
 
       if (direction.x !== 0 && direction.y !== 0) {
         if (
-          !canOccupyTile(current.x + direction.x, current.y, blocked, mapSize, surfaceMap) ||
-          !canOccupyTile(current.x, current.y + direction.y, blocked, mapSize, surfaceMap)
+          !canOccupyTile(current.x + direction.x, current.y, blocked, mapSize, surfaceMap, tileFilter) ||
+          !canOccupyTile(current.x, current.y + direction.y, blocked, mapSize, surfaceMap, tileFilter)
         ) {
           continue;
         }
@@ -210,13 +275,24 @@ export const findPath = (
   end: WorldPosition,
   buildings: Record<string, Building>,
   mapSize: number = WORLD_SIZE,
-  navigationZones: NavigationZone[] = []
+  navigationZones: NavigationZone[] = [],
+  options: FindPathOptions = {}
 ): WorldPosition[] => {
   const surfaceMap = buildWorldSurfaceMap(buildings, mapSize, navigationZones);
   const blocked = buildBlockedTiles(surfaceMap);
 
-  const startTile = getNearestWalkableTile(clampWorldPosition(start, mapSize), surfaceMap);
-  const endTile = getNearestWalkableTile(clampWorldPosition(end, mapSize), surfaceMap);
+  const startTile = getNearestAllowedTile(
+    clampWorldPosition(start, mapSize),
+    surfaceMap,
+    12,
+    options.nearestTileFilter ?? options.tileFilter
+  );
+  const endTile = getNearestAllowedTile(
+    clampWorldPosition(end, mapSize),
+    surfaceMap,
+    12,
+    options.nearestTileFilter ?? options.tileFilter
+  );
 
   if (!startTile || !endTile) {
     return [];
@@ -231,5 +307,5 @@ export const findPath = (
 
   blocked.delete(keyFor(startPos.x, startPos.y));
 
-  return findPathOnGrid(startPos, endPos, blocked, mapSize, surfaceMap);
+  return findPathOnGrid(startPos, endPos, blocked, mapSize, surfaceMap, options.tileFilter);
 };

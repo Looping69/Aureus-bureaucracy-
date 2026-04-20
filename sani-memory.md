@@ -32,3 +32,5 @@
 2026-04-20: Lifted generated terrain heights by one step in `src/utils/worldSurface.ts` so sunken grass lots render closer to the road/building plane instead of disappearing at the isometric camera angle.
 2026-04-20: Corrected lowered terrain visuals in src/utils/worldSurface.ts so CLIFF tiles keep a grassy top surface instead of rendering grey stone across the entire lowered lot.
 2026-04-20: Unified natural terrain palettes in `src/utils/worldSurface.ts` so ground, park, and cliff tiles all render as green earth across every visible layer regardless of elevation.
+2026-04-20: Added pedestrian-only NPC routing and off-duty roaming (`src/game/npcNavigation.ts`, `src/EntityManager.ts`, `src/utils/pathfinding.ts`) so NPCs stay on sidewalks/frontage connectors, only cross at intersections, and walk at a capped player-matched pace. Updated planner/layout validation and added `src/game/npcNavigation.test.ts`.
+- 2026-04-20: Started world-entry first-person transition work. Added failing camera-plan tests in `src/game/worldEntryCamera.test.ts` to define the target pose before wiring engine/runtime behavior.

@@ -43,6 +43,7 @@ interface GameSceneRouterProps {
   onSelectMine: (mineId: string) => void;
   onCloseMinePicker: () => void;
   onWorldInteract: (npcId: string, buildingId: string) => void;
+  onEnterBuilding: (buildingId: string) => void;
   onApplyAuthoring: (world: CompiledAuthoringWorld) => void;
   onClosePlanner: () => void;
   onReturnMineToWorld: () => void;
@@ -61,6 +62,8 @@ interface GameSceneRouterProps {
   onInitialWorldReady?: () => void;
   onInitialWorldLoadingProgress?: (progress: number, phase: string) => void;
   onInitialSceneMounted?: (scene: GameScene) => void;
+  entryTransitionBuildingId?: string | null;
+  onEntryTransitionComplete?: (buildingId: string) => void;
 }
 
 const SceneMountSignal = ({
@@ -98,6 +101,7 @@ export const GameSceneRouter: React.FC<GameSceneRouterProps> = ({
   onSelectMine,
   onCloseMinePicker,
   onWorldInteract,
+  onEnterBuilding,
   onApplyAuthoring,
   onClosePlanner,
   onReturnMineToWorld,
@@ -115,7 +119,9 @@ export const GameSceneRouter: React.FC<GameSceneRouterProps> = ({
   showInitialWorldLoadingOverlay = true,
   onInitialWorldReady,
   onInitialWorldLoadingProgress,
-  onInitialSceneMounted
+  onInitialSceneMounted,
+  entryTransitionBuildingId = null,
+  onEntryTransitionComplete
 }) => {
   const sceneLoading = <LightLoadingOverlay />;
   const renderableScene = getRenderableScene(state.currentScene, plannerEnabled);
@@ -189,9 +195,12 @@ export const GameSceneRouter: React.FC<GameSceneRouterProps> = ({
                 onMove={onMove}
                 onDirectMove={onDirectMove}
                 onInteract={onWorldInteract}
+                onEnterBuilding={onEnterBuilding}
                 onRecenter={onRecenter}
                 showDebug={showDebug}
                 showInitialLoadingOverlay={showInitialWorldLoadingOverlay}
+                entryTransitionBuildingId={entryTransitionBuildingId}
+                onEntryTransitionComplete={onEntryTransitionComplete}
                 onInitialSceneReady={onInitialWorldReady}
                 onInitialLoadingProgress={onInitialWorldLoadingProgress}
               />

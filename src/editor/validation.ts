@@ -1,11 +1,11 @@
 import { WORLD_SIZE } from '../utils/voxelConstants';
-import { findPath } from '../utils/pathfinding';
 import { getBuildingAccessPosition } from '../utils/buildingAccess';
 import { getBuildingFootprint } from '../utils/worldNavigation';
 import { buildWorldSurfaceMap, getWorldSurfaceTile } from '../utils/worldSurface';
 import { compileAuthoringScene } from './compiler';
 import { AuthoringScene, EditorValidationIssue } from './types';
 import { NPC } from '../types';
+import { buildNpcPedestrianPath } from '../game/npcNavigation';
 
 const overlaps = (
   a: { minX: number; maxX: number; minY: number; maxY: number },
@@ -112,12 +112,13 @@ export const validateAuthoringScene = (
       const home = compiled.buildings[npc.homeBuildingId];
       const work = compiled.buildings[npc.workBuildingId];
       if (home && work && home.id !== work.id) {
-        const path = findPath(
-          getBuildingAccessPosition(home),
-          getBuildingAccessPosition(work),
+        const path = buildNpcPedestrianPath(
+          npc,
           compiled.buildings,
           WORLD_SIZE,
-          compiled.navigationZones
+          compiled.navigationZones,
+          getBuildingAccessPosition(home),
+          getBuildingAccessPosition(work)
         );
         if (path.length === 0) {
           issues.push({

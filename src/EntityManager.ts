@@ -9,7 +9,12 @@ import {
   getBuildingHeight,
   getStructureBaseHeight,
 } from './utils/worldNavigation';
-import { findPath } from './utils/pathfinding';
+import {
+  buildNpcPedestrianPath,
+  chooseNpcRoamingDestination,
+  collectNpcRoamingDestinations,
+  NPC_WALK_SPEED,
+} from './game/npcNavigation';
 
 // NPC colour palettes so each resident looks distinct
 const NPC_PALETTES: Record<string, { shirt: number; pants: number; hair: number; skin: number; shoes: number; belt: number }> = {
@@ -31,11 +36,13 @@ interface NpcMovementState {
   workPos: WorldPosition;
   workStart: number;
   workEnd: number;
-  pathToWork: WorldPosition[];
-  pathToHome: WorldPosition[];
-  phase: 'AT_HOME' | 'COMMUTING_TO_WORK' | 'AT_WORK' | 'COMMUTING_HOME';
+  phase: 'AT_WORK' | 'COMMUTING_TO_WORK' | 'OFF_DUTY_IDLE' | 'OFF_DUTY_WALK';
+  currentPos: WorldPosition;
+  activePath: WorldPosition[];
   pathIndex: number;
-  moveTick: number;
+  idleTimeRemaining: number;
+  roamDestinations: WorldPosition[];
+  lastRoamDestination: WorldPosition | null;
 }
 
 export class EntityManager {
@@ -47,7 +54,9 @@ export class EntityManager {
   private lightPool: THREE.PointLight[] = [];
   private MAX_LIGHTS = 8;
   private npcMovement: Map<string, NpcMovementState> = new Map();
+  private npcData: Record<string, NPC> = {};
   private buildingsData: Record<string, Building> = {};
+  private navigationZones: NavigationZone[] = [];
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
@@ -172,10 +181,12 @@ export class EntityManager {
     navigationZones: NavigationZone[] = []
   ) {
     this.npcMovement.clear();
+    this.npcData = allNpcs;
+    this.buildingsData = buildings;
+    this.navigationZones = navigationZones;
 
     for (const npc of Object.values(allNpcs)) {
       if (!npc.homeBuildingId || !npc.workBuildingId) continue;
-      if (npc.homeBuildingId === npc.workBuildingId) continue;
 
       const homeBuilding = buildings[npc.homeBuildingId];
       const workBuilding = buildings[npc.workBuildingId];
@@ -183,11 +194,7 @@ export class EntityManager {
 
       const homePos = getBuildingAccessPosition(homeBuilding);
       const workPos = getBuildingAccessPosition(workBuilding);
-
-      const pathToWork = findPath(homePos, workPos, buildings, undefined, navigationZones);
-      const pathToHome = findPath(workPos, homePos, buildings, undefined, navigationZones);
-
-      if (pathToWork.length === 0 && pathToHome.length === 0) continue;
+      const roamDestinations = collectNpcRoamingDestinations(npc, buildings);
 
       this.npcMovement.set(npc.id, {
         npcId: npc.id,
@@ -195,118 +202,242 @@ export class EntityManager {
         workPos,
         workStart: npc.workHours.start,
         workEnd: npc.workHours.end,
-        pathToWork,
-        pathToHome,
-        phase: 'AT_HOME',
+        phase: 'OFF_DUTY_IDLE',
+        currentPos: { ...homePos },
+        activePath: [],
         pathIndex: 0,
-        moveTick: 0,
+        idleTimeRemaining: 0.6,
+        roamDestinations,
+        lastRoamDestination: null,
       });
     }
   }
 
-  /** Advance NPC commuting based on current game time (called every frame). */
-  private updateNpcCommute(time: number) {
+  private isWorkTime(state: NpcMovementState, time: number) {
+    if (state.workStart === state.workEnd) {
+      return true;
+    }
+
+    const wrapsAround = state.workStart > state.workEnd;
+    return wrapsAround
+      ? time >= state.workStart || time < state.workEnd
+      : time >= state.workStart && time < state.workEnd;
+  }
+
+  private isWithinPreWorkLead(state: NpcMovementState, time: number, leadHours: number = 1) {
+    if (state.workStart === state.workEnd) {
+      return true;
+    }
+
+    const normalizedDelta = (state.workStart - time + 24) % 24;
+    return normalizedDelta > 0 && normalizedDelta <= leadHours;
+  }
+
+  private positionsClose(a: WorldPosition, b: WorldPosition, tolerance: number = 0.05) {
+    return Math.hypot(a.x - b.x, a.y - b.y) <= tolerance;
+  }
+
+  private setNpcPhase(state: NpcMovementState, phase: NpcMovementState['phase']) {
+    state.phase = phase;
+    if (phase !== 'OFF_DUTY_WALK') {
+      state.activePath = [];
+      state.pathIndex = 0;
+    }
+  }
+
+  private routeNpc(
+    npc: NPC,
+    state: NpcMovementState,
+    destination: WorldPosition,
+    phase: NpcMovementState['phase']
+  ) {
+    const route = buildNpcPedestrianPath(
+      npc,
+      this.buildingsData,
+      undefined,
+      this.navigationZones,
+      { x: Math.round(state.currentPos.x), y: Math.round(state.currentPos.y) },
+      destination
+    );
+
+    state.activePath = route;
+    state.pathIndex = 0;
+    state.phase = phase;
+
+    if (route.length === 0) {
+      state.currentPos = { ...destination };
+    }
+  }
+
+  private beginOffDutyWander(npc: NPC, state: NpcMovementState) {
+    const destination = chooseNpcRoamingDestination(
+      state.currentPos,
+      state.roamDestinations,
+      state.lastRoamDestination
+    );
+
+    if (!destination) {
+      this.setNpcPhase(state, 'OFF_DUTY_IDLE');
+      state.idleTimeRemaining = 1;
+      return;
+    }
+
+    this.routeNpc(npc, state, destination, 'OFF_DUTY_WALK');
+
+    if (state.activePath.length === 0) {
+      state.lastRoamDestination = destination;
+      this.setNpcPhase(state, 'OFF_DUTY_IDLE');
+      state.idleTimeRemaining = 0.8 + Math.random() * 1.4;
+    }
+  }
+
+  /** Advance NPC movement based on current game time (called every frame). */
+  private updateNpcCommute(deltaTime: number, time: number) {
     this.npcMovement.forEach((state) => {
       const npcChar = this.npcs.get(state.npcId);
-      if (!npcChar) return;
+      const npcData = this.npcData[state.npcId];
+      if (!npcChar || !npcData) return;
 
-      // Determine whether NPC should be commuting, at work, or at home
-      const commuteLeadTime = 1; // leave 1 hour before work starts
-      const wrapsAround = state.workStart > state.workEnd;
-      const isWorkTime = wrapsAround
-        ? time >= state.workStart || time < state.workEnd
-        : time >= state.workStart && time < state.workEnd;
-      const isCommuteToWork = wrapsAround
-        ? time >= (state.workStart - commuteLeadTime + 24) % 24 && time < state.workStart
-        : time >= state.workStart - commuteLeadTime && time < state.workStart;
-      const isCommuteHome = wrapsAround
-        ? time >= state.workEnd && time < state.workEnd + commuteLeadTime
-        : time >= state.workEnd && time < state.workEnd + commuteLeadTime;
-
-      const prevPhase = state.phase;
-
-      if (isCommuteToWork && state.phase === 'AT_HOME') {
-        state.phase = 'COMMUTING_TO_WORK';
-        state.pathIndex = 0;
-        state.moveTick = 0;
-      } else if (isWorkTime && (state.phase === 'COMMUTING_TO_WORK' || state.phase === 'AT_HOME')) {
-        state.phase = 'AT_WORK';
-        state.pathIndex = 0;
-        state.moveTick = 0;
-      } else if (isCommuteHome && state.phase === 'AT_WORK') {
-        state.phase = 'COMMUTING_HOME';
-        state.pathIndex = 0;
-        state.moveTick = 0;
-      } else if (!isWorkTime && !isCommuteToWork && !isCommuteHome && state.phase !== 'AT_HOME' && state.phase !== 'COMMUTING_HOME') {
-        state.phase = 'AT_HOME';
-        state.pathIndex = 0;
-        state.moveTick = 0;
-      }
-
-      // If phase just changed, handle snap to destination
-      if (prevPhase !== state.phase) {
-        if (state.phase === 'AT_WORK') {
-          this.placeNpcAt(npcChar, state.workPos);
-          npcChar.setMoving(false);
-        } else if (state.phase === 'AT_HOME') {
-          this.placeNpcAt(npcChar, state.homePos);
-          npcChar.setMoving(false);
-        }
-      }
-
-      // Animate commuting
-      if (state.phase === 'COMMUTING_TO_WORK') {
-        this.advanceNpcAlongPath(npcChar, state, state.pathToWork, 'AT_WORK', state.workPos);
-      } else if (state.phase === 'COMMUTING_HOME') {
-        this.advanceNpcAlongPath(npcChar, state, state.pathToHome, 'AT_HOME', state.homePos);
-      }
+      this.updateNpcMovementState(npcData, npcChar, state, deltaTime, time);
     });
+  }
+
+  private updateNpcMovementState(
+    npcData: NPC,
+    npcChar: VoxelCharacter,
+    state: NpcMovementState,
+    deltaTime: number,
+    time: number
+  ) {
+    const shouldHeadToWork = this.isWorkTime(state, time) || this.isWithinPreWorkLead(state, time);
+
+    if (shouldHeadToWork) {
+      if (this.positionsClose(state.currentPos, state.workPos)) {
+        state.currentPos = { ...state.workPos };
+        this.setNpcPhase(state, 'AT_WORK');
+        this.placeNpcAt(npcChar, state.workPos);
+        npcChar.setMoving(false);
+        return;
+      }
+
+      if (state.phase !== 'COMMUTING_TO_WORK' || state.activePath.length === 0) {
+        this.routeNpc(npcData, state, state.workPos, 'COMMUTING_TO_WORK');
+      }
+
+      this.advanceNpcAlongPath(npcChar, state, deltaTime, 'AT_WORK', state.workPos);
+      return;
+    }
+
+    if (state.phase === 'COMMUTING_TO_WORK' || state.phase === 'AT_WORK') {
+      this.setNpcPhase(state, 'OFF_DUTY_IDLE');
+      state.idleTimeRemaining = 0.8;
+    }
+
+    if (state.phase === 'OFF_DUTY_WALK') {
+      const destination = state.activePath[state.activePath.length - 1] ?? state.currentPos;
+      this.advanceNpcAlongPath(npcChar, state, deltaTime, 'OFF_DUTY_IDLE', destination);
+      const phaseAfterMove = state.phase as NpcMovementState['phase'];
+      if (phaseAfterMove === 'OFF_DUTY_IDLE') {
+        state.lastRoamDestination = { x: Math.round(destination.x), y: Math.round(destination.y) };
+        state.idleTimeRemaining = 0.8 + Math.random() * 1.4;
+      }
+      return;
+    }
+
+    state.idleTimeRemaining -= deltaTime;
+    if (state.idleTimeRemaining <= 0) {
+      this.beginOffDutyWander(npcData, state);
+      const phaseAfterWanderPick = state.phase as NpcMovementState['phase'];
+      if (phaseAfterWanderPick === 'OFF_DUTY_WALK') {
+        this.advanceNpcAlongPath(
+          npcChar,
+          state,
+          deltaTime,
+          'OFF_DUTY_IDLE',
+          state.activePath[state.activePath.length - 1] ?? state.currentPos
+        );
+      } else {
+        this.placeNpcAtFloat(npcChar, state.currentPos);
+        npcChar.setMoving(false);
+      }
+      return;
+    }
+
+    this.placeNpcAtFloat(npcChar, state.currentPos);
+    npcChar.setMoving(false);
   }
 
   private advanceNpcAlongPath(
     npcChar: VoxelCharacter,
     state: NpcMovementState,
-    path: WorldPosition[],
+    deltaTime: number,
     endPhase: NpcMovementState['phase'],
     endPos: WorldPosition
   ) {
-    if (path.length === 0) {
+    const path = state.activePath;
+    if (path.length === 0 || state.pathIndex >= path.length) {
+      state.phase = endPhase;
+      state.currentPos = { ...endPos };
+      this.placeNpcAt(npcChar, endPos);
+      npcChar.setMoving(false);
+      return;
+    }
+
+    let remainingDistance = NPC_WALK_SPEED * deltaTime;
+    let moved = false;
+
+    while (remainingDistance > 0 && state.pathIndex < path.length) {
+      const target = path[state.pathIndex];
+      const dx = target.x - state.currentPos.x;
+      const dy = target.y - state.currentPos.y;
+      const segmentDistance = Math.hypot(dx, dy);
+
+      if (segmentDistance <= 0.0001) {
+        state.currentPos = { ...target };
+        state.pathIndex += 1;
+        continue;
+      }
+
+      npcChar.group.rotation.y = Math.atan2(dx, -dy);
+      moved = true;
+
+      if (remainingDistance >= segmentDistance) {
+        state.currentPos = { ...target };
+        state.pathIndex += 1;
+        remainingDistance -= segmentDistance;
+        continue;
+      }
+
+      state.currentPos = {
+        x: state.currentPos.x + (dx / segmentDistance) * remainingDistance,
+        y: state.currentPos.y + (dy / segmentDistance) * remainingDistance,
+      };
+      remainingDistance = 0;
+    }
+
+    if (state.pathIndex >= path.length) {
+      state.currentPos = { ...endPos };
+      state.activePath = [];
+      state.pathIndex = 0;
       state.phase = endPhase;
       this.placeNpcAt(npcChar, endPos);
       npcChar.setMoving(false);
       return;
     }
 
-    // Move one step every few ticks (controlled by moveTick)
-    state.moveTick += 1;
-    const TICKS_PER_STEP = 4; // advance one path node every 4 update cycles
-    if (state.moveTick < TICKS_PER_STEP) return;
-    state.moveTick = 0;
-
-    if (state.pathIndex < path.length) {
-      const target = path[state.pathIndex];
-      this.placeNpcAt(npcChar, target);
-      npcChar.setMoving(true);
-
-      // Face direction of movement
-      if (state.pathIndex > 0) {
-        const prev = path[state.pathIndex - 1];
-        const dx = target.x - prev.x;
-        const dy = target.y - prev.y;
-        if (dx !== 0 || dy !== 0) {
-          npcChar.group.rotation.y = Math.atan2(dx, -dy);
-        }
-      }
-
-      state.pathIndex += 1;
-    } else {
-      state.phase = endPhase;
-      this.placeNpcAt(npcChar, endPos);
-      npcChar.setMoving(false);
-    }
+    this.placeNpcAtFloat(npcChar, state.currentPos);
+    npcChar.setMoving(moved);
   }
 
   private placeNpcAt(npcChar: VoxelCharacter, pos: WorldPosition) {
+    npcChar.group.position.set(
+      pos.x - WORLD_HALF_SIZE,
+      CONFIG.FLOOR_Y + 0.5,
+      pos.y - WORLD_HALF_SIZE
+    );
+  }
+
+  private placeNpcAtFloat(npcChar: VoxelCharacter, pos: WorldPosition) {
     npcChar.group.position.set(
       pos.x - WORLD_HALF_SIZE,
       CONFIG.FLOOR_Y + 0.5,
@@ -319,7 +450,7 @@ export class EntityManager {
     this.npcs.forEach(npc => npc.update(deltaTime));
 
     // Advance NPC commuting
-    this.updateNpcCommute(time);
+    this.updateNpcCommute(deltaTime, time);
 
     // Update light pool based on proximity to player
     const isNight = time >= 19 || time < 6;

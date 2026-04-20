@@ -15,6 +15,7 @@ import { WorldEnvironmentSystem } from './lighting/WorldEnvironmentSystem';
 import { configureWorldRenderer } from './lighting/WorldRenderAdapter';
 import backgroundData from '../background.json';
 import { toLogicalWorldY, toRenderedWorldY, WORLD_RENDER_Y_OFFSET } from './game/worldPresentation';
+import { createWorldEntryCameraPlan, sampleWorldEntryCameraPlan, WorldEntryCameraPlan } from './game/worldEntryCamera';
 
 const WORLD_CAMERA_OFFSET = new THREE.Vector3(24, 32, 16);
 export const WORLD_CAMERA_AZIMUTH = Math.atan2(WORLD_CAMERA_OFFSET.x, WORLD_CAMERA_OFFSET.z);
@@ -111,6 +112,10 @@ export class VoxelEngine {
   private requestedPlayerMoving: boolean = false;
   private introCameraActive: boolean = false;
   private introCameraElapsed: number = 0;
+  private worldEntryCameraPlan: WorldEntryCameraPlan | null = null;
+  private worldEntryCameraElapsed: number = 0;
+  private worldEntryBuildingId: string | null = null;
+  private onWorldEntryTransitionComplete?: (buildingId: string) => void;
 
   private getRenderedFocus(source: THREE.Vector3) {
     return source.clone().setY(toRenderedWorldY(source.y));
@@ -319,6 +324,9 @@ export class VoxelEngine {
   }
 
   public moveCamera(dx: number, dz: number) {
+    if (this.worldEntryCameraPlan) {
+      return;
+    }
     this.cancelIntroCameraAnimation();
 
     // Move camera relative to its current orientation for intuitive WASD controls
@@ -341,6 +349,9 @@ export class VoxelEngine {
   }
 
   public zoomCamera(delta: number) {
+    if (this.worldEntryCameraPlan) {
+      return;
+    }
     this.cancelIntroCameraAnimation();
 
     const zoomSpeed = 3;
@@ -452,6 +463,9 @@ export class VoxelEngine {
   }
 
   public recenterOnPlayer() {
+    if (this.worldEntryCameraPlan) {
+      return;
+    }
     this.cancelIntroCameraAnimation();
     this.targetCameraFocus.copy(this.currentPlayerPos);
     this.currentCameraFocus.copy(this.currentPlayerPos);
@@ -477,6 +491,44 @@ export class VoxelEngine {
     this.objectiveSelector.visible = true;
   }
 
+  public startWorldEntryTransition({
+    buildingId,
+    lookTarget,
+    onComplete,
+  }: {
+    buildingId: string;
+    lookTarget: { x: number; y: number; z: number };
+    onComplete?: (buildingId: string) => void;
+  }) {
+    if (this.worldEntryBuildingId === buildingId && this.worldEntryCameraPlan) {
+      return;
+    }
+
+    this.cancelIntroCameraAnimation();
+    this.controls.enabled = false;
+    this.worldEntryBuildingId = buildingId;
+    this.onWorldEntryTransitionComplete = onComplete;
+    this.worldEntryCameraElapsed = 0;
+    this.worldEntryCameraPlan = createWorldEntryCameraPlan({
+      orbitCameraPosition: {
+        x: this.camera.position.x,
+        y: toLogicalWorldY(this.camera.position.y),
+        z: this.camera.position.z,
+      },
+      orbitCameraTarget: {
+        x: this.controls.target.x,
+        y: toLogicalWorldY(this.controls.target.y),
+        z: this.controls.target.z,
+      },
+      playerPosition: {
+        x: this.currentPlayerPos.x,
+        y: this.currentPlayerPos.y,
+        z: this.currentPlayerPos.z,
+      },
+      buildingLookTarget: lookTarget,
+    });
+  }
+
   private updateCameraFollow(deltaTime: number) {
     this.targetCameraFocus.copy(this.currentPlayerPos);
 
@@ -500,6 +552,37 @@ export class VoxelEngine {
     );
 
     this.controls.target.copy(this.getRenderedFocus(this.currentCameraFocus));
+
+    if (this.worldEntryCameraPlan) {
+      this.worldEntryCameraElapsed = Math.min(
+        this.worldEntryCameraElapsed + deltaTime,
+        this.worldEntryCameraPlan.duration
+      );
+
+      const sample = sampleWorldEntryCameraPlan(this.worldEntryCameraPlan, this.worldEntryCameraElapsed);
+      this.controls.target.set(
+        sample.lookTarget.x,
+        toRenderedWorldY(sample.lookTarget.y),
+        sample.lookTarget.z
+      );
+      this.camera.position.set(
+        sample.position.x,
+        toRenderedWorldY(sample.position.y),
+        sample.position.z
+      );
+
+      if (sample.progress >= 1) {
+        const completedBuildingId = this.worldEntryBuildingId;
+        this.worldEntryCameraPlan = null;
+        this.worldEntryBuildingId = null;
+        this.worldEntryCameraElapsed = 0;
+        this.controls.enabled = true;
+        if (completedBuildingId) {
+          this.onWorldEntryTransitionComplete?.(completedBuildingId);
+        }
+      }
+      return;
+    }
 
     if (!this.introCameraActive) {
       return;
@@ -1708,8 +1791,10 @@ export class VoxelEngine {
 
     this.updateCameraFollow(deltaTime);
     this.environment.update(this.time, this.weather, this.currentCameraFocus, deltaTime);
-    this.controls.update();
-    this.enforceCameraBounds();
+    if (!this.worldEntryCameraPlan) {
+      this.controls.update();
+      this.enforceCameraBounds();
+    }
     this.reportCameraAzimuth();
     this.physicsWorld.step(1 / 60, deltaTime, 3);
     this.updatePhysics(deltaTime);
@@ -1754,6 +1839,9 @@ export class VoxelEngine {
   }
 
   public rotateCamera(delta: number) {
+    if (this.worldEntryCameraPlan) {
+      return;
+    }
     this.cancelIntroCameraAnimation();
     const offset = this.camera.position.clone().sub(this.controls.target);
     const spherical = new THREE.Spherical().setFromVector3(offset);

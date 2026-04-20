@@ -25,9 +25,12 @@ export const WorldScene = ({
   onMove, 
   onDirectMove,
   onInteract,
+  onEnterBuilding,
   onRecenter,
   showDebug = false,
   showInitialLoadingOverlay = true,
+  entryTransitionBuildingId = null,
+  onEntryTransitionComplete,
   onInitialSceneReady,
   onInitialLoadingProgress
 }: { 
@@ -35,9 +38,12 @@ export const WorldScene = ({
   onMove: (pos: WorldPosition, options?: { ignoreDrag?: boolean }) => void,
   onDirectMove: (pos: WorldPosition) => void,
   onInteract: (npcId: string, buildingId: string) => void,
+  onEnterBuilding: (buildingId: string) => void,
   onRecenter: () => void,
   showDebug?: boolean,
   showInitialLoadingOverlay?: boolean,
+  entryTransitionBuildingId?: string | null,
+  onEntryTransitionComplete?: (buildingId: string) => void,
   onInitialSceneReady?: () => void,
   onInitialLoadingProgress?: (progress: number, phase: string) => void
 }) => {
@@ -56,6 +62,7 @@ export const WorldScene = ({
   const severeWeather = React.useMemo(() => isSevereWeather(state.weather.current), [state.weather.current]);
   const movementMultiplier = React.useMemo(() => getWeatherMovementMultiplier(state.weather), [state.weather]);
   const isBureauFunnelActive = isFtueWorldFunnelPhase(state.ftuePhase);
+  const isEntryTransitionActive = entryTransitionBuildingId !== null;
   const bureauBuilding = state.buildings[BUREAU_BUILDING_ID] ?? null;
   const bureauAccessPos = React.useMemo(
     () => (bureauBuilding ? getBuildingAccessPosition(bureauBuilding) : null),
@@ -143,6 +150,7 @@ export const WorldScene = ({
     }
   }, [bureauAccessPos, onMove]);
   const handleNpcSelection = React.useCallback((target: WorldHoverInfo) => {
+    if (isEntryTransitionActive) return;
     if (!target.id) return;
 
     if (isBureauFunnelActive && target.id !== bureauBuilding?.npcId) {
@@ -156,8 +164,9 @@ export const WorldScene = ({
     }
 
     onMove({ x: target.x, y: target.y });
-  }, [bureauBuilding?.npcId, isBureauFunnelActive, onInteract, onMove, routeToBureau, state.playerPos]);
+  }, [bureauBuilding?.npcId, isBureauFunnelActive, isEntryTransitionActive, onInteract, onMove, routeToBureau, state.playerPos]);
   const handleBuildingSelection = React.useCallback((target: WorldHoverInfo) => {
+    if (isEntryTransitionActive) return;
     if (!target.id) return;
 
     const building = state.buildings[target.id];
@@ -171,7 +180,7 @@ export const WorldScene = ({
 
       const accessPos = getBuildingAccessPosition(building);
       if (isWithinRange(state.playerPos, accessPos, 2)) {
-        onInteract('none', building.id);
+        onEnterBuilding(building.id);
         return;
       }
 
@@ -185,8 +194,9 @@ export const WorldScene = ({
     }
 
     onMove(getBuildingAccessPosition(building));
-  }, [isBureauFunnelActive, onInteract, onMove, routeToBureau, state.buildings, state.playerPos]);
+  }, [isBureauFunnelActive, isEntryTransitionActive, onEnterBuilding, onMove, routeToBureau, state.buildings, state.playerPos]);
   const handleWorldSelect = React.useCallback((target: WorldHoverInfo) => {
+    if (isEntryTransitionActive) return;
     setPendingSelection(target);
 
     if (target.kind === 'GROUND') {
@@ -202,7 +212,7 @@ export const WorldScene = ({
     if (target.kind === 'BUILDING') {
       handleBuildingSelection(target);
     }
-  }, [confirmGroundMove, handleBuildingSelection, handleNpcSelection]);
+  }, [confirmGroundMove, handleBuildingSelection, handleNpcSelection, isEntryTransitionActive]);
   const flushHoverPosition = React.useCallback(() => {
     hoverRafRef.current = null;
     const pending = pendingHoverPosRef.current;
@@ -267,15 +277,15 @@ export const WorldScene = ({
   }, [buildingPromptId, isBureauFunnelActive, state.buildings]);
 
   React.useEffect(() => {
-    if (!isBureauFunnelActive || !bureauBuilding || !isPlayerNearBureau) {
+    if (!isBureauFunnelActive || !bureauBuilding || !isPlayerNearBureau || isEntryTransitionActive) {
       bureauAutoEnterRef.current = false;
       return;
     }
 
     if (bureauAutoEnterRef.current) return;
     bureauAutoEnterRef.current = true;
-    onInteract('none', bureauBuilding.id);
-  }, [bureauBuilding, isBureauFunnelActive, isPlayerNearBureau, onInteract]);
+    onEnterBuilding(bureauBuilding.id);
+  }, [bureauBuilding, isBureauFunnelActive, isEntryTransitionActive, isPlayerNearBureau, onEnterBuilding]);
 
   return (
     <div className={`flex-1 relative overflow-hidden transition-colors duration-1000 ${isNight ? 'bg-slate-950' : 'bg-slate-200'}`}>
@@ -298,6 +308,8 @@ export const WorldScene = ({
         onSelect={handleWorldSelect}
         onCameraAzimuthChange={setCameraAzimuth}
         objectiveTarget={objectiveTarget}
+        entryTransitionBuildingId={entryTransitionBuildingId}
+        onEntryTransitionComplete={onEntryTransitionComplete}
         showLoadingOverlay={showInitialLoadingOverlay}
         onReady={onInitialSceneReady}
         onProgress={onInitialLoadingProgress}
@@ -382,13 +394,16 @@ export const WorldScene = ({
                 <p className="text-[10px] font-black uppercase tracking-[0.24em] text-black/40">Building</p>
                 <h3 className="mt-1 text-lg font-black leading-none">{promptedBuilding.name}</h3>
                 <p className="mt-2 text-sm font-medium text-black/65">
-                  {isPlayerNearBuilding
+                  {isEntryTransitionActive
+                    ? 'Camera is moving into position.'
+                    : isPlayerNearBuilding
                     ? 'Enter it, or stay outside and move to the access point.'
                     : 'Move closer to this building before you can enter it.'}
                 </p>
               </div>
               <button
                 onClick={() => setBuildingPromptId(null)}
+                disabled={isEntryTransitionActive}
                 className="rounded-full p-2 transition-colors hover:bg-black/5"
               >
                 <X size={18} />
@@ -398,29 +413,33 @@ export const WorldScene = ({
             <div className="mt-4 grid grid-cols-2 gap-3">
               <button
                 onClick={() => {
+                  if (isEntryTransitionActive) return;
                   onMove(getBuildingAccessPosition(promptedBuilding));
                   setBuildingPromptId(null);
                 }}
-                className="flex items-center justify-center gap-2 rounded-2xl border-2 border-black px-4 py-3 text-xs font-black uppercase tracking-[0.22em] transition-all hover:bg-black hover:text-white active:scale-95"
+                disabled={isEntryTransitionActive}
+                className={`flex items-center justify-center gap-2 rounded-2xl border-2 border-black px-4 py-3 text-xs font-black uppercase tracking-[0.22em] transition-all active:scale-95 ${
+                  isEntryTransitionActive ? 'border-black/20 text-black/35 cursor-not-allowed' : 'hover:bg-black hover:text-white'
+                }`}
               >
                 <MoveDiagonal2 size={16} />
                 Move Here
               </button>
               <button
                 onClick={() => {
-                  if (!isPlayerNearBuilding) return;
-                  onInteract('none', promptedBuilding.id);
+                  if (!isPlayerNearBuilding || isEntryTransitionActive) return;
+                  onEnterBuilding(promptedBuilding.id);
                   setBuildingPromptId(null);
                 }}
-                disabled={!isPlayerNearBuilding}
+                disabled={!isPlayerNearBuilding || isEntryTransitionActive}
                 className={`flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-xs font-black uppercase tracking-[0.22em] transition-all active:scale-95 ${
-                  isPlayerNearBuilding
+                  isPlayerNearBuilding && !isEntryTransitionActive
                     ? 'bg-black text-white hover:bg-zinc-800'
                     : 'bg-black/20 text-black/40 cursor-not-allowed'
                 }`}
               >
                 <DoorOpen size={16} />
-                {isPlayerNearBuilding ? 'Enter' : 'Too Far'}
+                {isEntryTransitionActive ? 'Entering' : isPlayerNearBuilding ? 'Enter' : 'Too Far'}
               </button>
             </div>
           </motion.div>

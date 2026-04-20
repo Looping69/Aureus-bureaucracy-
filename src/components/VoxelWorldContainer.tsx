@@ -5,6 +5,8 @@ import { useCameraControls } from '../hooks/useCameraControls';
 import { WORLD_HALF_SIZE } from '../utils/voxelConstants';
 import { buildWorldSurfaceMap, getWorldSurfaceHeight } from '../utils/worldSurface';
 import { LoadingScreen } from './LoadingScreen';
+import { getBuildingFootprint } from '../utils/worldNavigation';
+import { getBuildingAccessPosition } from '../utils/buildingAccess';
 
 interface VoxelWorldProps {
   voxels: VoxelData[];
@@ -25,6 +27,8 @@ interface VoxelWorldProps {
   onSelect?: (target: WorldHoverInfo, tapCount: number) => void;
   onCameraAzimuthChange?: (azimuth: number) => void;
   objectiveTarget?: WorldHoverInfo | null;
+  entryTransitionBuildingId?: string | null;
+  onEntryTransitionComplete?: (buildingId: string) => void;
   showLoadingOverlay?: boolean;
   onReady?: () => void;
   onProgress?: (progress: number, phase: string) => void;
@@ -53,6 +57,8 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
   onSelect,
   onCameraAzimuthChange,
   objectiveTarget,
+  entryTransitionBuildingId = null,
+  onEntryTransitionComplete,
   showLoadingOverlay = true,
   onReady,
   onProgress,
@@ -71,6 +77,7 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
   const lastEntitySyncKeyRef = useRef<string | null>(null);
   const onReadyRef = useRef(onReady);
   const onProgressRef = useRef(onProgress);
+  const activeEntryTransitionRef = useRef<string | null>(null);
   const surfaceMap = React.useMemo(
     () => buildWorldSurfaceMap(buildings, undefined, navigationZones),
     [buildings, navigationZones]
@@ -267,6 +274,53 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
       engineRef.current.setObjectiveTarget(objectiveTarget ?? null);
     }
   }, [objectiveTarget]);
+
+  useEffect(() => {
+    if (!entryTransitionBuildingId) {
+      activeEntryTransitionRef.current = null;
+      return;
+    }
+
+    if (!engineRef.current || activeEntryTransitionRef.current === entryTransitionBuildingId) {
+      return;
+    }
+
+    const building = buildings.find((candidate) => candidate.id === entryTransitionBuildingId);
+    if (!building) {
+      return;
+    }
+
+    const accessPos = getBuildingAccessPosition(building);
+    const accessWorldX = accessPos.x - WORLD_HALF_SIZE;
+    const accessWorldZ = accessPos.y - WORLD_HALF_SIZE;
+    const footprint = getBuildingFootprint(building);
+    const centerWorldX = footprint
+      ? ((footprint.minX + footprint.maxX) / 2) - WORLD_HALF_SIZE
+      : building.pos.x - WORLD_HALF_SIZE;
+    const centerWorldZ = footprint
+      ? ((footprint.minY + footprint.maxY) / 2) - WORLD_HALF_SIZE
+      : building.pos.y - WORLD_HALF_SIZE;
+    const directionX = centerWorldX - accessWorldX;
+    const directionZ = centerWorldZ - accessWorldZ;
+    const directionLength = Math.hypot(directionX, directionZ);
+    const inwardDistance = 2.4;
+    const inwardX = directionLength > 0 ? (directionX / directionLength) * inwardDistance : 0;
+    const inwardZ = directionLength > 0 ? (directionZ / directionLength) * inwardDistance : -inwardDistance;
+
+    activeEntryTransitionRef.current = entryTransitionBuildingId;
+    engineRef.current.startWorldEntryTransition({
+      buildingId: entryTransitionBuildingId,
+      lookTarget: {
+        x: accessWorldX + inwardX,
+        y: playerSurfaceY + 1.1,
+        z: accessWorldZ + inwardZ,
+      },
+      onComplete: (completedBuildingId) => {
+        activeEntryTransitionRef.current = null;
+        onEntryTransitionComplete?.(completedBuildingId);
+      },
+    });
+  }, [buildings, entryTransitionBuildingId, onEntryTransitionComplete, playerSurfaceY]);
 
   useEffect(() => {
     if (engineRef.current) {
