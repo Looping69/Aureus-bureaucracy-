@@ -270,6 +270,33 @@ genHouseD.addBox(-1, -1, 7, -1, -1, 7, SIGNAL_RED);
 addFrontSteps(genHouseD, 1, -4, 1, CONCRETE, CHARCOAL);
 export const GENERIC_HOUSE_D_VOXELS = GENERIC_HOUSE_D_ASSET_VOXELS;
 
+// 9d. Small Cottage - compact infill house for denser suburban blocks.
+const genSmallCottage = new BuildingGenerator();
+genSmallCottage.addBox(-2, -2, 0, 2, 2, 0, CHARCOAL);
+genSmallCottage.addBox(-2, -2, 1, 2, 2, 1, PALE_STONE);
+genSmallCottage.addHollowBox(-2, -2, 2, 2, 2, 4, CANVAS);
+genSmallCottage.addBox(0, -2, 2, 0, -2, 4, TIMBER);
+genSmallCottage.addBox(-2, -1, 3, -2, 1, 3, GLASS);
+genSmallCottage.addBox(2, -1, 3, 2, 1, 3, GLASS);
+genSmallCottage.addBox(-2, -2, 5, 2, 2, 5, OXIDE);
+genSmallCottage.addBox(-1, -1, 6, 1, 1, 6, OXIDE);
+addFrontSteps(genSmallCottage, 1, -3, 1, PALE_STONE, CHARCOAL);
+export const SMALL_COTTAGE_VOXELS = genSmallCottage.getVoxels();
+
+// 9e. Corner Shop - mixed-use kiosk for transition blocks near the core.
+const genCornerShop = new BuildingGenerator();
+genCornerShop.addBox(-3, -2, 0, 3, 2, 0, CHARCOAL);
+genCornerShop.addBox(-3, -2, 1, 3, 2, 1, DUST);
+genCornerShop.addHollowBox(-3, -2, 2, 3, 2, 4, OFF_WHITE);
+genCornerShop.addBox(-1, -2, 2, 1, -2, 4, TIMBER);
+genCornerShop.addBox(-3, -1, 3, 3, -1, 3, GLASS);
+genCornerShop.addBox(-3, 2, 3, 3, 2, 3, GLASS);
+genCornerShop.addBox(-3, -2, 5, 3, 2, 5, SIGNAL_TEAL);
+genCornerShop.addBox(-2, -1, 6, 2, 1, 6, BRASS);
+genCornerShop.addBox(-1, 0, 7, 1, 0, 7, WARM_LIGHT);
+addFrontSteps(genCornerShop, 1, -3, 1, PALE_STONE, CHARCOAL);
+export const CORNER_SHOP_VOXELS = genCornerShop.getVoxels();
+
 // 10. Generic Office - cleaner podium office with stepped crown.
 const genOffice = new BuildingGenerator();
 genOffice.addBox(-3, -3, 0, 3, 3, 0, CHARCOAL);

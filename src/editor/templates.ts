@@ -24,6 +24,8 @@ import {
   ROAD_CROSS_VOXELS,
   FACTORY_VOXELS,
   GENERIC_HOUSE_D_VOXELS,
+  SMALL_COTTAGE_VOXELS,
+  CORNER_SHOP_VOXELS,
 } from '../buildings';
 
 export interface BuildingTemplate {
@@ -54,6 +56,8 @@ export const BUILDING_TEMPLATES: BuildingTemplate[] = [
   { id: 'road-cross', type: 'ROAD', name: 'Road Cross', voxels: ROAD_CROSS_VOXELS },
   { id: 'factory', type: 'INDUSTRIAL', name: 'Factory', voxels: FACTORY_VOXELS },
   { id: 'generic-house-d', type: 'HOME', name: 'Generic House D', voxels: GENERIC_HOUSE_D_VOXELS },
+  { id: 'small-cottage', type: 'HOME', name: 'Small Cottage', voxels: SMALL_COTTAGE_VOXELS },
+  { id: 'corner-shop', type: 'OFFICE', name: 'Corner Shop', voxels: CORNER_SHOP_VOXELS },
   { id: 'tree-a', type: 'PARK', name: 'Tree A', voxels: TREE_A_VOXELS },
   { id: 'tree-b', type: 'PARK', name: 'Tree B', voxels: TREE_B_VOXELS },
   { id: 'bush', type: 'PARK', name: 'Bush', voxels: BUSH_VOXELS },

@@ -32,6 +32,10 @@ import {
   GARDEN_VOXELS,
   GENERIC_HOUSE_C_VOXELS,
   GENERIC_HOUSE_D_VOXELS,
+  SIDEWALK_VOXELS,
+  STREET_LIGHT_VOXELS,
+  SMALL_COTTAGE_VOXELS,
+  CORNER_SHOP_VOXELS,
 } from './buildings';
 
 export const generateGrid = (width: number, height: number, yieldRate: number = 0.2): Tile[] => {
@@ -1391,6 +1395,30 @@ const createPlacedBuilding = (
   };
 };
 
+const createPlacedOffsetBuilding = (
+  cell: CityCell,
+  slotId: string,
+  offset: WorldPosition,
+  building: Omit<Building, 'pos'>,
+  occupiedCells: Set<string>
+): Building => {
+  const runtimeCell = expandCityCell(cell);
+  const key = `${runtimeCell.x},${runtimeCell.y}:${slotId}`;
+  if (occupiedCells.has(key)) {
+    throw new Error(`City layout overlap at cell ${key} while placing ${building.id}`);
+  }
+  occupiedCells.add(key);
+
+  const basePos = toWorldFromCityCell(runtimeCell);
+  return {
+    ...building,
+    pos: {
+      x: basePos.x + offset.x,
+      y: basePos.y + offset.y,
+    },
+  };
+};
+
 const getLayoutBounds = (buildings: Record<string, Building>) => {
   const bounds = {
     minX: Number.POSITIVE_INFINITY,
@@ -1472,6 +1500,13 @@ const cityRoadLines: CityCell[][] = [
 ];
 
 const cityStreets: Record<string, Building> = createPlacedRoadGrid(cityRoadLines, [1, 3, 5, 7, 9], [1, 3, 5, 7, 9], occupiedCityCells);
+
+const districtPromenades: Record<string, Building> = {
+  ...createPlacedTiles('promenade', 'SIDEWALK', [{ x: 0, y: 4 }], SIDEWALK_VOXELS, occupiedCityCells),
+  ...createPlacedTiles('greenbelt_northwest', 'SIDEWALK', [{ x: 2, y: 10 }], SIDEWALK_VOXELS, occupiedCityCells),
+  ...createPlacedTiles('greenbelt_north', 'SIDEWALK', [{ x: 6, y: 10 }], SIDEWALK_VOXELS, occupiedCityCells),
+  ...createPlacedTiles('greenbelt_east', 'SIDEWALK', [{ x: 10, y: 8 }], SIDEWALK_VOXELS, occupiedCityCells),
+};
 
 // ── Building placement ───────────────────────────────────────────────
 // Perimeter even-numbered cells form the suburban rim.
@@ -1811,6 +1846,121 @@ const baseBuildings: Record<string, Building> = {
     },
     occupiedCityCells
   ),
+
+  suburb_annex_a: createPlacedOffsetBuilding(
+    { x: 4, y: 8 },
+    'east-annex',
+    { x: 12, y: -1 },
+    {
+      id: 'suburb_annex_a',
+      npcId: 'none',
+      name: 'Annex Cottage',
+      type: 'HOME',
+      isDiscovered: true,
+      voxels: SMALL_COTTAGE_VOXELS,
+    },
+    occupiedCityCells
+  ),
+  suburb_annex_b: createPlacedOffsetBuilding(
+    { x: 6, y: 8 },
+    'west-annex',
+    { x: -12, y: -1 },
+    {
+      id: 'suburb_annex_b',
+      npcId: 'none',
+      name: 'Annex Cottage',
+      type: 'HOME',
+      isDiscovered: true,
+      voxels: SMALL_COTTAGE_VOXELS,
+    },
+    occupiedCityCells
+  ),
+  north_duplex_a: createPlacedOffsetBuilding(
+    { x: 2, y: 10 },
+    'west-cottage',
+    { x: -7, y: 0 },
+    {
+      id: 'north_duplex_a',
+      npcId: 'none',
+      name: 'North Rim Cottage',
+      type: 'HOME',
+      isDiscovered: true,
+      voxels: SMALL_COTTAGE_VOXELS,
+    },
+    occupiedCityCells
+  ),
+  north_duplex_b: createPlacedOffsetBuilding(
+    { x: 2, y: 10 },
+    'east-cottage',
+    { x: 7, y: 0 },
+    {
+      id: 'north_duplex_b',
+      npcId: 'none',
+      name: 'North Rim Cottage',
+      type: 'HOME',
+      isDiscovered: true,
+      voxels: SMALL_COTTAGE_VOXELS,
+    },
+    occupiedCityCells
+  ),
+  east_duplex_a: createPlacedOffsetBuilding(
+    { x: 6, y: 10 },
+    'west-cottage',
+    { x: -7, y: 0 },
+    {
+      id: 'east_duplex_a',
+      npcId: 'none',
+      name: 'East Rim Cottage',
+      type: 'HOME',
+      isDiscovered: true,
+      voxels: SMALL_COTTAGE_VOXELS,
+    },
+    occupiedCityCells
+  ),
+  east_duplex_b: createPlacedOffsetBuilding(
+    { x: 6, y: 10 },
+    'east-cottage',
+    { x: 7, y: 0 },
+    {
+      id: 'east_duplex_b',
+      npcId: 'none',
+      name: 'East Rim Cottage',
+      type: 'HOME',
+      isDiscovered: true,
+      voxels: SMALL_COTTAGE_VOXELS,
+    },
+    occupiedCityCells
+  ),
+  west_corner_shop: createPlacedOffsetBuilding(
+    { x: 0, y: 4 },
+    'shop',
+    { x: 9, y: 0 },
+    {
+      id: 'west_corner_shop',
+      npcId: 'none',
+      name: 'West Corner Shop',
+      type: 'OFFICE',
+      isDiscovered: true,
+      voxels: CORNER_SHOP_VOXELS,
+    },
+    occupiedCityCells
+  ),
+  west_corner_light: createPlacedOffsetBuilding(
+    { x: 0, y: 4 },
+    'light',
+    { x: -9, y: 5 },
+    {
+      id: 'west_corner_light',
+      npcId: 'none',
+      name: 'Promenade Lamp',
+      type: 'LANDMARK',
+      isDiscovered: true,
+      voxels: STREET_LIGHT_VOXELS,
+    },
+    occupiedCityCells
+  ),
+
+  ...districtPromenades,
 
   ...cityStreets,
 
