@@ -54,6 +54,17 @@ export class VoxelEngine {
   private ghostSymmetryVoxel: THREE.Mesh;
   private hoverSelector: THREE.Mesh;
   private objectiveSelector: THREE.Mesh;
+
+  private getEffectiveEdgeConfig() {
+    const cfg = backgroundData.edgeConfig;
+    const ringStart = Math.max(cfg.ringStart, WORLD_HALF_SIZE + 10);
+    const ringEnd = Math.max(cfg.ringEnd, ringStart + 34);
+    return {
+      ...cfg,
+      ringStart,
+      ringEnd,
+    };
+  }
   
   private voxels: SimulationVoxel[] = [];
   private currentVoxelData: VoxelData[] = [];
@@ -491,7 +502,7 @@ export class VoxelEngine {
    */
   private buildGroundRing() {
     const innerRadius = WORLD_HALF_SIZE;
-    const outerRadius = backgroundData.edgeConfig.ringEnd + 10;
+    const outerRadius = this.getEffectiveEdgeConfig().ringEnd + 10;
     const GROUND_Y = CONFIG.FLOOR_Y - 2; // sits at terrain base level
 
     // Dark ground colour that reads as distant wasteland / outskirts
@@ -538,7 +549,7 @@ export class VoxelEngine {
    * intentional distant city instead of a test scene.
    */
   private buildEdgeDecorations() {
-    const cfg = backgroundData.edgeConfig;
+    const cfg = this.getEffectiveEdgeConfig();
     const motifs = backgroundData.motifs as Array<{
       name: string; width: number; depth: number; floors: number; style: string;
     }>;

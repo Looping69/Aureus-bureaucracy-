@@ -314,8 +314,14 @@ export const WorldScene = ({
       )}
 
       <div className="absolute right-16 top-4 z-30 flex flex-col items-end gap-2 pointer-events-none">
-        <div className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] shadow-lg backdrop-blur-sm ${weatherToneClassName}`}>
-          {weatherLabel} {state.weather.current !== 'CLEAR' ? `· ${Math.max(1, Math.ceil(state.weather.timeLeft))}h` : ''}
+        <div className={`flex items-center gap-2 rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.2em] shadow-lg backdrop-blur-sm ${weatherToneClassName}`}>
+          <span className="rounded-full border border-current/20 bg-black/10 px-2 py-0.5 text-[8px] tracking-[0.24em]">
+            Weather
+          </span>
+          <span>
+            {weatherLabel}
+            {state.weather.current !== 'CLEAR' ? ` · ${Math.max(1, Math.ceil(state.weather.timeLeft))}h` : ''}
+          </span>
         </div>
         {severeWeather && (
           <div className="max-w-[220px] rounded-2xl border border-black/15 bg-black/65 px-3 py-2 text-right text-[10px] font-semibold leading-snug text-white shadow-xl">
