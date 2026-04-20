@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="bg" x1="12" y1="8" x2="52" y2="56" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1e293b" />
+      <stop offset="1" stop-color="#0f172a" />
+    </linearGradient>
+    <linearGradient id="coin" x1="21" y1="18" x2="43" y2="46" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f8df8b" />
+      <stop offset="1" stop-color="#d4a73a" />
+    </linearGradient>
+  </defs>
+
+  <rect x="4" y="4" width="56" height="56" rx="14" fill="url(#bg)" />
+  <rect x="8" y="8" width="48" height="48" rx="10" fill="none" stroke="#f8fafc" stroke-opacity=".12" stroke-width="2" />
+
+  <circle cx="32" cy="28" r="16" fill="url(#coin)" stroke="#f9e7aa" stroke-width="2" />
+  <path
+    d="M32 17l7.4 22h-4.9l-1.4-4.7h-8.2L23.5 39h-4.9L26 17h6zm-2.9 13.7h4.8L31.5 23h-.1l-2.3 7.7z"
+    fill="#1f2937"
+  />
+
+  <g transform="translate(32 42) rotate(-18)">
+    <rect x="-16" y="-5.5" width="32" height="11" rx="5.5" fill="#7f1d1d" />
+    <rect x="-13" y="-3" width="26" height="6" rx="3" fill="#dc2626" />
+    <path d="M-6 0l3.2 3.2L6.8-6" fill="none" stroke="#fee2e2" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" />
+  </g>
+</svg>
