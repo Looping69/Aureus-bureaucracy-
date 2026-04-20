@@ -355,9 +355,6 @@ export const WorldScene = ({
       </div>
 
       <div className="absolute bottom-4 right-4 flex flex-col items-end gap-2">
-        <div className="rounded-full border border-black/15 bg-white/88 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-slate-700 shadow-lg backdrop-blur-sm">
-          Drag or Q/E to rotate
-        </div>
         <button 
           onClick={(e) => {
             e.stopPropagation();
