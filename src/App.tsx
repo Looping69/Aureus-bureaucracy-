@@ -482,9 +482,9 @@ export default function App() {
       licensed: hasExportLicense(state),
       options: getExportOptions(state, state.ore)
     };
-  }, [state]);
+  }, [state.ore, state.permits, state.meters.influence, state.weather, state.worldEffects]);
 
-  const isCompactFtueHud = useMemo(() => shouldShowCompactFtueHud(state), [state]);
+  const isCompactFtueHud = useMemo(() => shouldShowCompactFtueHud(state), [state.ftuePhase, state.tutorialStep, state.activePermitId, state.pendingPermitAction]);
   const bureauFilingsUnlocked = useMemo(() => hasUnlockedBureauFilings(state), [state.permits]);
 
   const handleToggleTutorialOverlay = () => {

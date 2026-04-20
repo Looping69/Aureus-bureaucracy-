@@ -167,11 +167,39 @@ const applyBlockedSurface = (
   tile.buildingId = buildingId;
 };
 
+// ── Surface-map reference-equality cache ─────────────────────────────────
+// buildWorldSurfaceMap iterates every cell in the grid (360×360 = 130K)
+// and is called repeatedly during NPC pathfinding.  By caching the result
+// keyed on the *identity* of the buildings / zones references, we avoid
+// the expensive rebuild when nothing has changed.
+let _surfaceMapCache: {
+  buildings: Record<string, Building> | Building[];
+  mapSize: number;
+  navigationZones: NavigationZone[];
+  map: WorldSurfaceMap;
+} | null = null;
+
+/** Drop the cached surface map so the next call rebuilds from scratch. */
+export const invalidateSurfaceMapCache = () => {
+  _surfaceMapCache = null;
+};
+
+const EMPTY_NAVIGATION_ZONES: NavigationZone[] = [];
+
 export const buildWorldSurfaceMap = (
   buildings: Record<string, Building> | Building[],
   mapSize: number = WORLD_SIZE,
-  navigationZones: NavigationZone[] = []
+  navigationZones: NavigationZone[] = EMPTY_NAVIGATION_ZONES
 ): WorldSurfaceMap => {
+  if (
+    _surfaceMapCache &&
+    _surfaceMapCache.buildings === buildings &&
+    _surfaceMapCache.mapSize === mapSize &&
+    _surfaceMapCache.navigationZones === navigationZones
+  ) {
+    return _surfaceMapCache.map;
+  }
+
   const entries = Array.isArray(buildings) ? buildings : Object.values(buildings);
   const tiles = new Map<string, SurfaceTile>();
 
@@ -239,11 +267,15 @@ export const buildWorldSurfaceMap = (
     }
   }
 
-  return {
+  const result: WorldSurfaceMap = {
     width: mapSize,
     height: mapSize,
     tiles,
   };
+
+  _surfaceMapCache = { buildings, mapSize, navigationZones, map: result };
+
+  return result;
 };
 
 export const getWorldSurfaceTile = (
