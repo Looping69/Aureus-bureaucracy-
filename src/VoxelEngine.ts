@@ -20,6 +20,8 @@ export const WORLD_CAMERA_AZIMUTH = Math.atan2(WORLD_CAMERA_OFFSET.x, WORLD_CAME
 const WORLD_CAMERA_DISTANCE = WORLD_CAMERA_OFFSET.length();
 const WORLD_CAMERA_POLAR = Math.acos(WORLD_CAMERA_OFFSET.y / WORLD_CAMERA_DISTANCE);
 const WORLD_CAMERA_AZIMUTH_SPREAD = 0.55;
+const WORLD_CAMERA_INTRO_DURATION = 2.2;
+const WORLD_CAMERA_INTRO_START_MULTIPLIER = 2.3;
 
 export class VoxelEngine {
   private static readonly ANALOG_MOVE_CONVERGE_THRESHOLD = 0.05;
@@ -106,6 +108,8 @@ export class VoxelEngine {
   private targetRotationY: number = 0;
   private firstPositionSet: boolean = false;
   private requestedPlayerMoving: boolean = false;
+  private introCameraActive: boolean = false;
+  private introCameraElapsed: number = 0;
 
   constructor(
     container: HTMLElement, 
@@ -306,6 +310,8 @@ export class VoxelEngine {
   }
 
   public moveCamera(dx: number, dz: number) {
+    this.cancelIntroCameraAnimation();
+
     // Move camera relative to its current orientation for intuitive WASD controls
     const forward = new THREE.Vector3();
     this.camera.getWorldDirection(forward);
@@ -326,6 +332,8 @@ export class VoxelEngine {
   }
 
   public zoomCamera(delta: number) {
+    this.cancelIntroCameraAnimation();
+
     const zoomSpeed = 3;
     const direction = new THREE.Vector3();
     this.camera.getWorldDirection(direction);
@@ -375,6 +383,11 @@ export class VoxelEngine {
       this.targetCameraFocus.copy(this.currentPlayerPos);
       this.currentCameraFocus.copy(this.currentPlayerPos);
       this.controls.target.copy(this.currentCameraFocus);
+      this.camera.position.copy(this.currentCameraFocus).add(
+        WORLD_CAMERA_OFFSET.clone().multiplyScalar(WORLD_CAMERA_INTRO_START_MULTIPLIER)
+      );
+      this.introCameraElapsed = 0;
+      this.introCameraActive = true;
       this.firstPositionSet = true;
     }
     
@@ -429,6 +442,7 @@ export class VoxelEngine {
   }
 
   public recenterOnPlayer() {
+    this.cancelIntroCameraAnimation();
     this.targetCameraFocus.copy(this.currentPlayerPos);
     this.currentCameraFocus.copy(this.currentPlayerPos);
     this.controls.target.copy(this.currentCameraFocus);
@@ -471,6 +485,42 @@ export class VoxelEngine {
     );
 
     this.controls.target.copy(this.currentCameraFocus);
+
+    if (!this.introCameraActive) {
+      return;
+    }
+
+    this.introCameraElapsed = Math.min(
+      this.introCameraElapsed + deltaTime,
+      WORLD_CAMERA_INTRO_DURATION
+    );
+    const progress = this.introCameraElapsed / WORLD_CAMERA_INTRO_DURATION;
+    const easedProgress = 1 - Math.pow(1 - progress, 3);
+    const introOffset = WORLD_CAMERA_OFFSET
+      .clone()
+      .multiplyScalar(
+        THREE.MathUtils.lerp(
+          WORLD_CAMERA_INTRO_START_MULTIPLIER,
+          1,
+          easedProgress
+        )
+      );
+
+    this.camera.position.copy(this.currentCameraFocus).add(introOffset);
+
+    if (progress >= 1) {
+      this.introCameraActive = false;
+    }
+  }
+
+  private cancelIntroCameraAnimation() {
+    if (!this.introCameraActive) {
+      return;
+    }
+
+    this.introCameraActive = false;
+    this.introCameraElapsed = WORLD_CAMERA_INTRO_DURATION;
+    this.camera.position.copy(this.controls.target).add(WORLD_CAMERA_OFFSET);
   }
 
   private enforceCameraBounds() {
@@ -1685,6 +1735,7 @@ export class VoxelEngine {
   }
 
   public rotateCamera(delta: number) {
+    this.cancelIntroCameraAnimation();
     const offset = this.camera.position.clone().sub(this.controls.target);
     const spherical = new THREE.Spherical().setFromVector3(offset);
     spherical.theta = THREE.MathUtils.clamp(
