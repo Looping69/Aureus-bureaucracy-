@@ -1,4 +1,5 @@
 import { BUILDINGS, INITIAL_MINES } from '../data';
+import { approvePermit } from './permitProgression';
 import { GameState, GameWorldState, Mine, WeatherState, WorldProfileId } from '../types';
 
 export interface WorldProfileSummary {
@@ -19,11 +20,27 @@ type WorldProfileDefinition = WorldProfileSummary & {
   knownNpcIds: string[];
   discoveredBuildingIds: string[];
   discoveredMineIds: string[];
+  applyProgression?: (state: GameState) => GameState;
 };
 
 const DEFAULT_PROFILE_ID: WorldProfileId = 'world-1';
 
 const cloneSerializable = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
+
+const applyPermitApprovals = (state: GameState, permitIds: string[]): GameState => {
+  let nextState = state;
+
+  permitIds.forEach((permitId) => {
+    const approved = approvePermit(permitId, nextState.permits, nextState.mines);
+    nextState = {
+      ...nextState,
+      permits: approved.permits,
+      mines: approved.mines,
+    };
+  });
+
+  return nextState;
+};
 
 const WORLD_PROFILE_DEFINITIONS: Record<WorldProfileId, WorldProfileDefinition> = {
   'world-1': {
@@ -85,6 +102,31 @@ const WORLD_PROFILE_DEFINITIONS: Record<WorldProfileId, WorldProfileDefinition> 
     knownNpcIds: ['journalist', 'licensing', 'chief', 'fixer'],
     discoveredBuildingIds: ['player_home', 'hotline_booth', 'chief_hut', 'central_park', 'mine_entrance', 'licensing_office', 'union_hall', 'fixer_den'],
     discoveredMineIds: ['iron-vein', 'deep-hollow'],
+    applyProgression: (state) => {
+      const sandboxState = applyPermitApprovals(state, [
+        'extraction-intent',
+        'prospecting-license',
+        'mining-permit-iron',
+      ]);
+
+      return {
+        ...sandboxState,
+        activeMiniGame: null,
+        activePermitId: null,
+        pendingPermitAction: null,
+        ftuePhase: 'ftue_complete',
+        tutorialStep: 99,
+        tutorialMinimized: false,
+        objectives: [
+          {
+            id: 'sandbox-free-roam',
+            text: 'Sandbox file: roam, test systems, and file deeper permits whenever you want.',
+            isCompleted: false,
+            type: 'DISCOVER',
+          },
+        ],
+      };
+    },
   },
   'world-4': {
     id: 'world-4',
@@ -151,7 +193,7 @@ export const applyWorldProfileToState = (state: GameState, worldProfileId: World
   const profile = getWorldProfile(worldProfileId);
   const buildings = applyBuildingDiscovery(cloneSerializable(BUILDINGS), profile.discoveredBuildingIds);
 
-  return {
+  const profiledState: GameState = {
     ...state,
     worldProfileId: profile.id,
     day: profile.day,
@@ -165,4 +207,6 @@ export const applyWorldProfileToState = (state: GameState, worldProfileId: World
     buildings,
     mines: applyMineDiscovery(profile.discoveredMineIds),
   };
+
+  return profile.applyProgression ? profile.applyProgression(profiledState) : profiledState;
 };
