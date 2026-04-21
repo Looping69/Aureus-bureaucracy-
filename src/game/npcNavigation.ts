@@ -142,7 +142,7 @@ export const isNpcPedestrianTile = (
     return true;
   }
 
-  if (tile.kind !== 'GROUND' && tile.kind !== 'ROAD') {
+  if (tile.kind !== 'GROUND' && tile.kind !== 'LOT_EDGE' && tile.kind !== 'ROAD') {
     return false;
   }
 
@@ -183,7 +183,7 @@ export const isNpcPedestrianTile = (
           break;
         }
 
-        if (probeTile.kind === 'GROUND') {
+        if (probeTile.kind === 'GROUND' || probeTile.kind === 'LOT_EDGE') {
           continue;
         }
 

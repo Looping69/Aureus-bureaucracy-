@@ -9,6 +9,7 @@ import type { BuildingFootprint } from './worldNavigation';
 
 export type SurfaceKind =
   | 'GROUND'
+  | 'LOT_EDGE'
   | 'ROAD'
   | 'SIDEWALK'
   | 'PARK'
@@ -36,9 +37,18 @@ const MAX_SURFACE_HEIGHT = 0;
 const MIN_SURFACE_HEIGHT = -3;
 const TERRAIN_LAYERS = 4;
 const TERRAIN_HEIGHT_LIFT = 1;
+const LOT_EDGE_TARGET_DROP = 1;
+
+const CARDINAL_NEIGHBORS = [
+  { x: 1, y: 0 },
+  { x: -1, y: 0 },
+  { x: 0, y: 1 },
+  { x: 0, y: -1 },
+] as const;
 
 const WALKABLE_COSTS: Record<SurfaceKind, number> = {
   GROUND: 1.65,
+  LOT_EDGE: 1.25,
   ROAD: 0.8,
   SIDEWALK: 0.95,
   PARK: 1.05,
@@ -49,6 +59,7 @@ const WALKABLE_COSTS: Record<SurfaceKind, number> = {
 
 const SURFACE_COLORS: Record<SurfaceKind, [number, number, number, number]> = {
   GROUND: [COLORS.GRASS, 0x5a6d46, 0x466038, 0x314827],
+  LOT_EDGE: [0x738e57, 0x62784a, 0x51643d, 0x3f4e30],
   ROAD: [COLORS.ROAD, COLORS.DARK_GREY, COLORS.GREY, COLORS.SAND],
   SIDEWALK: [COLORS.SIDEWALK, COLORS.GREY, COLORS.DARK_GREY, COLORS.SAND],
   PARK: [COLORS.GRASS, 0x5a6d46, 0x466038, 0x314827],
@@ -67,6 +78,9 @@ const withinBounds = (x: number, y: number, mapSize: number = WORLD_SIZE) =>
 
 const quantizeHeight = (value: number) =>
   clamp(Math.round(value), MIN_SURFACE_HEIGHT, MAX_SURFACE_HEIGHT);
+
+const NATURAL_SURFACE_KINDS = new Set<SurfaceKind>(['GROUND', 'PARK', 'CLIFF', 'LOT_EDGE']);
+const INFRASTRUCTURE_SURFACE_KINDS = new Set<SurfaceKind>(['ROAD', 'SIDEWALK', 'PLAZA']);
 
 const terrainHeightAt = (x: number, y: number, mapSize: number = WORLD_SIZE) => {
   const nx = x / (mapSize - 1);
@@ -185,7 +199,53 @@ export const invalidateSurfaceMapCache = () => {
 };
 
 const EMPTY_NAVIGATION_ZONES: NavigationZone[] = [];
+const softenLoweredLotEdges = (tiles: Map<string, SurfaceTile>) => {
+  const updates = new Map<string, { height: number; kind: SurfaceKind }>();
 
+  for (const tile of tiles.values()) {
+    if (!tile.walkable || !NATURAL_SURFACE_KINDS.has(tile.kind)) {
+      continue;
+    }
+
+    let supportedHeight = tile.height;
+    let shouldTransition = false;
+
+    for (const neighbor of CARDINAL_NEIGHBORS) {
+      const adjacentTile = tiles.get(keyFor(tile.x + neighbor.x, tile.y + neighbor.y));
+      if (!adjacentTile || !INFRASTRUCTURE_SURFACE_KINDS.has(adjacentTile.kind)) {
+        continue;
+      }
+
+      const heightGap = adjacentTile.height - tile.height;
+      if (heightGap < 1) {
+        continue;
+      }
+
+      shouldTransition = true;
+      supportedHeight = Math.max(supportedHeight, adjacentTile.height - LOT_EDGE_TARGET_DROP);
+    }
+
+    if (!shouldTransition) {
+      continue;
+    }
+
+    updates.set(keyFor(tile.x, tile.y), {
+      height: clamp(supportedHeight, MIN_SURFACE_HEIGHT, MAX_SURFACE_HEIGHT),
+      kind: 'LOT_EDGE',
+    });
+  }
+
+  for (const [key, update] of updates) {
+    const tile = tiles.get(key);
+    if (!tile) {
+      continue;
+    }
+
+    tile.height = update.height;
+    tile.kind = update.kind;
+    tile.cost = WALKABLE_COSTS[update.kind];
+  }
+};
 export const buildWorldSurfaceMap = (
   buildings: Record<string, Building> | Building[],
   mapSize: number = WORLD_SIZE,
@@ -266,6 +326,12 @@ export const buildWorldSurfaceMap = (
       tiles.set(keyFor(x, y), tile);
     }
   }
+
+  const result: WorldSurfaceMap = {
+
+  // Give lowered parcels a deliberate shoulder where they meet the road/building plane
+  // so the camera reads them as stepped lots rather than broken sinkholes.
+  softenLoweredLotEdges(tiles);
 
   const result: WorldSurfaceMap = {
     width: mapSize,

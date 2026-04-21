@@ -41,6 +41,7 @@ const tintForType = (type: AuthoredBuilding['type']) => {
 
 const SURFACE_BASE_COLORS: Record<SurfaceKind, string> = {
   GROUND: '#243424',
+  LOT_EDGE: '#35512f',
   ROAD: '#374151',
   SIDEWALK: '#5b6578',
   PARK: '#335c2b',
@@ -51,6 +52,7 @@ const SURFACE_BASE_COLORS: Record<SurfaceKind, string> = {
 
 const SURFACE_OVERLAY_COLORS: Record<SurfaceKind, string> = {
   GROUND: '#14532d',
+  LOT_EDGE: '#84cc16',
   ROAD: '#475569',
   SIDEWALK: '#94a3b8',
   PARK: '#65a30d',
@@ -785,6 +787,7 @@ const PlannerCanvas2D = ({
 
     const byKind: Record<SurfaceKind, string[]> = {
       GROUND: [],
+      LOT_EDGE: [],
       ROAD: [],
       SIDEWALK: [],
       PARK: [],
