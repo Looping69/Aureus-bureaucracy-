@@ -10,6 +10,8 @@ const DEFAULT_SLOT_ID = 'slot-1';
 const MOBILE_VIEWPORT_WIDTH = 430;
 const ANALOG_STICK_DRAG_DISTANCE = 26;
 const STICK_CENTER_TOLERANCE_PX = 40;
+const CAMERA_DISTANCE_TOLERANCE = 0.65;
+const RECENTER_TARGET_TOLERANCE = 0.05;
 
 const assert = (condition, message) => {
   if (!condition) throw new Error(message);
@@ -157,6 +159,23 @@ const removeBlockingNotificationOverlay = async (page) => {
   });
 };
 
+const readWorldDebugSnapshot = async (page) => page.evaluate(() => window.__AUREUS_WORLD_DEBUG__?.getSnapshot?.() ?? null);
+
+const waitForWorldCameraMode = async (page, mode) => {
+  await page.waitForFunction((expectedMode) => {
+    const snapshot = window.__AUREUS_WORLD_DEBUG__?.getSnapshot?.();
+    return snapshot?.mode === expectedMode;
+  }, mode, { timeout: 15000 });
+};
+
+const getFocusDistanceToPlayer = (snapshot) => {
+  if (!snapshot) return Number.POSITIVE_INFINITY;
+  return Math.hypot(
+    snapshot.lookTarget.x - snapshot.currentPlayerPos.x,
+    snapshot.lookTarget.z - snapshot.currentPlayerPos.z
+  );
+};
+
 const waitForWorldHud = async (page) => {
   await page.locator('[aria-label="Movement stick"]').waitFor({ state: 'visible', timeout: 30000 });
   await page.waitForTimeout(400);
@@ -210,8 +229,16 @@ const continueSavedRun = async (page) => {
 };
 
 const startRun = async (page) => {
-  await page.waitForTimeout(250);
-  await page.getByRole('button', { name: /Start Run/i }).waitFor({ state: 'visible', timeout: 30000 });
+  await waitForWorldHud(page);
+  const startButton = page.getByRole('button', { name: /Start Run/i });
+  if (!(await startButton.isVisible().catch(() => false))) {
+    const openObjectiveButton = page.locator('[aria-label="Open objective panel"]');
+    if (await openObjectiveButton.isVisible().catch(() => false)) {
+      await openObjectiveButton.click();
+      await page.waitForTimeout(250);
+    }
+  }
+  await startButton.waitFor({ state: 'visible', timeout: 30000 });
   await page.evaluate(() => {
     const startButton = [...document.querySelectorAll('button')].find((el) =>
       el.textContent?.includes('Start Run')
@@ -315,9 +342,52 @@ const run = async () => {
     assert(!!beforeAnalogMove, 'Expected player position to be readable before analog movement.');
     const afterAnalogMove = await dragAnalogUntilMovement(page, beforeAnalogMove);
 
+    await page.waitForFunction(() => !!window.__AUREUS_WORLD_DEBUG__?.getSnapshot?.(), { timeout: 15000 });
+    const bootCameraSnapshot = await readWorldDebugSnapshot(page);
+    assert(
+      bootCameraSnapshot?.mode === 'intro' || bootCameraSnapshot?.mode === 'follow',
+      `Expected boot camera to be in intro or follow mode, got ${bootCameraSnapshot ? bootCameraSnapshot.mode : 'missing snapshot'}.`
+    );
+
+    await waitForWorldCameraMode(page, 'follow');
+    await page.waitForTimeout(250);
+
+    const settledCameraSnapshot = await readWorldDebugSnapshot(page);
+    assert(!!afterAnalogMove, 'Expected player position to remain readable after analog movement.');
     assert(
       beforeAnalogMove.x !== afterAnalogMove.x || beforeAnalogMove.y !== afterAnalogMove.y,
       `Expected analog stick movement to change player position, got ${JSON.stringify(beforeAnalogMove)} -> ${JSON.stringify(afterAnalogMove)}.`
+    );
+    assert(!!settledCameraSnapshot, 'Expected a readable world camera snapshot after intro settles.');
+    assert(
+      settledCameraSnapshot.controlsEnabled,
+      'Expected orbit controls to be re-enabled after the spawn fly-in completes.'
+    );
+    assert(
+      Math.abs(settledCameraSnapshot.cameraDistanceToTarget - settledCameraSnapshot.expectedFollowDistance) <= CAMERA_DISTANCE_TOLERANCE,
+      `Expected settled follow camera distance near ${settledCameraSnapshot.expectedFollowDistance}, got ${settledCameraSnapshot.cameraDistanceToTarget}.`
+    );
+
+    const preRecenterFocusDistance = getFocusDistanceToPlayer(settledCameraSnapshot);
+    await page.locator('button[title="Recenter"]').click();
+    await page.waitForTimeout(150);
+    const recenteredSnapshot = await readWorldDebugSnapshot(page);
+    assert(!!recenteredSnapshot, 'Expected a readable world camera snapshot after recenter.');
+    assert(
+      recenteredSnapshot.mode === 'follow',
+      `Expected recenter to leave the camera in follow mode, got ${recenteredSnapshot.mode}.`
+    );
+    assert(
+      recenteredSnapshot.controlsEnabled,
+      'Expected recenter to preserve interactive camera controls.'
+    );
+    assert(
+      getFocusDistanceToPlayer(recenteredSnapshot) <= RECENTER_TARGET_TOLERANCE,
+      `Expected recenter to snap the follow target onto the player, got distance ${getFocusDistanceToPlayer(recenteredSnapshot)}.`
+    );
+    assert(
+      preRecenterFocusDistance >= getFocusDistanceToPlayer(recenteredSnapshot),
+      'Expected recenter to move the camera focus closer to the player instead of drifting away.'
     );
 
     await clickNavAction(page, 'Mine');
@@ -466,7 +536,7 @@ const run = async () => {
     );
     await bureauPage.close();
 
-    console.log('Regression smoke passed: boot, save archive restore, Bureau FTUE filing chain, and mine navigation.');
+    console.log('Regression smoke passed: spawn fly-in, movement/recenter handoff, save archive restore, Bureau FTUE filing chain, and mine navigation.');
   } finally {
     if (browser) await browser.close();
     if (viteServer) await viteServer.close();

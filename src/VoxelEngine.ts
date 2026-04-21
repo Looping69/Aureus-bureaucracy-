@@ -15,15 +15,21 @@ import { WorldEnvironmentSystem } from './lighting/WorldEnvironmentSystem';
 import { configureWorldRenderer } from './lighting/WorldRenderAdapter';
 import backgroundData from '../background.json';
 import { toLogicalWorldY, toRenderedWorldY, WORLD_RENDER_Y_OFFSET } from './game/worldPresentation';
-import { createWorldEntryCameraPlan, sampleWorldEntryCameraPlan, WorldEntryCameraPlan } from './game/worldEntryCamera';
+import {
+  createWorldEntryCameraPlan,
+  createWorldSpawnCameraPlan,
+  sampleWorldEntryCameraPlan,
+  sampleWorldSpawnCameraPlan,
+  WorldEntryCameraPlan,
+  WorldSpawnCameraPlan,
+} from './game/worldEntryCamera';
 
 const WORLD_CAMERA_OFFSET = new THREE.Vector3(24, 32, 16);
 export const WORLD_CAMERA_AZIMUTH = Math.atan2(WORLD_CAMERA_OFFSET.x, WORLD_CAMERA_OFFSET.z);
 const WORLD_CAMERA_DISTANCE = WORLD_CAMERA_OFFSET.length();
 const WORLD_CAMERA_POLAR = Math.acos(WORLD_CAMERA_OFFSET.y / WORLD_CAMERA_DISTANCE);
 const WORLD_CAMERA_AZIMUTH_SPREAD = 0.55;
-const WORLD_CAMERA_INTRO_DURATION = 2.2;
-const WORLD_CAMERA_INTRO_START_MULTIPLIER = 2.3;
+const WORLD_CAMERA_INTRO_START_MULTIPLIER = 1.9;
 
 export class VoxelEngine {
   private static readonly ANALOG_MOVE_CONVERGE_THRESHOLD = 0.05;
@@ -110,8 +116,8 @@ export class VoxelEngine {
   private targetRotationY: number = 0;
   private firstPositionSet: boolean = false;
   private requestedPlayerMoving: boolean = false;
-  private introCameraActive: boolean = false;
   private introCameraElapsed: number = 0;
+  private introCameraPlan: WorldSpawnCameraPlan | null = null;
   private worldEntryCameraPlan: WorldEntryCameraPlan | null = null;
   private worldEntryCameraElapsed: number = 0;
   private worldEntryBuildingId: string | null = null;
@@ -119,6 +125,21 @@ export class VoxelEngine {
 
   private getRenderedFocus(source: THREE.Vector3) {
     return source.clone().setY(toRenderedWorldY(source.y));
+  }
+
+  private applyCameraPose(position: { x: number; y: number; z: number }, lookTarget: { x: number; y: number; z: number }) {
+    this.controls.target.set(lookTarget.x, toRenderedWorldY(lookTarget.y), lookTarget.z);
+    this.camera.position.set(position.x, toRenderedWorldY(position.y), position.z);
+  }
+
+  private settleCameraOnCurrentFocus() {
+    const renderedFocus = this.getRenderedFocus(this.currentCameraFocus);
+    this.controls.target.copy(renderedFocus);
+    this.camera.position.copy(renderedFocus).add(WORLD_CAMERA_OFFSET);
+    this.controls.enabled = true;
+    this.controls.update();
+    this.enforceCameraBounds();
+    this.reportCameraAzimuth(true);
   }
 
   constructor(
@@ -402,13 +423,23 @@ export class VoxelEngine {
       this.entities.player.group.position.copy(this.currentPlayerPos);
       this.targetCameraFocus.copy(this.currentPlayerPos);
       this.currentCameraFocus.copy(this.currentPlayerPos);
-      const renderedFocus = this.getRenderedFocus(this.currentCameraFocus);
-      this.controls.target.copy(renderedFocus);
-      this.camera.position.copy(renderedFocus).add(
-        WORLD_CAMERA_OFFSET.clone().multiplyScalar(WORLD_CAMERA_INTRO_START_MULTIPLIER)
-      );
+      this.introCameraPlan = createWorldSpawnCameraPlan({
+        focusPosition: {
+          x: this.currentCameraFocus.x,
+          y: this.currentCameraFocus.y,
+          z: this.currentCameraFocus.z,
+        },
+        orbitCameraOffset: {
+          x: WORLD_CAMERA_OFFSET.x,
+          y: WORLD_CAMERA_OFFSET.y,
+          z: WORLD_CAMERA_OFFSET.z,
+        },
+        startMultiplier: WORLD_CAMERA_INTRO_START_MULTIPLIER,
+      });
       this.introCameraElapsed = 0;
-      this.introCameraActive = true;
+      this.controls.enabled = false;
+      const initialSample = sampleWorldSpawnCameraPlan(this.introCameraPlan, 0);
+      this.applyCameraPose(initialSample.position, initialSample.lookTarget);
       this.firstPositionSet = true;
     }
     
@@ -469,12 +500,7 @@ export class VoxelEngine {
     this.cancelIntroCameraAnimation();
     this.targetCameraFocus.copy(this.currentPlayerPos);
     this.currentCameraFocus.copy(this.currentPlayerPos);
-    const renderedFocus = this.getRenderedFocus(this.currentCameraFocus);
-    this.controls.target.copy(renderedFocus);
-    this.camera.position.copy(renderedFocus).add(WORLD_CAMERA_OFFSET);
-    this.enforceCameraBounds();
-    this.controls.update();
-    this.reportCameraAzimuth(true);
+    this.settleCameraOnCurrentFocus();
   }
 
   public setObjectiveTarget(target: WorldHoverInfo | null) {
@@ -584,41 +610,47 @@ export class VoxelEngine {
       return;
     }
 
-    if (!this.introCameraActive) {
+    if (!this.introCameraPlan) {
       return;
     }
 
     this.introCameraElapsed = Math.min(
       this.introCameraElapsed + deltaTime,
-      WORLD_CAMERA_INTRO_DURATION
+      this.introCameraPlan.duration
     );
-    const progress = this.introCameraElapsed / WORLD_CAMERA_INTRO_DURATION;
-    const easedProgress = 1 - Math.pow(1 - progress, 3);
-    const introOffset = WORLD_CAMERA_OFFSET
-      .clone()
-      .multiplyScalar(
-        THREE.MathUtils.lerp(
-          WORLD_CAMERA_INTRO_START_MULTIPLIER,
-          1,
-          easedProgress
-        )
-      );
-
-    this.camera.position.copy(this.getRenderedFocus(this.currentCameraFocus)).add(introOffset);
+    const latestIntroPlan = createWorldSpawnCameraPlan({
+      focusPosition: {
+        x: this.currentCameraFocus.x,
+        y: this.currentCameraFocus.y,
+        z: this.currentCameraFocus.z,
+      },
+      orbitCameraOffset: {
+        x: WORLD_CAMERA_OFFSET.x,
+        y: WORLD_CAMERA_OFFSET.y,
+        z: WORLD_CAMERA_OFFSET.z,
+      },
+      startMultiplier: WORLD_CAMERA_INTRO_START_MULTIPLIER,
+    });
+    const progress = Math.min(1, this.introCameraElapsed / latestIntroPlan.duration);
+    this.introCameraPlan = latestIntroPlan;
+    const sample = sampleWorldSpawnCameraPlan(this.introCameraPlan, this.introCameraElapsed);
+    this.applyCameraPose(sample.position, sample.lookTarget);
 
     if (progress >= 1) {
-      this.introCameraActive = false;
+      this.introCameraPlan = null;
+      this.introCameraElapsed = 0;
+      this.settleCameraOnCurrentFocus();
     }
   }
 
   private cancelIntroCameraAnimation() {
-    if (!this.introCameraActive) {
+    if (!this.introCameraPlan) {
       return;
     }
 
-    this.introCameraActive = false;
-    this.introCameraElapsed = WORLD_CAMERA_INTRO_DURATION;
-    this.camera.position.copy(this.controls.target).add(WORLD_CAMERA_OFFSET);
+    this.introCameraPlan = null;
+    this.introCameraElapsed = 0;
+    this.settleCameraOnCurrentFocus();
   }
 
   private enforceCameraBounds() {
@@ -1791,7 +1823,7 @@ export class VoxelEngine {
 
     this.updateCameraFollow(deltaTime);
     this.environment.update(this.time, this.weather, this.currentCameraFocus, deltaTime);
-    if (!this.worldEntryCameraPlan) {
+    if (!this.worldEntryCameraPlan && !this.introCameraPlan) {
       this.controls.update();
       this.enforceCameraBounds();
     }
@@ -1836,6 +1868,39 @@ export class VoxelEngine {
   public setCameraAzimuthCallback(callback?: (azimuth: number) => void) {
     this.onCameraAzimuthChange = callback;
     this.reportCameraAzimuth(true);
+  }
+
+  public getCameraDebugState() {
+    return {
+      mode: this.worldEntryCameraPlan ? 'world-entry' : this.introCameraPlan ? 'intro' : 'follow',
+      controlsEnabled: this.controls.enabled,
+      introProgress: this.introCameraPlan
+        ? Math.min(1, this.introCameraElapsed / this.introCameraPlan.duration)
+        : 1,
+      expectedFollowDistance: WORLD_CAMERA_DISTANCE,
+      cameraDistanceToTarget: this.camera.position.distanceTo(this.controls.target),
+      cameraAzimuth: this.getCameraAzimuth(),
+      cameraPosition: {
+        x: this.camera.position.x,
+        y: toLogicalWorldY(this.camera.position.y),
+        z: this.camera.position.z,
+      },
+      lookTarget: {
+        x: this.controls.target.x,
+        y: toLogicalWorldY(this.controls.target.y),
+        z: this.controls.target.z,
+      },
+      currentPlayerPos: {
+        x: this.currentPlayerPos.x,
+        y: this.currentPlayerPos.y,
+        z: this.currentPlayerPos.z,
+      },
+      currentCameraFocus: {
+        x: this.currentCameraFocus.x,
+        y: this.currentCameraFocus.y,
+        z: this.currentCameraFocus.z,
+      },
+    };
   }
 
   public rotateCamera(delta: number) {

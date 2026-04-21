@@ -8,6 +8,14 @@ import { LoadingScreen } from './LoadingScreen';
 import { getBuildingFootprint } from '../utils/worldNavigation';
 import { getBuildingAccessPosition } from '../utils/buildingAccess';
 
+type WorldDebugApi = {
+  getSnapshot: () => ReturnType<VoxelEngine['getCameraDebugState']> | null;
+};
+
+type DebugWindow = Window & {
+  __AUREUS_WORLD_DEBUG__?: WorldDebugApi;
+};
+
 interface VoxelWorldProps {
   voxels: VoxelData[];
   pickupVoxels?: VoxelData[];
@@ -117,6 +125,7 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
 
     if (containerRef.current) {
       reportProgress(8, 'Booting render pipeline...');
+      const debugWindow = window as DebugWindow;
       engineRef.current = new VoxelEngine(
         containerRef.current,
         onStateChange,
@@ -126,6 +135,10 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
         onSelect,
         onCameraAzimuthChange
       );
+      const debugApi: WorldDebugApi = {
+        getSnapshot: () => engineRef.current?.getCameraDebugState() ?? null,
+      };
+      debugWindow.__AUREUS_WORLD_DEBUG__ = debugApi;
       reportProgress(18, 'Allocating render systems...');
 
       engineRef.current.loadInitialModel(voxels);
@@ -184,6 +197,9 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
 
       return () => {
         resizeObserver.disconnect();
+        if (debugWindow.__AUREUS_WORLD_DEBUG__ === debugApi) {
+          delete debugWindow.__AUREUS_WORLD_DEBUG__;
+        }
         engineRef.current?.cleanup();
       };
     }

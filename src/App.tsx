@@ -577,31 +577,6 @@ export default function App() {
     setState((prev) => enterOfficeBuilding(prev, buildingId));
   };
 
-  if (!gameStarted) {
-    if (homeScreenView === 'archive') {
-      return (
-        <SaveArchiveScreen
-          saveSlots={saveSlots}
-          onBack={handleBackToStartMenu}
-          onLoadSlot={handleLoadSaveSlot}
-        />
-      );
-    }
-
-    return (
-      <StartScreen
-        hasSave={hasSave}
-        worldProfiles={WORLD_PROFILES}
-        onStartWorld={handleStartNewGame}
-        onContinue={handleOpenArchiveBrowser}
-        onOpenPlanner={handleOpenPlannerFromHome}
-        showPlannerAccess={plannerEnabled}
-      />
-    );
-  }
-
-  const isPlannerScene = state.currentScene === 'CITY_PLANNER';
-
   const sceneRouter = (
     <GameSceneRouter
       state={state}
@@ -667,6 +642,31 @@ export default function App() {
       onEntryTransitionComplete={handleWorldEntryTransitionComplete}
     />
   );
+
+  if (!gameStarted) {
+    if (homeScreenView === 'archive') {
+      return (
+        <SaveArchiveScreen
+          saveSlots={saveSlots}
+          onBack={handleBackToStartMenu}
+          onLoadSlot={handleLoadSaveSlot}
+        />
+      );
+    }
+
+    return (
+      <StartScreen
+        hasSave={hasSave}
+        worldProfiles={WORLD_PROFILES}
+        onStartWorld={handleStartNewGame}
+        onContinue={handleOpenArchiveBrowser}
+        onOpenPlanner={handleOpenPlannerFromHome}
+        showPlannerAccess={plannerEnabled}
+      />
+    );
+  }
+
+  const isPlannerScene = state.currentScene === 'CITY_PLANNER';
 
   if (isPlannerScene) {
     return (
