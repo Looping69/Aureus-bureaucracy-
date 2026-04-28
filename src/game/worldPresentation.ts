@@ -1,6 +1,6 @@
-export const DAY_NIGHT_TIME_SCALE = 0.1;
-export const DAY_AMBIENT_TIME_RATE = 0.04;
-export const NIGHT_AMBIENT_TIME_RATE = 0.2;
+export const DAY_NIGHT_TIME_SCALE = 0.3;
+export const DAY_AMBIENT_TIME_RATE = 0.12;
+export const NIGHT_AMBIENT_TIME_RATE = 0.6;
 export const WORLD_RENDER_Y_OFFSET = 1;
 
 export const isNightHour = (time: number) => time >= 20 || time < 6;

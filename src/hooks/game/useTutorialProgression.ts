@@ -24,6 +24,16 @@ export const useTutorialProgression = (
       let nextFtuePhase = prev.ftuePhase;
 
       if (
+        prev.ftuePhase === 'intro' &&
+        prev.currentScene === 'WORLD'
+      ) {
+        nextFtuePhase = 'reach_bureau';
+        nextTutorialStep = getLegacyTutorialStepForFtuePhase('reach_bureau');
+        setNotification({ title: 'Head to the Bureau', msg: 'Find the Bureau of Extraction east of your house. Your mining permit depends on it.' });
+        changed = true;
+      }
+
+      if (
         prev.ftuePhase === 'enter_bureau' &&
         prev.currentScene === 'OFFICE' &&
         prev.activeBuildingId === BUREAU_BUILDING_ID

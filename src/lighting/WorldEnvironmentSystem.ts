@@ -298,7 +298,7 @@ export class WorldEnvironmentSystem {
     shadowCamera.bottom = -SHADOW_CAMERA_HALF_EXTENT;
     shadowCamera.updateProjectionMatrix();
 
-    this.dirLight.castShadow = getDaylightFactor(this.timeOfDay) > 0.32 && this.weather.current !== 'STORM';
+    this.dirLight.castShadow = getDaylightFactor(this.timeOfDay) > 0.15 && this.weather.current !== 'STORM';
     this.dirLight.updateMatrixWorld();
   }
 
