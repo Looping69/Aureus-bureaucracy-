@@ -8,10 +8,10 @@ import {
   toRenderedWorldY,
 } from './worldPresentation';
 
-test('day-night time scale is tuned slightly faster than before', () => {
-  assert.equal(DAY_NIGHT_TIME_SCALE, 0.1);
-  assert.equal(getAmbientTimeStep(12), 0.004);
-  assert.ok(Math.abs(getAmbientTimeStep(22) - 0.02) < 1e-9);
+test('day-night time scale is tuned for faster gameplay', () => {
+  assert.equal(DAY_NIGHT_TIME_SCALE, 0.3);
+  assert.equal(getAmbientTimeStep(12), 0.036);
+  assert.ok(Math.abs(getAmbientTimeStep(22) - 0.18) < 1e-9);
 });
 
 test('rendered world Y offset round-trips back to logical Y', () => {

@@ -327,8 +327,6 @@ export const buildWorldSurfaceMap = (
     }
   }
 
-  const result: WorldSurfaceMap = {
-
   // Give lowered parcels a deliberate shoulder where they meet the road/building plane
   // so the camera reads them as stepped lots rather than broken sinkholes.
   softenLoweredLotEdges(tiles);
