@@ -9,6 +9,9 @@
     "preview": "vite preview",
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
     "lint": "tsc --noEmit",
+    "test:unit": "node --import tsx --test \"src/**/*.test.ts\"",
+    "validate:city": "tsx scripts/validate-city-layout.ts",
+    "check": "node scripts/check.mjs",
     "smoke:regression": "node scripts/smoke-regression.mjs"
   },
   "dependencies": {

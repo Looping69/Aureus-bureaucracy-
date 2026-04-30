@@ -1,5 +1,6 @@
 import { GameState } from '../types';
 import saveMetadata from './saveMetadata.json';
+import { isValidGameStateCandidate } from './saveValidation';
 
 export const SAVE_KEY = saveMetadata.saveKey;
 export const LEGACY_SAVE_KEYS = saveMetadata.legacySaveKeys;
@@ -28,31 +29,13 @@ export type SaveSlotSummary = {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
 
-const isLikelyGameState = (value: unknown): value is GameState => {
-  if (!isRecord(value)) return false;
-
-  return (
-    typeof value.money === 'number' &&
-    typeof value.ore === 'number' &&
-    typeof value.energy === 'number' &&
-    typeof value.day === 'number' &&
-    typeof value.time === 'number' &&
-    Array.isArray(value.mines) &&
-    Array.isArray(value.objectives) &&
-    Array.isArray(value.storyFlags) &&
-    isRecord(value.permits) &&
-    isRecord(value.npcs) &&
-    isRecord(value.buildings)
-  );
-};
-
 const isSaveEnvelope = (value: unknown): value is SaveEnvelope => {
   if (!isRecord(value)) return false;
 
   return (
     typeof value.version === 'number' &&
     typeof value.savedAt === 'string' &&
-    isLikelyGameState(value.state)
+    isValidGameStateCandidate(value.state)
   );
 };
 
@@ -99,7 +82,7 @@ const migrateLegacySave = (value: unknown): SaveEnvelope | null => {
     return createSaveEnvelope(value.state, value.savedAt);
   }
 
-  if (isLikelyGameState(value)) {
+  if (isValidGameStateCandidate(value)) {
     return createSaveEnvelope(value);
   }
 

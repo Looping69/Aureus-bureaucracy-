@@ -3,7 +3,7 @@ import { COLORS, WORLD_HALF_SIZE, WORLD_SIZE } from '../utils/voxelConstants';
 import { WorldSurfaceMap, buildWorldSurfaceMap, getWorldSurfaceTile } from '../utils/worldSurface';
 
 const STREET_PICKUP_TARGET_COUNT = 12;
-const STREET_PICKUP_RESTORE = 10;
+const STREET_PICKUP_RESTORE = 20;
 const STREET_PICKUP_KINDS = new Set<string>(['ROAD', 'SIDEWALK']);
 
 type CollectionResult = {
