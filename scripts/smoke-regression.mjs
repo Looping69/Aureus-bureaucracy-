@@ -2,7 +2,8 @@ import { chromium } from 'playwright';
 import { createServer } from 'vite';
 import saveMetadata from '../src/game/saveMetadata.json' with { type: 'json' };
 
-const APP_URL = 'http://127.0.0.1:4173';
+const SMOKE_PORT = Number(process.env.AUREUS_SMOKE_PORT ?? 4173);
+const APP_URL = `http://127.0.0.1:${SMOKE_PORT}`;
 const SAVE_KEY = saveMetadata.saveKey;
 const LEGACY_SAVE_KEYS = saveMetadata.legacySaveKeys;
 const SAVE_VERSION = saveMetadata.saveVersion;
@@ -49,6 +50,18 @@ const clickButtonByText = async (page, text) => {
     }
     button.click();
   }, text);
+};
+
+const clickWorldFile = async (page, label) => {
+  await page.evaluate((targetLabel) => {
+    const button = [...document.querySelectorAll('button')].find((element) =>
+      element.textContent?.replace(/\s+/g, ' ').trim().includes(targetLabel)
+    );
+    if (!(button instanceof HTMLElement)) {
+      throw new Error(`World file not found: ${targetLabel}`);
+    }
+    button.click();
+  }, label);
 };
 
 const clickNavAction = async (page, label) => {
@@ -302,7 +315,8 @@ const run = async () => {
     viteServer = await createServer({
       server: {
         host: '127.0.0.1',
-        port: 4173
+        port: SMOKE_PORT,
+        strictPort: true
       },
       logLevel: 'error'
     });
@@ -326,7 +340,7 @@ const run = async () => {
 
     await page.getByText(/World Files/i).first().waitFor({ state: 'visible', timeout: 30000 });
 
-    await page.getByRole('button', { name: /World 1/i }).click();
+    await clickWorldFile(page, 'World 1');
     await assertNoRuntimeErrors();
     await waitForWorldHud(page);
     await assertNoRuntimeErrors();
@@ -536,7 +550,68 @@ const run = async () => {
     );
     await bureauPage.close();
 
-    console.log('Regression smoke passed: spawn fly-in, movement/recenter handoff, save archive restore, Bureau FTUE filing chain, and mine navigation.');
+    console.log('Scenario 4: seeded district incident choice card resolves into state and ledger');
+    const incidentSeedPage = await context.newPage();
+    incidentSeedPage.setDefaultTimeout(30000);
+    await incidentSeedPage.goto(APP_URL);
+    await writeSavedState(incidentSeedPage, {
+      ...savedAfterStart,
+      money: 500,
+      currentScene: 'WORLD',
+      activeNPCId: null,
+      activePermitId: null,
+      activeMiniGame: null,
+      pendingPermitAction: null,
+      ftuePhase: 'ftue_complete',
+      tutorialStep: 99,
+      activeCityIncident: {
+        id: 'bureau-delay',
+        title: 'Bureau Delay',
+        description: 'Central filing is slowing your active applications before the next run.',
+        trigger: 'A clerk warns that your next filing will crawl unless you create pressure.',
+        choices: [
+          {
+            id: 'pay-overtime',
+            label: 'Pay Overtime',
+            detail: 'Put cash on the desk and make the file worth touching tonight.',
+            effectLabel: '-$160, Bureau Pull 10h',
+          },
+          {
+            id: 'accept-delay',
+            label: 'Accept Delay',
+            detail: 'Do nothing loud. You lose tempo, but the office stays calm.',
+            effectLabel: 'Energy +6, Exposure -1',
+          },
+        ],
+      },
+    });
+    await incidentSeedPage.close();
+
+    const incidentPage = await context.newPage();
+    incidentPage.setDefaultTimeout(30000);
+    await incidentPage.goto(APP_URL);
+    await continueSavedRun(incidentPage);
+    await incidentPage.getByText(/District Incident/i).first().waitFor({ state: 'visible', timeout: 30000 });
+    await incidentPage.getByRole('button', { name: /Pay Overtime/i }).click();
+    await incidentPage.waitForFunction(({ key, slotId }) => {
+      const raw = window.localStorage.getItem(key);
+      if (!raw) return false;
+      const parsed = JSON.parse(raw);
+      const state = parsed?.slots?.[slotId]?.state;
+      return (
+        state?.activeCityIncident === null &&
+        state?.money === 340 &&
+        state?.worldEffects?.bureauPull > 0
+      );
+    }, { key: SAVE_KEY, slotId: DEFAULT_SLOT_ID }, { timeout: 15000 });
+
+    await incidentPage.locator('button[title="Open utilities"]').click();
+    await incidentPage.getByRole('button', { name: /Story Ledger/i }).click();
+    await incidentPage.getByText(/Incident Resolved/i).first().waitFor({ state: 'visible', timeout: 15000 });
+    await incidentPage.getByText(/Bureau Delay: -\$160, Bureau Pull 10h/i).first().waitFor({ state: 'visible', timeout: 15000 });
+    await incidentPage.close();
+
+    console.log('Regression smoke passed: spawn fly-in, movement/recenter handoff, save archive restore, Bureau FTUE filing chain, district incident choice card, and mine navigation.');
   } finally {
     if (browser) await browser.close();
     if (viteServer) await viteServer.close();

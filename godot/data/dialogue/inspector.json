@@ -1,0 +1,41 @@
+{
+  "npc_id": "inspector",
+  "nodes": [
+    {
+      "id": "root",
+      "text": "Inspector Krell measures the room with his eyes and finds it non-compliant. He wants order, signatures, and preferably fear.",
+      "options": [
+        {
+          "id": "request_precheck",
+          "text": "Request a safety pre-check. (-$50, -Exposure)",
+          "conditions": [{ "type": "money_at_least", "amount": 50 }],
+          "commands": [
+            { "type": "add_money", "amount": -50 },
+            { "type": "adjust_meters", "exposure": -6, "trust": 3 },
+            { "type": "adjust_npc_trust", "npc_id": "inspector", "delta": 8 }
+          ],
+          "next_node_id": "precheck"
+        },
+        {
+          "id": "ask_sector_four",
+          "text": "Mention Sector 4 records. (+Influence, discovers leverage)",
+          "commands": [
+            { "type": "set_npc_vulnerability_discovered", "npc_id": "inspector", "discovered": true },
+            { "type": "adjust_meters", "influence": 7, "exposure": 2 }
+          ],
+          "next_node_id": "sector_four"
+        }
+      ]
+    },
+    {
+      "id": "precheck",
+      "text": "Krell files a provisional cleanliness blessing. It smells like disinfectant and litigation.",
+      "options": [{ "id": "back", "text": "Return to inspection posture.", "next_node_id": "root" }]
+    },
+    {
+      "id": "sector_four",
+      "text": "His jaw tightens by a legally meaningful amount. You have his attention.",
+      "options": [{ "id": "back", "text": "Let that hang in the air.", "next_node_id": "root" }]
+    }
+  ]
+}

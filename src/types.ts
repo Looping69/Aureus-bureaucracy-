@@ -185,6 +185,22 @@ export interface Objective {
   targetId?: string;
 }
 
+export interface CityIncidentChoice {
+  id: string;
+  label: string;
+  detail: string;
+  effectLabel: string;
+  disabledReason?: string;
+}
+
+export interface CityIncident {
+  id: string;
+  title: string;
+  description: string;
+  trigger: string;
+  choices: CityIncidentChoice[];
+}
+
 export type FtuePhase =
   | 'intro'
   | 'reach_bureau'
@@ -273,6 +289,7 @@ export interface GameNarrativeState {
   worldEffects: WorldEffects;
   storyFlags: StoryFlag[];
   lastCityEventHour: number;
+  activeCityIncident: CityIncident | null;
 }
 
 export interface GameFtueState {

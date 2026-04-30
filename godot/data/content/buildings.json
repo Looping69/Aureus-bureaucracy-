@@ -1,0 +1,97 @@
+{
+  "buildings": [
+    {
+      "id": "player_home",
+      "npc_id": "none",
+      "name": "Your House",
+      "type": "HOME",
+      "position": { "x": 2, "y": 8 },
+      "access_position": { "x": 2, "y": 11 },
+      "is_discovered": true,
+      "description": "A cramped company house with just enough room to keep moving."
+    },
+    {
+      "id": "licensing_office",
+      "npc_id": "licensing",
+      "name": "Bureau of Extraction",
+      "type": "OFFICE",
+      "position": { "x": 6, "y": 4 },
+      "access_position": { "x": 6, "y": 7 },
+      "is_discovered": false,
+      "description": "The permit gate. If this building says no, nothing else matters.",
+      "exploration_items": ["vane_ledger", "trash_can_vane"]
+    },
+    {
+      "id": "union_hall",
+      "npc_id": "union",
+      "name": "The Gilded Pick",
+      "type": "PUB",
+      "position": { "x": 8, "y": 4 },
+      "access_position": { "x": 8, "y": 7 },
+      "is_discovered": false,
+      "description": "A union front with equal parts liquor, leverage, and theater.",
+      "exploration_items": ["sal_cigar_box"]
+    },
+    {
+      "id": "inspector_hq",
+      "npc_id": "inspector",
+      "name": "Compliance Tower",
+      "type": "OFFICE",
+      "position": { "x": 6, "y": 2 },
+      "access_position": { "x": 6, "y": 5 },
+      "is_discovered": false,
+      "description": "Krell's domain. Sterile, severe, and one missing form away from violence.",
+      "exploration_items": ["krell_blueprints"]
+    },
+    {
+      "id": "fixer_den",
+      "npc_id": "fixer",
+      "name": "Slink's Salvage",
+      "type": "HOME",
+      "position": { "x": 8, "y": 8 },
+      "access_position": { "x": 8, "y": 11 },
+      "is_discovered": false,
+      "description": "A junk-clotted den where silence is for sale."
+    },
+    {
+      "id": "hotline_booth",
+      "npc_id": "journalist",
+      "name": "Hotline Booth",
+      "type": "HOTLINE",
+      "position": { "x": 2, "y": 4 },
+      "access_position": { "x": 2, "y": 4 },
+      "is_discovered": true,
+      "description": "Elena's little truth booth, half newsroom and half trap."
+    },
+    {
+      "id": "chief_hut",
+      "npc_id": "chief",
+      "name": "Chief's Hut",
+      "type": "HOME",
+      "position": { "x": 0, "y": 2 },
+      "access_position": { "x": 0, "y": 5 },
+      "is_discovered": true,
+      "description": "One of the last places in town that still feels human."
+    },
+    {
+      "id": "mine_entrance",
+      "npc_id": "none",
+      "name": "Sector 4 Entrance",
+      "type": "MINE_ENTRANCE",
+      "position": { "x": 4, "y": 10 },
+      "access_position": { "x": 4, "y": 9 },
+      "is_discovered": true,
+      "description": "A scar in the ground and the start of your real work."
+    },
+    {
+      "id": "central_park",
+      "npc_id": "none",
+      "name": "Dusty Palms Park",
+      "type": "PARK",
+      "position": { "x": 4, "y": 4 },
+      "access_position": { "x": 4, "y": 4 },
+      "is_discovered": true,
+      "description": "The only patch of public calm in a city built on extraction."
+    }
+  ]
+}

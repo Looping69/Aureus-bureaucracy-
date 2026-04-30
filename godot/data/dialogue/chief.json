@@ -1,0 +1,41 @@
+{
+  "npc_id": "chief",
+  "nodes": [
+    {
+      "id": "root",
+      "text": "Chief Okon watches the mine road more than he watches you. The land is already speaking. You are here to prove whether you listen.",
+      "options": [
+        {
+          "id": "fund_clinic",
+          "text": "Fund clinic supplies. (-$120, +Trust)",
+          "conditions": [{ "type": "money_at_least", "amount": 120 }],
+          "commands": [
+            { "type": "add_money", "amount": -120 },
+            { "type": "adjust_meters", "trust": 14, "exposure": -3 },
+            { "type": "adjust_npc_trust", "npc_id": "chief", "delta": 18 }
+          ],
+          "next_node_id": "clinic"
+        },
+        {
+          "id": "ask_old_vein",
+          "text": "Ask about the Old Vein. (+Influence, discovers leverage)",
+          "commands": [
+            { "type": "set_npc_vulnerability_discovered", "npc_id": "chief", "discovered": true },
+            { "type": "adjust_meters", "trust": 4, "influence": 4 }
+          ],
+          "next_node_id": "old_vein"
+        }
+      ]
+    },
+    {
+      "id": "clinic",
+      "text": "Okon nods once. Not forgiveness. Not yet. But the door is less closed.",
+      "options": [{ "id": "back", "text": "Respect the silence.", "next_node_id": "root" }]
+    },
+    {
+      "id": "old_vein",
+      "text": "He tells you where not to dig. In this town, that is also a map.",
+      "options": [{ "id": "back", "text": "Remember the warning.", "next_node_id": "root" }]
+    }
+  ]
+}

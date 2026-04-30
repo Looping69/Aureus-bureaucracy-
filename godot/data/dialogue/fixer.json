@@ -1,0 +1,41 @@
+{
+  "npc_id": "fixer",
+  "nodes": [
+    {
+      "id": "root",
+      "text": "Slink's smile arrives before the truth and leaves before the invoice. He can move ore, silence, or trouble.",
+      "options": [
+        {
+          "id": "sell_whisper",
+          "text": "Buy market whispers. (-$100, +Influence)",
+          "conditions": [{ "type": "money_at_least", "amount": 100 }],
+          "commands": [
+            { "type": "add_money", "amount": -100 },
+            { "type": "adjust_meters", "influence": 10, "exposure": 4 },
+            { "type": "adjust_npc_trust", "npc_id": "fixer", "delta": 10 }
+          ],
+          "next_node_id": "whispers"
+        },
+        {
+          "id": "ask_debt",
+          "text": "Ask about his off-world debt. (+Leverage, +Exposure)",
+          "commands": [
+            { "type": "set_npc_vulnerability_discovered", "npc_id": "fixer", "discovered": true },
+            { "type": "adjust_meters", "influence": 6, "exposure": 6 }
+          ],
+          "next_node_id": "debt"
+        }
+      ]
+    },
+    {
+      "id": "whispers",
+      "text": "Slink names a buyer, a bribe, and three exits. Only two probably exist.",
+      "options": [{ "id": "back", "text": "Keep the useful parts.", "next_node_id": "root" }]
+    },
+    {
+      "id": "debt",
+      "text": "For half a second, the grin drops. That half second is worth money.",
+      "options": [{ "id": "back", "text": "Smile back.", "next_node_id": "root" }]
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "effects": [
+    {
+      "id": "bureauPull",
+      "label": "Bureau Pull",
+      "detail": "Permits move faster and land with less resistance."
+    },
+    {
+      "id": "communityBacking",
+      "label": "Community Backing",
+      "detail": "Locals steady your operation and reduce field pressure."
+    },
+    {
+      "id": "marketInsight",
+      "label": "Market Window",
+      "detail": "Export timing is favorable and your buyers pay better."
+    },
+    {
+      "id": "mediaHeat",
+      "label": "Media Heat",
+      "detail": "Everyone is watching. Influence rises faster, but so does scrutiny."
+    }
+  ]
+}

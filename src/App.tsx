@@ -20,6 +20,7 @@ import { EndingOverlay } from './components/EndingOverlay';
 import { MarketOverlay } from './components/MarketOverlay';
 import { UtilityDrawer } from './components/UtilityDrawer';
 import { SideNavPanel } from './components/SideNavPanel';
+import { CityIncidentOverlay } from './components/CityIncidentOverlay';
 import { getBuildingAccessPosition } from './utils/buildingAccess';
 import { findPath } from './utils/pathfinding';
 import { buildWorldSurfaceMap, getWorldSurfaceTile } from './utils/worldSurface';
@@ -39,6 +40,7 @@ import { useCityEventLoop } from './hooks/game/useCityEventLoop';
 import { getUnlockedEnding } from './game/endings';
 import { applyDialogueCommands } from './game/dialogue/dialogueCommands';
 import { applyOperationAction } from './game/runCycle';
+import { applyCityIncidentChoice } from './game/cityIncidents';
 import { buildHydratedBuildings, buildInitialGameState } from './game/session';
 import {
   applyPlannerWorld,
@@ -445,6 +447,15 @@ export default function App() {
     });
   }, [pushNotification]);
 
+  const handleCityIncidentChoice = React.useCallback((choiceId: string) => {
+    beginTrackedAction(`city_incident:${choiceId}`);
+    setState((prev) => {
+      const result = applyCityIncidentChoice(prev, choiceId);
+      pushNotification(result.notification);
+      return result.nextState;
+    });
+  }, [pushNotification]);
+
   const handleTakePhoto = (itemId: string) => {
     beginTrackedAction(`take_photo:${itemId}`);
     setState(prev => {
@@ -813,6 +824,13 @@ export default function App() {
                 <EndingOverlay
                   endingId={state.activeEndingId}
                   onClose={() => setState(closeEnding)}
+                />
+              )}
+              {state.activeCityIncident && (
+                <CityIncidentOverlay
+                  key={`city-incident-${state.activeCityIncident.id}`}
+                  incident={state.activeCityIncident}
+                  onChoose={handleCityIncidentChoice}
                 />
               )}
               {showMarket && (

@@ -1,0 +1,41 @@
+{
+  "npc_id": "union",
+  "nodes": [
+    {
+      "id": "root",
+      "text": "Big Sal wipes coal dust off a glass that somehow gets dirtier. The boys need work, protection, and someone else to pay for both. What are you offering?",
+      "options": [
+        {
+          "id": "buy_round",
+          "text": "Buy a round for the crew. (-$75, +Trust)",
+          "conditions": [{ "type": "money_at_least", "amount": 75 }],
+          "commands": [
+            { "type": "add_money", "amount": -75 },
+            { "type": "adjust_meters", "trust": 8, "influence": 3 },
+            { "type": "adjust_npc_trust", "npc_id": "union", "delta": 12 }
+          ],
+          "next_node_id": "favor"
+        },
+        {
+          "id": "ask_safety",
+          "text": "Ask where the unsafe tunnels really are. (+Influence)",
+          "commands": [
+            { "type": "set_npc_vulnerability_discovered", "npc_id": "union", "discovered": true },
+            { "type": "adjust_meters", "influence": 5 }
+          ],
+          "next_node_id": "intel"
+        }
+      ]
+    },
+    {
+      "id": "favor",
+      "text": "Sal grins. A generous prospector is still a prospector, but the crew will remember the tab.",
+      "options": [{ "id": "back", "text": "Back to business.", "next_node_id": "root" }]
+    },
+    {
+      "id": "intel",
+      "text": "Sal marks three spots on a napkin. None of them are on the official maps. Naturally.",
+      "options": [{ "id": "back", "text": "Pocket the napkin.", "next_node_id": "root" }]
+    }
+  ]
+}

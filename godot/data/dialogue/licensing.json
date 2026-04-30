@@ -1,0 +1,208 @@
+{
+  "npc_id": "licensing",
+  "nodes": [
+    {
+      "id": "root",
+      "text": "Vane doesn't look up from his ledger. Form 1-A is the foundation of civilization. Without it, you are merely a loiterer with a shovel. What do you want?",
+      "options": [
+        {
+          "id": "need_permit",
+          "text": "I need a permit to start digging.",
+          "conditions": [
+            {
+              "type": "permit_status_in",
+              "permit_id": "extraction-intent",
+              "statuses": ["LOCKED", "AVAILABLE"]
+            }
+          ],
+          "commands": [
+            {
+              "type": "set_permit_status",
+              "permit_id": "extraction-intent",
+              "status": "AVAILABLE"
+            }
+          ],
+          "next_node_id": "tutorial_intro"
+        },
+        {
+          "id": "discuss_rejected",
+          "text": "I need to discuss my rejected application (Form 17-B).",
+          "conditions": [
+            {
+              "type": "permit_status_is",
+              "permit_id": "extraction-intent",
+              "status": "REJECTED"
+            }
+          ],
+          "next_node_id": "rejection_discussion"
+        },
+        {
+          "id": "flattery",
+          "text": "Your filing system is remarkably efficient, Officer.",
+          "commands": [
+            {
+              "type": "adjust_npc_trust",
+              "npc_id": "licensing",
+              "delta": 5
+            }
+          ],
+          "next_node_id": "flattery"
+        }
+      ]
+    },
+    {
+      "id": "tutorial_intro",
+      "text": "New meat? Very well. You'll need Form 17-B. I've unlocked it in your file. Fill it out. Don't make mistakes.",
+      "options": [
+        {
+          "id": "ack_intro",
+          "text": "I'll get right on it.",
+          "next_node_id": "root"
+        }
+      ]
+    },
+    {
+      "id": "rejection_discussion",
+      "text": "Ah, yes. The 17-B. Rejected for excessive hopefulness. A serious infraction. We can't have dreamers clogging up the tunnels.",
+      "options": [
+        {
+          "id": "appeal",
+          "text": "This is absurd! I demand an appeal.",
+          "next_node_id": "appeal_denied"
+        },
+        {
+          "id": "expedite",
+          "text": "Is there any way to expedite a reconsideration?",
+          "next_node_id": "bribe_hint"
+        }
+      ]
+    },
+    {
+      "id": "appeal_denied",
+      "text": "Appeals require Form 99-Z, which is currently out of print. Come back in six to eight months.",
+      "options": [
+        {
+          "id": "no_time",
+          "text": "I don't have six months.",
+          "next_node_id": "bribe_hint"
+        }
+      ]
+    },
+    {
+      "id": "bribe_hint",
+      "text": "Time is a luxury, isn't it? Just like recognition. The Regional Director is visiting soon. He values initiative.",
+      "options": [
+        {
+          "id": "insight",
+          "text": "I see. Initiative. [Insight]",
+          "commands": [
+            {
+              "type": "set_tutorial_step",
+              "step": 5
+            },
+            {
+              "type": "set_npc_vulnerability_discovered",
+              "npc_id": "licensing",
+              "discovered": true
+            }
+          ],
+          "next_node_id": "negotiation_phase"
+        }
+      ]
+    },
+    {
+      "id": "negotiation_phase",
+      "text": "Vane waits, tapping his pen. He expects you to make a move.",
+      "options": [
+        {
+          "id": "use_vulnerability",
+          "text": "I heard the Director is looking for efficient officers... [Use Vulnerability]",
+          "conditions": [
+            {
+              "type": "npc_vulnerability_discovered",
+              "npc_id": "licensing"
+            }
+          ],
+          "commands": [
+            {
+              "type": "set_tutorial_step",
+              "step": 7
+            },
+            {
+              "type": "approve_permit",
+              "permit_id": "extraction-intent"
+            },
+            {
+              "type": "extend_world_effect",
+              "effect_id": "bureauPull",
+              "hours": 10
+            },
+            {
+              "type": "adjust_npc_trust",
+              "npc_id": "licensing",
+              "delta": 20
+            },
+            {
+              "type": "adjust_meters",
+              "trust": 10,
+              "influence": 5
+            }
+          ],
+          "next_node_id": "tutorial_success"
+        },
+        {
+          "id": "processing_fee",
+          "text": "Maybe I can offer a processing fee? ($50)",
+          "conditions": [
+            {
+              "type": "money_at_least",
+              "amount": 50
+            }
+          ],
+          "commands": [
+            {
+              "type": "add_money",
+              "amount": -50
+            },
+            {
+              "type": "set_tutorial_step",
+              "step": 7
+            },
+            {
+              "type": "approve_permit",
+              "permit_id": "extraction-intent"
+            },
+            {
+              "type": "adjust_meters",
+              "trust": -5,
+              "exposure": 5
+            }
+          ],
+          "next_node_id": "tutorial_success"
+        }
+      ]
+    },
+    {
+      "id": "tutorial_success",
+      "text": "Well now. That is precisely the kind of initiative we look for. Your 17-B is approved. Try not to die down there.",
+      "options": [
+        {
+          "id": "thanks",
+          "text": "Thanks, Vane.",
+          "next_node_id": "root"
+        }
+      ]
+    },
+    {
+      "id": "flattery",
+      "text": "Efficiency is its own reward, but recognition is rare in this sector. You have a keen eye.",
+      "options": [
+        {
+          "id": "back_to_root",
+          "text": "Just stating the obvious.",
+          "next_node_id": "root"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,90 @@
+{
+  "permits": [
+    {
+      "id": "extraction-intent",
+      "name": "Extraction Intent (Form 17-B)",
+      "form_number": "17-B",
+      "description": "Preliminary declaration of intent to extract resources from the crust. Required for all mining operations.",
+      "cost": 50,
+      "status": "LOCKED",
+      "unlocks_feature": "prospecting"
+    },
+    {
+      "id": "prospecting-license",
+      "name": "Prospecting License (Form 404)",
+      "form_number": "404",
+      "description": "Allows for surface-level sampling (up to 10 samples) to determine site viability. Do not extract ore.",
+      "cost": 150,
+      "status": "LOCKED",
+      "unlocks_feature": "mine_access"
+    },
+    {
+      "id": "mining-permit-iron",
+      "name": "Iron Vein Extraction Permit",
+      "form_number": "FE-26",
+      "description": "Full operational rights for the Iron Vein Outpost. Compliance with safety regulations mandatory.",
+      "cost": 500,
+      "status": "LOCKED",
+      "unlocks_feature": "iron_mine_full"
+    },
+    {
+      "id": "prospecting-permit-deep",
+      "name": "Deep Hollow Survey Request",
+      "form_number": "DH-01",
+      "description": "Permission to survey the Deep Hollow region. High danger pay required for inspectors.",
+      "cost": 300,
+      "status": "LOCKED"
+    },
+    {
+      "id": "mining-permit-deep",
+      "name": "Deep Hollow Excavation Rights",
+      "form_number": "DH-02",
+      "description": "Full mining rights for Deep Hollow. Waiver of liability for shadow sickness required.",
+      "cost": 1200,
+      "status": "LOCKED"
+    },
+    {
+      "id": "prospecting-permit-abyss",
+      "name": "Abyssal Reach Probe Auth",
+      "form_number": "AR-00",
+      "description": "Authorization to send probes into the Abyssal Reach. Extreme caution advised.",
+      "cost": 1000,
+      "status": "LOCKED"
+    },
+    {
+      "id": "wash-plant-permit",
+      "name": "Wash Plant Installation",
+      "form_number": "WP-09",
+      "description": "Permit to install a high-capacity wash plant, doubling ore yield per tile.",
+      "cost": 800,
+      "status": "AVAILABLE",
+      "unlocks_feature": "wash_plant"
+    },
+    {
+      "id": "export-license",
+      "name": "Ore Export License",
+      "form_number": "EX-99",
+      "description": "Authorization to sell extracted ore on the open market.",
+      "cost": 300,
+      "status": "AVAILABLE",
+      "unlocks_feature": "export_ore"
+    },
+    {
+      "id": "claim-expansion",
+      "name": "Claim Expansion Request",
+      "form_number": "CE-12",
+      "description": "Expand the boundaries of your current mining claim.",
+      "cost": 1500,
+      "status": "AVAILABLE",
+      "unlocks_feature": "expand_claim"
+    },
+    {
+      "id": "mining-permit-abyss",
+      "name": "Abyssal Reach Exploitation Grant",
+      "form_number": "AR-666",
+      "description": "Unrestricted mining access to the Abyssal Reach. God help us all.",
+      "cost": 5000,
+      "status": "LOCKED"
+    }
+  ]
+}

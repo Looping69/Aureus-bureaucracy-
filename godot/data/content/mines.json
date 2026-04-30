@@ -1,0 +1,62 @@
+{
+  "mines": [
+    {
+      "id": "iron-vein",
+      "name": "Iron Vein Outpost",
+      "location": "OUTSKIRTS",
+      "travel_time": 2,
+      "has_locals": false,
+      "yield": 1,
+      "danger": 10,
+      "discovered": true,
+      "grid_width": 5,
+      "grid_height": 10,
+      "yield_rate": 0.3,
+      "status": "PROSPECTING",
+      "prospecting_count": 0,
+      "permits": {
+        "prospecting_id": "prospecting-license",
+        "mining_id": "mining-permit-iron"
+      }
+    },
+    {
+      "id": "deep-hollow",
+      "name": "Deep Hollow",
+      "location": "DEEP_WASTE",
+      "travel_time": 6,
+      "has_locals": true,
+      "chief_id": "chief",
+      "yield": 3,
+      "danger": 40,
+      "discovered": false,
+      "grid_width": 8,
+      "grid_height": 15,
+      "yield_rate": 0.5,
+      "status": "LOCKED",
+      "prospecting_count": 0,
+      "permits": {
+        "prospecting_id": "prospecting-permit-deep",
+        "mining_id": "mining-permit-deep"
+      }
+    },
+    {
+      "id": "abyssal-reach",
+      "name": "Abyssal Reach",
+      "location": "DEEP_WASTE",
+      "travel_time": 12,
+      "has_locals": false,
+      "yield": 10,
+      "danger": 90,
+      "discovered": false,
+      "grid_width": 10,
+      "grid_height": 20,
+      "yield_rate": 0.8,
+      "status": "LOCKED",
+      "prospecting_count": 0,
+      "permits": {
+        "prospecting_id": "prospecting-permit-abyss",
+        "mining_id": "mining-permit-abyss"
+      }
+    }
+  ]
+}

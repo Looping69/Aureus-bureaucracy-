@@ -1,0 +1,138 @@
+{
+  "profiles": [
+    {
+      "id": "world-1",
+      "tag": "World 1",
+      "title": "Core Basin",
+      "description": "Balanced starting file. Clear weather, standard cash, standard pressure.",
+      "day": 1,
+      "time": 8,
+      "weather": {
+        "current": "CLEAR",
+        "time_left": 4,
+        "intensity": 0.1
+      },
+      "money": 1000,
+      "energy": 100,
+      "evidence": 0,
+      "ore": 0,
+      "known_npc_ids": [
+        "journalist"
+      ],
+      "discovered_building_ids": [
+        "player_home",
+        "hotline_booth",
+        "chief_hut",
+        "central_park",
+        "mine_entrance"
+      ],
+      "discovered_mine_ids": [
+        "iron-vein"
+      ]
+    },
+    {
+      "id": "world-2",
+      "tag": "World 2",
+      "title": "Storm Ledger",
+      "description": "Wet start, lighter cash buffer, and more of the west side already exposed.",
+      "day": 2,
+      "time": 6.5,
+      "weather": {
+        "current": "RAIN",
+        "time_left": 5,
+        "intensity": 0.48
+      },
+      "money": 900,
+      "energy": 92,
+      "evidence": 0,
+      "ore": 0,
+      "known_npc_ids": [
+        "journalist",
+        "chief"
+      ],
+      "discovered_building_ids": [
+        "player_home",
+        "hotline_booth",
+        "chief_hut",
+        "central_park",
+        "mine_entrance",
+        "union_hall"
+      ],
+      "discovered_mine_ids": [
+        "iron-vein"
+      ]
+    },
+    {
+      "id": "world-3",
+      "tag": "World 3",
+      "title": "Testing Basin",
+      "description": "Fast-start sandbox file. Clear weather, boosted cash, wider discovery, and both core mines already exposed.",
+      "day": 2,
+      "time": 10,
+      "weather": {
+        "current": "CLEAR",
+        "time_left": 6,
+        "intensity": 0.08
+      },
+      "money": 2200,
+      "energy": 100,
+      "evidence": 0,
+      "ore": 4,
+      "known_npc_ids": [
+        "journalist",
+        "licensing",
+        "chief",
+        "fixer"
+      ],
+      "discovered_building_ids": [
+        "player_home",
+        "hotline_booth",
+        "chief_hut",
+        "central_park",
+        "mine_entrance",
+        "licensing_office",
+        "union_hall",
+        "fixer_den"
+      ],
+      "discovered_mine_ids": [
+        "iron-vein",
+        "deep-hollow"
+      ]
+    },
+    {
+      "id": "world-4",
+      "tag": "World 4",
+      "title": "Frontier Burn",
+      "description": "Harsh dawn start with deeper intel, more resources, and a hotter operating climate.",
+      "day": 4,
+      "time": 5.5,
+      "weather": {
+        "current": "HEATWAVE",
+        "time_left": 6,
+        "intensity": 0.64
+      },
+      "money": 1500,
+      "energy": 88,
+      "evidence": 2,
+      "ore": 2,
+      "known_npc_ids": [
+        "journalist",
+        "fixer",
+        "chief"
+      ],
+      "discovered_building_ids": [
+        "player_home",
+        "hotline_booth",
+        "chief_hut",
+        "central_park",
+        "mine_entrance",
+        "fixer_den",
+        "union_hall"
+      ],
+      "discovered_mine_ids": [
+        "iron-vein",
+        "deep-hollow"
+      ]
+    }
+  ]
+}

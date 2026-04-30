@@ -1,0 +1,39 @@
+{
+  "npc_id": "journalist",
+  "nodes": [
+    {
+      "id": "root",
+      "text": "Elena Vox has a recorder in one hand and a conscience in the other. She looks like she trusts neither.",
+      "options": [
+        {
+          "id": "tip_corruption",
+          "text": "Tip her about Bureau corruption. (+Trust, +Exposure)",
+          "commands": [
+            { "type": "adjust_meters", "trust": 8, "exposure": 8, "influence": 2 },
+            { "type": "adjust_npc_trust", "npc_id": "journalist", "delta": 15 }
+          ],
+          "next_node_id": "tip"
+        },
+        {
+          "id": "offer_scoop",
+          "text": "Promise a bigger scoop later. (+Influence)",
+          "commands": [
+            { "type": "set_npc_vulnerability_discovered", "npc_id": "journalist", "discovered": true },
+            { "type": "adjust_meters", "influence": 5 }
+          ],
+          "next_node_id": "scoop"
+        }
+      ]
+    },
+    {
+      "id": "tip",
+      "text": "She starts recording before you finish the sentence. Useful, dangerous, very on-brand.",
+      "options": [{ "id": "back", "text": "End the interview.", "next_node_id": "root" }]
+    },
+    {
+      "id": "scoop",
+      "text": "Vox hates waiting, but loves leverage more. She gives you one day of silence.",
+      "options": [{ "id": "back", "text": "Take the silence.", "next_node_id": "root" }]
+    }
+  ]
+}

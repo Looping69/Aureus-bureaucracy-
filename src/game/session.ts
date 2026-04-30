@@ -84,6 +84,7 @@ export const buildInitialGameState = (worldProfileId: WorldProfileId = 'world-1'
     worldEffects: EMPTY_WORLD_EFFECTS,
     storyFlags: [],
     lastCityEventHour: -1,
+    activeCityIncident: null,
     unlockedEndings: [],
     activeEndingId: null,
     ftuePhase: 'intro',
@@ -134,6 +135,7 @@ export const hydrateSavedState = ({
     worldEffects: { ...EMPTY_WORLD_EFFECTS, ...(saved.worldEffects ?? {}) },
     storyFlags: saved.storyFlags ?? [],
     lastCityEventHour: saved.lastCityEventHour ?? -1,
+    activeCityIncident: saved.activeCityIncident ?? null,
     unlockedEndings: saved.unlockedEndings ?? [],
     activeEndingId: saved.activeEndingId ?? null,
     tutorialStep:

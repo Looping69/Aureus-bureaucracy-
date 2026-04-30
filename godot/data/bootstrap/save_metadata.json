@@ -1,0 +1,6 @@
+{
+  "save_key": "aureus-save-v3",
+  "legacy_save_keys": ["aureus-save-v2", "aureus-save-v1"],
+  "save_version": 3,
+  "slot_ids": ["slot-1", "slot-2", "slot-3"]
+}

@@ -12,3 +12,6 @@ tmp-*.cjs
 .env*
 !.env.example
 Recording *.mp4
+godot/.godot/
+godot/export_presets.cfg
+*.translation
