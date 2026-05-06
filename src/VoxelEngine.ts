@@ -123,6 +123,20 @@ export class VoxelEngine {
   private worldEntryBuildingId: string | null = null;
   private onWorldEntryTransitionComplete?: (buildingId: string) => void;
 
+  // Performance: Cached spatial grid for physics
+  private spatialGrid: Map<string, number[]> = new Map();
+  private spatialGridSize = 1.5;
+  private voxelColorsDirty = false;
+
+  // Performance: Pre-allocated vectors for animation loop
+  private readonly tempVec3 = new THREE.Vector3();
+  private readonly tempQuaternion = new THREE.Quaternion();
+
+  // Performance: Cached entity groups for raycasting
+  private cachedNpcGroups: THREE.Group[] = [];
+  private cachedBuildingGroups: THREE.Group[] = [];
+  private entityCacheValid = false;
+
   private getRenderedFocus(source: THREE.Vector3) {
     return source.clone().setY(toRenderedWorldY(source.y));
   }
@@ -1027,9 +1041,14 @@ export class VoxelEngine {
   private resolveWorldTarget() {
     this.raycaster.setFromCamera(this.pointer, this.camera);
 
-    const npcGroups = Array.from(this.entities.npcs.values()).map((n) => n.group);
-    const buildingGroups = Array.from(this.entities.buildings.values()).map((b) => b.group);
-    const npcIntersects = this.raycaster.intersectObjects(npcGroups, true);
+    // Performance: Use cached entity groups and rebuild only when needed
+    if (!this.entityCacheValid) {
+      this.cachedNpcGroups = Array.from(this.entities.npcs.values()).map((n) => n.group);
+      this.cachedBuildingGroups = Array.from(this.entities.buildings.values()).map((b) => b.group);
+      this.entityCacheValid = true;
+    }
+
+    const npcIntersects = this.raycaster.intersectObjects(this.cachedNpcGroups, true);
     if (npcIntersects.length > 0) {
       const npcTarget = this.resolveEntityTarget(npcIntersects[0], 'NPC');
       if (npcTarget) {
@@ -1037,7 +1056,7 @@ export class VoxelEngine {
       }
     }
 
-    const buildingIntersects = this.raycaster.intersectObjects(buildingGroups, true);
+    const buildingIntersects = this.raycaster.intersectObjects(this.cachedBuildingGroups, true);
     if (buildingIntersects.length > 0) {
       const buildingIntersect = buildingIntersects[0];
       const buildingTarget = this.resolveEntityTarget(buildingIntersect, 'BUILDING');
@@ -1552,17 +1571,24 @@ export class VoxelEngine {
         // No need to update matrix for static mesh
         return;
     }
-    
+
     if (!this.instanceMesh) return;
     this.voxels.forEach((v, i) => {
         this.dummy.position.set(v.x, v.y, v.z);
         this.dummy.rotation.set(v.rx, v.ry, v.rz);
         this.dummy.updateMatrix();
         this.instanceMesh!.setMatrixAt(i, this.dummy.matrix);
-        this.instanceMesh!.setColorAt(i, v.color);
     });
     this.instanceMesh.instanceMatrix.needsUpdate = true;
-    if (this.instanceMesh.instanceColor) this.instanceMesh.instanceColor.needsUpdate = true;
+
+    // Performance: Only update colors when they've actually changed
+    if (this.voxelColorsDirty && this.instanceMesh.instanceColor) {
+      this.voxels.forEach((v, i) => {
+        this.instanceMesh!.setColorAt(i, v.color);
+      });
+      this.instanceMesh.instanceColor.needsUpdate = true;
+      this.voxelColorsDirty = false;
+    }
   }
   
   public drop() {
@@ -1650,6 +1676,21 @@ export class VoxelEngine {
     this.onStateChange(this.state);
   }
 
+  private rebuildSpatialGrid() {
+    // Rebuild the spatial grid from current voxel positions
+    this.spatialGrid.clear();
+    this.voxels.forEach((v, i) => {
+      const gx = Math.floor(v.x / this.spatialGridSize);
+      const gy = Math.floor(v.y / this.spatialGridSize);
+      const gz = Math.floor(v.z / this.spatialGridSize);
+      const key = `${gx},${gy},${gz}`;
+      if (!this.spatialGrid.has(key)) {
+        this.spatialGrid.set(key, []);
+      }
+      this.spatialGrid.get(key)!.push(i);
+    });
+  }
+
   private updatePhysics(deltaTime: number) {
     if (this.state === AppState.DISMANTLING) {
         // 1. Integration & Boundaries
@@ -1679,30 +1720,20 @@ export class VoxelEngine {
         });
 
         // 2. Voxel-Voxel Collisions (Spatial Grid)
-        // Optimization: Create a simplified grid for O(N) neighbor lookup
-        const gridSize = 1.5; // Roughly voxel size + buffer
-        const grid = new Map<string, number[]>();
+        // Performance: Rebuild spatial grid once per frame instead of every iteration
+        this.rebuildSpatialGrid();
 
         this.voxels.forEach((v, i) => {
-            const gx = Math.floor(v.x / gridSize);
-            const gy = Math.floor(v.y / gridSize);
-            const gz = Math.floor(v.z / gridSize);
-            const key = `${gx},${gy},${gz}`;
-            if (!grid.has(key)) grid.set(key, []);
-            grid.get(key)!.push(i);
-        });
-
-        this.voxels.forEach((v, i) => {
-             // Only process moving or slightly moving voxels to save cycles? 
+             // Only process moving or slightly moving voxels to save cycles?
              // For quality, we check all, but could optimize.
-             const gx = Math.floor(v.x / gridSize);
-             const gy = Math.floor(v.y / gridSize);
-             const gz = Math.floor(v.z / gridSize);
+             const gx = Math.floor(v.x / this.spatialGridSize);
+             const gy = Math.floor(v.y / this.spatialGridSize);
+             const gz = Math.floor(v.z / this.spatialGridSize);
 
              for (let x = gx - 1; x <= gx + 1; x++) {
                  for (let y = gy - 1; y <= gy + 1; y++) {
                      for (let z = gz - 1; z <= gz + 1; z++) {
-                         const neighbors = grid.get(`${x},${y},${z}`);
+                         const neighbors = this.spatialGrid.get(`${x},${y},${z}`);
                          if (!neighbors) continue;
 
                          for (const j of neighbors) {
