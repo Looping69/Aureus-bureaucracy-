@@ -18,7 +18,22 @@ export const useMovementLoop = ({ setState, setNotification, homePos, enabled = 
     if (!enabled) return;
     let movementBudget = 0;
     let cachedSurfaceMap: { buildings: GameState['buildings']; map: ReturnType<typeof buildWorldSurfaceMap> } | null = null;
-    const timer = setInterval(() => {
+    let lastTime = performance.now();
+
+    // Performance: Use requestAnimationFrame for smoother movement synced with rendering
+    let animationFrameId: number;
+    const tick = () => {
+      const now = performance.now();
+      const deltaMs = now - lastTime;
+      lastTime = now;
+
+      // Only update if enough time has passed (roughly 60fps = 16.67ms per frame)
+      // We run every ~70ms worth of time to match original behavior but sync with RAF
+      if (deltaMs < 16) {
+        animationFrameId = requestAnimationFrame(tick);
+        return;
+      }
+
       setState(prev => {
         if (prev.path.length === 0) {
           movementBudget = 0;
@@ -102,7 +117,11 @@ export const useMovementLoop = ({ setState, setNotification, homePos, enabled = 
           streetPickups: nextStreetPickups,
         };
       });
-    }, 70);
-    return () => clearInterval(timer);
+
+      animationFrameId = requestAnimationFrame(tick);
+    };
+
+    animationFrameId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(animationFrameId);
   }, [enabled, homePos, setNotification, setState]);
 };

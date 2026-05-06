@@ -150,6 +150,8 @@ const getNearestAllowedTile = (
 };
 
 const reconstructPath = (node: PathNode) => {
+  // Performance: Build path in reverse order, then reverse once
+  // This is faster than unshift() which requires shifting all elements
   const path: WorldPosition[] = [];
   let current: PathNode | null = node;
 
@@ -158,6 +160,7 @@ const reconstructPath = (node: PathNode) => {
     current = current.parent;
   }
 
+  // Reverse the path once at the end
   return path.reverse();
 };
 

@@ -86,6 +86,7 @@ export class VoxelCharacter {
     torso.position.y = 0.5 * s;
     torso.castShadow = true;
     torso.receiveShadow = true;
+    torso.frustumCulled = true; // Performance: Enable frustum culling
     group.add(torso);
 
     // Collar — two small angled flaps at the neckline

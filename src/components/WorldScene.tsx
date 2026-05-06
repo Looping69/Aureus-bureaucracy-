@@ -20,7 +20,7 @@ const BUILDING_ENTRY_TYPES = new Set(['OFFICE', 'HOME', 'MINE_ENTRANCE', 'PUB', 
 const isWithinRange = (from: WorldPosition, to: WorldPosition, distance: number) =>
   Math.abs(from.x - to.x) <= distance && Math.abs(from.y - to.y) <= distance;
 
-export const WorldScene = ({ 
+const WorldSceneComponent = ({ 
   state, 
   onMove, 
   onDirectMove,
@@ -448,3 +448,6 @@ export const WorldScene = ({
     </div>
   );
 };
+
+// Performance: Memoize WorldScene to prevent unnecessary re-renders
+export const WorldScene = React.memo(WorldSceneComponent);
