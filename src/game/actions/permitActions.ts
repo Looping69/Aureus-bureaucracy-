@@ -1,6 +1,7 @@
 import {
   GameState,
 } from '../../types';
+import { canTransitionPermit, transitionPermitStatus } from '../machines/permitMachine';
 import { approvePermit } from '../permitProgression';
 import { GameNotification } from './mineActions';
 
@@ -14,6 +15,13 @@ export const applyPermitOverlayAction = (
   const standardCost = permit.status === 'REJECTED' ? 100 : permit.cost;
 
   if (action === 'FAST_TRACK' || action === 'SUBMIT') {
+    if (!canTransitionPermit(permit.status, 'SUBMIT')) {
+      return {
+        nextState: prev,
+        notifications: [{ title: 'Invalid Filing State', msg: `${permit.name} cannot be submitted from ${permit.status}.` }]
+      };
+    }
+
     const cost = action === 'FAST_TRACK' ? standardCost * 2 : standardCost;
     if (prev.money < cost) {
       return {
@@ -32,6 +40,14 @@ export const applyPermitOverlayAction = (
     };
   }
 
+  const nextStatus = transitionPermitStatus(permit.status, 'SUBMIT');
+  if (!nextStatus) {
+    return {
+      nextState: prev,
+      notifications: [{ title: 'Invalid Filing State', msg: `${permit.name} cannot be paid from ${permit.status}.` }]
+    };
+  }
+
   if (prev.money < standardCost) return { nextState: prev, notifications: [] };
   return {
     nextState: {
@@ -39,7 +55,7 @@ export const applyPermitOverlayAction = (
       money: prev.money - standardCost,
       permits: {
         ...prev.permits,
-        [id]: { ...permit, status: 'PENDING' }
+        [id]: { ...permit, status: nextStatus }
       }
     },
     notifications: []
@@ -58,6 +74,8 @@ export const applyMiniGameCompletion = (
   }
 
   if (prev.tutorialStep === 5) {
+    const permit = prev.permits[prev.activePermitId];
+    const rejectedStatus = permit ? transitionPermitStatus(permit.status, 'REJECT') ?? 'REJECTED' : 'REJECTED';
     return {
       nextState: {
         ...prev,
@@ -66,7 +84,7 @@ export const applyMiniGameCompletion = (
           ...prev.permits,
           [prev.activePermitId]: {
             ...prev.permits[prev.activePermitId],
-            status: 'REJECTED',
+            status: rejectedStatus,
             rejectionReason: "Ink color was 'Excessively Hopeful'.",
             accuracy: results.accuracy
           }
@@ -92,12 +110,13 @@ export const applyMiniGameCompletion = (
 
   const isFailed = results.accuracy < 0.6;
   if (isFailed) {
+    const rejectedStatus = transitionPermitStatus(permit.status, 'REJECT') ?? 'REJECTED';
     return {
       nextState: {
         ...prev,
         permits: {
           ...prev.permits,
-          [prev.activePermitId]: { ...permit, status: 'REJECTED', rejectionReason: 'INSUFFICIENT ACCURACY', accuracy: results.accuracy }
+          [prev.activePermitId]: { ...permit, status: rejectedStatus, rejectionReason: 'INSUFFICIENT ACCURACY', accuracy: results.accuracy }
         },
         activeMiniGame: null,
         activePermitId: null,
@@ -131,9 +150,10 @@ export const applyMiniGameCompletion = (
     (prev.pendingPermitAction === 'FAST_TRACK' && results.accuracy > 0.9) ||
     (prev.pendingPermitAction === 'DIALOGUE');
 
+  const submittedStatus = transitionPermitStatus(permit.status, 'SUBMIT') ?? 'PENDING';
   newPermits[prev.activePermitId] = {
     ...permit,
-    status: approveImmediately ? 'APPROVED' : 'PENDING',
+    status: approveImmediately ? (transitionPermitStatus(submittedStatus, 'APPROVE') ?? 'APPROVED') : submittedStatus,
     accuracy: results.accuracy
   };
 
