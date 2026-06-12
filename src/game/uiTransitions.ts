@@ -1,11 +1,9 @@
 import {
-  GameFtueState,
-  GameInteractionState,
-  GameResourceState,
   GameState,
   FtuePhase,
 } from '../types';
 import { getLegacyTutorialStepForFtuePhase } from './ftue';
+import { applyFtuePhase } from './machines/ftueMachine';
 
 export const openPlannerScene = (state: GameState): GameState => ({
   ...state,
@@ -46,6 +44,7 @@ export const addOreToInventory = (
 export const closeMiniGame = (state: GameState): GameState => ({
   ...state,
   activeMiniGame: null,
+  pendingPermitAction: null,
 });
 
 export const closeEnding = (state: GameState): GameState => ({
@@ -63,7 +62,7 @@ export const toggleTutorialMinimized = (
 export const dismissTutorial = (
   state: GameState,
 ): GameState => ({
-  ...state,
+  ...applyFtuePhase(state, 'ftue_complete'),
   tutorialStep: 99,
 });
 
