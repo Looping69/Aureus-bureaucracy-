@@ -8,6 +8,7 @@ import {
   BUREAU_PERMIT_ID,
   getLegacyTutorialStepForFtuePhase
 } from '../../game/ftue';
+import { normalizeFtueFormState } from '../../game/machines/ftueMachine';
 
 export const useTutorialProgression = (
   state: GameState,
@@ -18,6 +19,9 @@ export const useTutorialProgression = (
   useEffect(() => {
     if (!enabled) return;
     setState(prev => {
+      const normalizedPrev = normalizeFtueFormState(prev);
+      if (normalizedPrev !== prev) return normalizedPrev;
+
       let changed = false;
       let nextTutorialStep = prev.tutorialStep;
       let nextObjectives = prev.objectives;
