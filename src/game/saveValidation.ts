@@ -1,145 +1,136 @@
+import { z } from 'zod';
 import { GameScene, GameState } from '../types';
 
 export type SaveValidationResult =
   | { valid: true; state: GameState; reasons: [] }
   | { valid: false; reasons: string[] };
 
-const GAME_SCENES = new Set<GameScene>(['MINE', 'MINE_WORLD', 'OFFICE', 'WORLD', 'CITY_PLANNER']);
-const MINI_GAMES = new Set(['FORM_PROCESSING']);
-const PENDING_PERMIT_ACTIONS = new Set(['SUBMIT', 'FAST_TRACK', 'DIALOGUE']);
+const permitStatusSchema = z.enum(['LOCKED', 'AVAILABLE', 'PENDING', 'APPROVED', 'REJECTED']);
+const gameSceneSchema = z.enum(['MINE', 'MINE_WORLD', 'OFFICE', 'WORLD', 'CITY_PLANNER']) satisfies z.ZodType<GameScene>;
+const activeMiniGameSchema = z.union([z.literal('FORM_PROCESSING'), z.null()]);
+const pendingPermitActionSchema = z.union([
+  z.literal('SUBMIT'),
+  z.literal('FAST_TRACK'),
+  z.literal('DIALOGUE'),
+  z.null(),
+]);
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null;
+const finiteNumber = z.number().finite();
+const nullableString = z.union([z.string(), z.null()]);
+const worldPositionSchema = z.object({ x: finiteNumber, y: finiteNumber }).passthrough();
 
-const isNumber = (value: unknown) => typeof value === 'number' && Number.isFinite(value);
-const isBoolean = (value: unknown) => typeof value === 'boolean';
-const isString = (value: unknown) => typeof value === 'string';
-const isNullableString = (value: unknown) => value === null || isString(value);
-const isArray = (value: unknown) => Array.isArray(value);
+const minimalPermitSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  cost: finiteNumber,
+  status: permitStatusSchema,
+}).passthrough();
 
-const isWorldPosition = (value: unknown) =>
-  isRecord(value) && isNumber(value.x) && isNumber(value.y);
+const minimalNpcSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  trustLevel: finiteNumber,
+  leverage: finiteNumber,
+}).passthrough();
 
-const requireNumber = (state: Record<string, unknown>, key: string, reasons: string[]) => {
-  if (!isNumber(state[key])) reasons.push(`${key} must be a finite number`);
-};
+const minimalMineSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  discovered: z.boolean(),
+  status: z.enum(['LOCKED', 'PROSPECTING', 'OPERATIONAL']),
+  grid: z.array(z.unknown()),
+  permits: z.object({
+    prospectingId: z.string(),
+    miningId: z.string(),
+  }).passthrough(),
+}).passthrough();
 
-const requireArray = (state: Record<string, unknown>, key: string, reasons: string[]) => {
-  if (!isArray(state[key])) reasons.push(`${key} must be an array`);
-};
-
-const requireRecord = (state: Record<string, unknown>, key: string, reasons: string[]) => {
-  if (!isRecord(state[key])) reasons.push(`${key} must be an object`);
-};
-
-const validateCoreResources = (state: Record<string, unknown>, reasons: string[]) => {
-  ['money', 'ore', 'evidence', 'energy', 'maxEnergy', 'movementSpeed'].forEach((key) =>
-    requireNumber(state, key, reasons),
-  );
-  ['upgrades', 'dirtItems', 'leverage'].forEach((key) => requireArray(state, key, reasons));
-};
-
-const validateCoreProgression = (state: Record<string, unknown>, reasons: string[]) => {
-  ['permits', 'npcs', 'buildings', 'meters'].forEach((key) => requireRecord(state, key, reasons));
-  ['knownNpcIds', 'objectives', 'mines'].forEach((key) => requireArray(state, key, reasons));
-
-  if (!isNullableString(state.activeMineId)) reasons.push('activeMineId must be null or a string');
-
-  const meters = state.meters;
-  if (isRecord(meters)) {
-    ['trust', 'influence', 'exposure'].forEach((key) => requireNumber(meters, key, reasons));
+export const gameStateCandidateSchema = z.object({
+  money: finiteNumber,
+  ore: finiteNumber,
+  evidence: finiteNumber,
+  energy: finiteNumber,
+  maxEnergy: finiteNumber,
+  movementSpeed: finiteNumber,
+  upgrades: z.array(z.string()),
+  dirtItems: z.array(z.unknown()),
+  leverage: z.array(z.string()),
+  foundOfficeItemIds: z.array(z.string()).optional(),
+  explorationActive: z.boolean().optional(),
+  meters: z.object({
+    trust: finiteNumber,
+    influence: finiteNumber,
+    exposure: finiteNumber,
+  }).passthrough(),
+  permits: z.record(z.string(), minimalPermitSchema),
+  npcs: z.record(z.string(), minimalNpcSchema),
+  knownNpcIds: z.array(z.string()),
+  objectives: z.array(z.unknown()),
+  mines: z.array(minimalMineSchema),
+  activeMineId: nullableString,
+  currentScene: gameSceneSchema,
+  activeNPCId: nullableString,
+  activePermitId: nullableString,
+  activeBuildingId: nullableString,
+  activeMiniGame: activeMiniGameSchema,
+  pendingPermitAction: pendingPermitActionSchema,
+  activeEndingId: nullableString,
+  worldProfileId: z.string().optional(),
+  buildings: z.record(z.string(), z.unknown()),
+  navigationZones: z.array(z.unknown()).optional(),
+  day: finiteNumber,
+  time: finiteNumber,
+  weather: z.record(z.string(), z.unknown()).optional(),
+  playerPos: worldPositionSchema,
+  targetPos: z.union([worldPositionSchema, z.null()]).optional(),
+  path: z.array(worldPositionSchema),
+  streetPickups: z.array(z.unknown()).optional(),
+  feedbacks: z.array(z.unknown()).optional(),
+  playerFeedbacks: z.array(z.unknown()).optional(),
+  dialogueCooldowns: z.record(z.string(), z.unknown()).optional(),
+  worldEffects: z.record(z.string(), z.unknown()).optional(),
+  storyFlags: z.array(z.string()).optional(),
+  lastCityEventHour: finiteNumber.optional(),
+  activeCityIncident: z.union([z.record(z.string(), z.unknown()), z.null()]).optional(),
+  unlockedEndings: z.array(z.string()).optional(),
+  ftuePhase: z.string().optional(),
+  tutorialStep: finiteNumber.optional(),
+  tutorialMinimized: z.boolean().optional(),
+}).passthrough().superRefine((state, ctx) => {
+  if (state.currentScene === 'MINE' && state.activeMineId !== null) {
+    const activeMineExists = state.mines.some((mine) => mine.id === state.activeMineId);
+    if (!activeMineExists) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['activeMineId'],
+        message: 'activeMineId must reference a known mine when the mine scene is active',
+      });
+    }
   }
-};
 
-const validateInteraction = (state: Record<string, unknown>, reasons: string[]) => {
-  if (!isString(state.currentScene) || !GAME_SCENES.has(state.currentScene as GameScene)) {
-    reasons.push('currentScene must be a known game scene');
+  if (state.activeMiniGame === 'FORM_PROCESSING' && state.pendingPermitAction === null) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['pendingPermitAction'],
+      message: 'form processing requires a pending permit action',
+    });
   }
-
-  ['activeNPCId', 'activePermitId', 'activeBuildingId', 'activeEndingId'].forEach((key) => {
-    if (!isNullableString(state[key])) reasons.push(`${key} must be null or a string`);
-  });
-
-  if (state.activeMiniGame !== null && !MINI_GAMES.has(String(state.activeMiniGame))) {
-    reasons.push('activeMiniGame must be null or a known mini-game');
-  }
-
-  if (state.pendingPermitAction !== null && !PENDING_PERMIT_ACTIONS.has(String(state.pendingPermitAction))) {
-    reasons.push('pendingPermitAction must be null or a known permit action');
-  }
-};
-
-const validateWorld = (state: Record<string, unknown>, reasons: string[]) => {
-  requireNumber(state, 'day', reasons);
-  requireNumber(state, 'time', reasons);
-  requireRecord(state, 'weather', reasons);
-
-  if (!isWorldPosition(state.playerPos)) reasons.push('playerPos must contain numeric x and y');
-  if (state.targetPos !== null && state.targetPos !== undefined && !isWorldPosition(state.targetPos)) {
-    reasons.push('targetPos must be null or a world position');
-  }
-
-  requireArray(state, 'path', reasons);
-
-  if (state.streetPickups !== undefined && !isArray(state.streetPickups)) {
-    reasons.push('streetPickups must be an array when present');
-  }
-};
-
-const validateOptionalMigrationFields = (state: Record<string, unknown>, reasons: string[]) => {
-  if (state.foundOfficeItemIds !== undefined && !isArray(state.foundOfficeItemIds)) {
-    reasons.push('foundOfficeItemIds must be an array when present');
-  }
-  if (state.explorationActive !== undefined && !isBoolean(state.explorationActive)) {
-    reasons.push('explorationActive must be a boolean when present');
-  }
-  if (state.feedbacks !== undefined && !isArray(state.feedbacks)) reasons.push('feedbacks must be an array when present');
-  if (state.playerFeedbacks !== undefined && !isArray(state.playerFeedbacks)) {
-    reasons.push('playerFeedbacks must be an array when present');
-  }
-  if (state.dialogueCooldowns !== undefined && !isRecord(state.dialogueCooldowns)) {
-    reasons.push('dialogueCooldowns must be an object when present');
-  }
-  if (state.worldEffects !== undefined && !isRecord(state.worldEffects)) {
-    reasons.push('worldEffects must be an object when present');
-  }
-  if (state.storyFlags !== undefined && !isArray(state.storyFlags)) {
-    reasons.push('storyFlags must be an array when present');
-  }
-  if (state.lastCityEventHour !== undefined && !isNumber(state.lastCityEventHour)) {
-    reasons.push('lastCityEventHour must be a finite number when present');
-  }
-  if (state.activeCityIncident !== undefined && state.activeCityIncident !== null && !isRecord(state.activeCityIncident)) {
-    reasons.push('activeCityIncident must be null or an object when present');
-  }
-  if (state.unlockedEndings !== undefined && !isArray(state.unlockedEndings)) {
-    reasons.push('unlockedEndings must be an array when present');
-  }
-  if (state.tutorialStep !== undefined && !isNumber(state.tutorialStep)) {
-    reasons.push('tutorialStep must be a finite number when present');
-  }
-  if (state.tutorialMinimized !== undefined && !isBoolean(state.tutorialMinimized)) {
-    reasons.push('tutorialMinimized must be a boolean when present');
-  }
-};
+});
 
 export const validateGameStateCandidate = (value: unknown): SaveValidationResult => {
-  if (!isRecord(value)) {
-    return { valid: false, reasons: ['save state must be an object'] };
+  const result = gameStateCandidateSchema.safeParse(value);
+
+  if (!result.success) {
+    return {
+      valid: false,
+      reasons: result.error.issues.map((issue) => {
+        const path = issue.path.length > 0 ? `${issue.path.join('.')}: ` : '';
+        return `${path}${issue.message}`;
+      }),
+    };
   }
 
-  const reasons: string[] = [];
-  validateCoreResources(value, reasons);
-  validateCoreProgression(value, reasons);
-  validateInteraction(value, reasons);
-  validateWorld(value, reasons);
-  validateOptionalMigrationFields(value, reasons);
-
-  if (reasons.length > 0) {
-    return { valid: false, reasons };
-  }
-
-  return { valid: true, state: value as unknown as GameState, reasons: [] };
+  return { valid: true, state: result.data as GameState, reasons: [] };
 };
 
 export const isValidGameStateCandidate = (value: unknown): value is GameState =>
