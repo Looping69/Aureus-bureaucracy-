@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 
+type BooleanSetterValue = boolean | ((current: boolean) => boolean);
+
 interface UiChromeState {
   showMinePicker: boolean;
   showMarket: boolean;
@@ -9,14 +11,14 @@ interface UiChromeState {
   showNavigationPanel: boolean;
   showSceneTransitionLoading: boolean;
   tutorialUnreadCount: number;
-  setShowMinePicker: (value: boolean) => void;
-  setShowMarket: (value: boolean) => void;
-  setShowActionLog: (value: boolean) => void;
-  setShowDebugPanel: (value: boolean) => void;
-  setShowUtilityDrawer: (value: boolean) => void;
-  setShowNavigationPanel: (value: boolean) => void;
-  setShowSceneTransitionLoading: (value: boolean) => void;
-  setTutorialUnreadCount: (value: number) => void;
+  setShowMinePicker: (value: BooleanSetterValue) => void;
+  setShowMarket: (value: BooleanSetterValue) => void;
+  setShowActionLog: (value: BooleanSetterValue) => void;
+  setShowDebugPanel: (value: BooleanSetterValue) => void;
+  setShowUtilityDrawer: (value: BooleanSetterValue) => void;
+  setShowNavigationPanel: (value: BooleanSetterValue) => void;
+  setShowSceneTransitionLoading: (value: BooleanSetterValue) => void;
+  setTutorialUnreadCount: (value: number | ((current: number) => number)) => void;
   resetChrome: () => void;
 }
 
@@ -40,16 +42,22 @@ const initialChromeState = {
   tutorialUnreadCount: 0,
 };
 
+const resolveBooleanSetter = (value: BooleanSetterValue, current: boolean) =>
+  typeof value === 'function' ? value(current) : value;
+
+const resolveNumberSetter = (value: number | ((current: number) => number), current: number) =>
+  typeof value === 'function' ? value(current) : value;
+
 export const useUiChromeStore = create<UiChromeState>((set) => ({
   ...initialChromeState,
-  setShowMinePicker: (showMinePicker) => set({ showMinePicker }),
-  setShowMarket: (showMarket) => set({ showMarket }),
-  setShowActionLog: (showActionLog) => set({ showActionLog }),
-  setShowDebugPanel: (showDebugPanel) => set({ showDebugPanel }),
-  setShowUtilityDrawer: (showUtilityDrawer) => set({ showUtilityDrawer }),
-  setShowNavigationPanel: (showNavigationPanel) => set({ showNavigationPanel }),
-  setShowSceneTransitionLoading: (showSceneTransitionLoading) => set({ showSceneTransitionLoading }),
-  setTutorialUnreadCount: (tutorialUnreadCount) => set({ tutorialUnreadCount }),
+  setShowMinePicker: (value) => set((state) => ({ showMinePicker: resolveBooleanSetter(value, state.showMinePicker) })),
+  setShowMarket: (value) => set((state) => ({ showMarket: resolveBooleanSetter(value, state.showMarket) })),
+  setShowActionLog: (value) => set((state) => ({ showActionLog: resolveBooleanSetter(value, state.showActionLog) })),
+  setShowDebugPanel: (value) => set((state) => ({ showDebugPanel: resolveBooleanSetter(value, state.showDebugPanel) })),
+  setShowUtilityDrawer: (value) => set((state) => ({ showUtilityDrawer: resolveBooleanSetter(value, state.showUtilityDrawer) })),
+  setShowNavigationPanel: (value) => set((state) => ({ showNavigationPanel: resolveBooleanSetter(value, state.showNavigationPanel) })),
+  setShowSceneTransitionLoading: (value) => set((state) => ({ showSceneTransitionLoading: resolveBooleanSetter(value, state.showSceneTransitionLoading) })),
+  setTutorialUnreadCount: (value) => set((state) => ({ tutorialUnreadCount: resolveNumberSetter(value, state.tutorialUnreadCount) })),
   resetChrome: () => set(initialChromeState),
 }));
 
