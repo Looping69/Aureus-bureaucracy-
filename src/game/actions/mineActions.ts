@@ -1,4 +1,4 @@
-import { GameState, Tile } from '../../types';
+import { GameState, Mine, Tile } from '../../types';
 import { applyOreExport } from '../economy';
 import { isWorldEffectActive } from '../dialogue/worldEffects';
 import { applyExhaustionCollapse } from '../exhaustion';
@@ -9,16 +9,50 @@ export interface GameNotification {
   msg: string;
 }
 
+type MineRunState = Mine & {
+  carriedOre?: number;
+  carryLimit?: number;
+  shaftStability?: number;
+  braceCharges?: number;
+};
+
 const MINE_SAFETY_KIT_UPGRADE = 'mine-safety-kit';
 const ORE_SCANNER_UPGRADE = 'mine-ore-scanner';
+const DEFAULT_CARRY_LIMIT = 80;
+const SAFETY_KIT_BRACE_CHARGES = 2;
+
+const getRunMine = (mine: Mine): MineRunState => mine as MineRunState;
+const getCarriedOre = (mine: MineRunState) => mine.carriedOre ?? 0;
+const getCarryLimit = (mine: MineRunState) => mine.carryLimit ?? DEFAULT_CARRY_LIMIT;
+const getShaftStability = (mine: MineRunState) => mine.shaftStability ?? 100;
+const getBraceCharges = (mine: MineRunState, hasSafetyKit: boolean) =>
+  mine.braceCharges ?? (hasSafetyKit ? SAFETY_KIT_BRACE_CHARGES : 0);
+
+const patchActiveMine = (
+  state: GameState,
+  mineIndex: number,
+  patch: Partial<MineRunState>,
+): Mine[] => {
+  const newMines = [...state.mines];
+  newMines[mineIndex] = { ...newMines[mineIndex], ...patch } as Mine;
+  return newMines;
+};
+
+const degradeAdjacentTiles = (grid: Tile[], tile: Tile, amount: number) =>
+  grid.map((candidate) => {
+    const distance = Math.abs(candidate.x - tile.x) + Math.abs(candidate.y - tile.y);
+    if (distance !== 1 || candidate.mined || candidate.stability <= 0) return candidate;
+    return { ...candidate, stability: Math.max(0, candidate.stability - amount) };
+  });
 
 export const applyMineTileInteraction = (
   prev: GameState,
   tileId: string,
 ): { nextState: GameState; notifications: GameNotification[] } => {
-  const activeMine = prev.mines.find(m => m.id === prev.activeMineId);
-  if (!activeMine) return { nextState: prev, notifications: [] };
+  const mineIndex = prev.mines.findIndex(m => m.id === prev.activeMineId);
+  if (mineIndex === -1) return { nextState: prev, notifications: [] };
 
+  const activeMine = getRunMine(prev.mines[mineIndex]);
   const tileIndex = activeMine.grid.findIndex(t => t.id === tileId);
   if (tileIndex === -1) return { nextState: prev, notifications: [] };
 
@@ -32,6 +66,14 @@ export const applyMineTileInteraction = (
   const hasCommunityBacking = isWorldEffectActive(prev, 'communityBacking');
   const hasMediaHeat = isWorldEffectActive(prev, 'mediaHeat');
   const weatherModifiers = getWeatherMiningModifiers(prev.weather);
+
+  if (tile.mined) {
+    return { nextState: prev, notifications: [{ title: 'Spent Ground', msg: 'This tile has already been worked.' }] };
+  }
+
+  if (tile.stability <= 0) {
+    return { nextState: prev, notifications: [{ title: 'Blocked By Collapse', msg: 'Rubble blocks this section. Expand or route around it.' }] };
+  }
 
   if (activeMine.status === 'PROSPECTING') {
     if (!hasProspecting) {
@@ -61,32 +103,33 @@ export const applyMineTileInteraction = (
       };
     }
 
-    const newMines = [...prev.mines];
-    const mineIndex = newMines.findIndex(m => m.id === prev.activeMineId);
-    const newGrid = [...newMines[mineIndex].grid];
+    const newGrid = [...activeMine.grid];
     newGrid[tileIndex] = { ...tile, revealed: true };
 
-    if (hasOreScanner && tile.type === 'ORE') {
+    if (hasOreScanner) {
       const neighbors = newGrid.filter((candidate) => {
         if (candidate.revealed || candidate.mined) return false;
         const dx = Math.abs(candidate.x - tile.x);
         const dy = Math.abs(candidate.y - tile.y);
         return dx + dy === 1;
       });
-      if (neighbors.length > 0) {
-        const neighbor = neighbors[Math.floor(Math.random() * neighbors.length)];
+      const revealCount = tile.type === 'ORE' ? 2 : 1;
+      neighbors.slice(0, revealCount).forEach((neighbor) => {
         const neighborIndex = newGrid.findIndex(t => t.id === neighbor.id);
         if (neighborIndex >= 0) {
           newGrid[neighborIndex] = { ...newGrid[neighborIndex], revealed: true };
         }
-      }
+      });
     }
 
-    newMines[mineIndex] = {
-      ...newMines[mineIndex],
+    const newMines = patchActiveMine(prev, mineIndex, {
       grid: newGrid,
-      prospectingCount: newMines[mineIndex].prospectingCount + 1
-    };
+      prospectingCount: activeMine.prospectingCount + 1,
+      shaftStability: getShaftStability(activeMine),
+      carriedOre: getCarriedOre(activeMine),
+      carryLimit: getCarryLimit(activeMine),
+      braceCharges: getBraceCharges(activeMine, hasSafetyKit),
+    });
 
     const notifications: GameNotification[] = [];
     if (tile.stability < 55) {
@@ -95,10 +138,12 @@ export const applyMineTileInteraction = (
         msg: 'This tile looks weak. Expect higher cave-in risk during extraction.'
       });
     }
-    if (hasOreScanner && tile.type === 'ORE') {
+    if (hasOreScanner) {
       notifications.push({
-        title: 'Scanner Ping',
-        msg: 'Nearby rock signature detected and partially revealed.'
+        title: 'Scanner Sweep',
+        msg: tile.type === 'ORE'
+          ? 'Ore signature found. Nearby tiles were partially revealed.'
+          : 'Nearby ground was partially revealed.'
       });
     }
 
@@ -131,27 +176,34 @@ export const applyMineTileInteraction = (
     };
   }
 
-  const instabilityPenalty = tile.stability < 55 ? 15 : 0;
+  const carriedOre = getCarriedOre(activeMine);
+  const carryLimit = getCarryLimit(activeMine);
+  if (tile.type === 'ORE' && carriedOre >= carryLimit) {
+    return {
+      nextState: prev,
+      notifications: [{ title: 'Load Full', msg: 'Secure your carried ore before extracting more.' }]
+    };
+  }
+
+  const shaftStability = getShaftStability(activeMine);
+  const braceCharges = getBraceCharges(activeMine, hasSafetyKit);
+  const instabilityPenalty = tile.stability < 55 ? 18 : 0;
+  const shaftPenalty = Math.max(0, 70 - shaftStability) * 0.35;
   const safetyReduction = hasSafetyKit ? 12 : 0;
-  const hazardChance = Math.min(95, Math.max(2, activeMine.danger + instabilityPenalty + weatherModifiers.hazardBonus - safetyReduction - (hasCommunityBacking ? 8 : 0)));
+  const hazardChance = Math.min(95, Math.max(2, activeMine.danger + instabilityPenalty + shaftPenalty + weatherModifiers.hazardBonus - safetyReduction - (hasCommunityBacking ? 8 : 0)));
   const riskRoll = Math.random() * 100;
   const isHazard = riskRoll < hazardChance;
   const isGasLeak = isHazard && Math.random() > 0.5;
   const isCaveIn = isHazard && !isGasLeak;
 
-  const newMines = [...prev.mines];
-  const mineIndex = newMines.findIndex(m => m.id === prev.activeMineId);
-  const newGrid = [...newMines[mineIndex].grid];
-  newGrid[tileIndex] = { ...tile, mined: true, revealed: true };
-  newMines[mineIndex] = {
-    ...newMines[mineIndex],
-    grid: newGrid
-  };
-
+  let newGrid = [...activeMine.grid];
   let oreGain = 0;
   let moneyGain = 0;
   let energyCost = Math.ceil((hasSafetyKit ? 4 : 5) * weatherModifiers.energyMultiplier);
   let richVeinBonus = 0;
+  let nextShaftStability = Math.max(0, shaftStability - (tile.stability < 55 ? 9 : 4) - Math.round(activeMine.danger / 18));
+  let nextBraceCharges = braceCharges;
+  const notifications: GameNotification[] = [];
 
   if (tile.type === 'ORE') {
     const hasWashPlant = prev.permits['wash-plant-permit']?.status === 'APPROVED';
@@ -160,78 +212,103 @@ export const applyMineTileInteraction = (
     richVeinBonus = foundRichVein ? multiplier : 0;
     oreGain = (activeMine.yield * multiplier) + richVeinBonus;
     oreGain = Math.max(1, Math.round(oreGain * weatherModifiers.yieldMultiplier));
-    // Economy rebalance: extraction yields ore primarily, cash comes from export flow.
+    oreGain = Math.min(oreGain, carryLimit - carriedOre);
     moneyGain = 0;
   }
 
   if (isGasLeak) {
     energyCost += hasSafetyKit ? 7 : 15;
+    notifications.push({ title: 'Gas Leak!', msg: 'Toxic fumes released. You lost extra energy.' });
   } else if (isCaveIn) {
-    energyCost += hasSafetyKit ? 4 : 10;
-    oreGain = Math.max(0, oreGain - 2);
+    if (nextBraceCharges > 0) {
+      nextBraceCharges -= 1;
+      nextShaftStability = Math.max(nextShaftStability, 35);
+      energyCost += 3;
+      notifications.push({ title: 'Brace Deployed', msg: 'A support brace stopped the cave-in, but one charge was consumed.' });
+    } else {
+      energyCost += hasSafetyKit ? 4 : 10;
+      oreGain = Math.max(0, oreGain - 2);
+      nextShaftStability = Math.max(0, nextShaftStability - 12);
+      newGrid[tileIndex] = { ...tile, type: 'ROCK', stability: 0, mined: false, revealed: true };
+      newGrid = degradeAdjacentTiles(newGrid, tile, 8);
+      notifications.push({ title: 'Cave-In!', msg: 'The tile collapsed into rubble and weakened adjacent ground.' });
+    }
+  }
+
+  if (!isCaveIn || nextBraceCharges < braceCharges) {
+    newGrid[tileIndex] = { ...tile, mined: true, revealed: true };
   }
 
   if (hasCommunityBacking) {
     energyCost = Math.max(2, energyCost - 1);
   }
 
-  const notifications: GameNotification[] = [];
-  if (isGasLeak) {
-    notifications.push({ title: 'Gas Leak!', msg: 'Toxic fumes released. You lost extra energy.' });
-  } else if (isCaveIn) {
-    notifications.push({ title: 'Cave-In!', msg: 'Unstable ground collapsed. You lost some ore and energy.' });
-  } else if (tile.type === 'ORE') {
-    if (richVeinBonus > 0) {
-      notifications.push({
-        title: 'Rich Vein!',
-        msg: `High-grade seam yielded bonus ore (+${richVeinBonus}) and extra payout.`
-      });
-    } else {
-      notifications.push({
-        title: 'Strike!',
-        msg: `Extracted ${oreGain} Ore. Export for cash at the market.`
-      });
-    }
-  } else if (tile.stability < 55) {
+  if (tile.type === 'ORE' && oreGain > 0) {
+    notifications.push({
+      title: richVeinBonus > 0 ? 'Rich Vein Loaded' : 'Ore Loaded',
+      msg: `Added ${oreGain} ore to your carried load. Secure it before leaving.`
+    });
+  } else if (tile.type !== 'ORE' && tile.stability < 55 && !isCaveIn) {
     notifications.push({
       title: 'Fragile Ground',
-      msg: 'Low-stability tile collapsed faster than expected.'
+      msg: 'Low-stability ground shook the shaft. Watch the stability meter.'
     });
   }
 
+  if (nextShaftStability <= 20) {
+    notifications.push({ title: 'Shaft Critical', msg: 'The mine is close to collapse. Secure your load or retreat.' });
+  }
+
+  const nextCarriedOre = carriedOre + oreGain;
+  const patchedMines = patchActiveMine(prev, mineIndex, {
+    grid: newGrid,
+    carriedOre: nextCarriedOre,
+    carryLimit,
+    shaftStability: nextShaftStability,
+    braceCharges: nextBraceCharges,
+  });
+
+  const exposureGain = (activeMine.danger * 0.1) + weatherModifiers.exposureBonus + (hasMediaHeat ? 2 : 0) + (nextShaftStability < 30 ? 1 : 0);
+
+  if (prev.energy - energyCost <= 0) {
+    const collapsedMine = getRunMine(patchedMines[mineIndex]);
+    const lostOre = Math.ceil(getCarriedOre(collapsedMine) / 2);
+    const collapseMines = patchActiveMine({ ...prev, mines: patchedMines }, mineIndex, {
+      carriedOre: Math.max(0, getCarriedOre(collapsedMine) - lostOre),
+      shaftStability: Math.max(0, getShaftStability(collapsedMine) - 20),
+    });
+    const collapsed = applyExhaustionCollapse({
+      ...prev,
+      mines: collapseMines,
+      energy: prev.energy - energyCost,
+      money: prev.money + moneyGain,
+      meters: {
+        ...prev.meters,
+        exposure: Math.min(100, prev.meters.exposure + exposureGain)
+      }
+    });
+    return {
+      nextState: collapsed.nextState,
+      notifications: [
+        ...notifications,
+        { title: 'Load Lost', msg: `You lost ${lostOre} carried ore during the collapse.` },
+        collapsed.notification,
+      ]
+    };
+  }
+
   return {
-    ...(prev.energy - energyCost <= 0
-      ? (() => {
-          const collapsed = applyExhaustionCollapse({
-            ...prev,
-            mines: newMines,
-            energy: prev.energy - energyCost,
-            ore: prev.ore + oreGain,
-            money: prev.money + moneyGain,
-            meters: {
-              ...prev.meters,
-              exposure: Math.min(100, prev.meters.exposure + (activeMine.danger * 0.1) + weatherModifiers.exposureBonus + (hasMediaHeat ? 2 : 0))
-            }
-          });
-          return {
-            nextState: collapsed.nextState,
-            notifications: [...notifications, collapsed.notification]
-          };
-        })()
-      : {
-          nextState: {
-            ...prev,
-            mines: newMines,
-            energy: prev.energy - energyCost,
-            ore: prev.ore + oreGain,
-            money: prev.money + moneyGain,
-            meters: {
-              ...prev.meters,
-              exposure: Math.min(100, prev.meters.exposure + (activeMine.danger * 0.1) + weatherModifiers.exposureBonus + (hasMediaHeat ? 2 : 0))
-            }
-          },
-          notifications
-        })
+    nextState: {
+      ...prev,
+      mines: patchedMines,
+      energy: prev.energy - energyCost,
+      money: prev.money + moneyGain,
+      meters: {
+        ...prev.meters,
+        exposure: Math.min(100, prev.meters.exposure + exposureGain)
+      }
+    },
+    notifications
   };
 };
 
@@ -239,8 +316,31 @@ export const applyMineSceneAction = (
   prev: GameState,
   action: string,
 ): { nextState: GameState; notifications: GameNotification[] } => {
-  const activeMine = prev.mines.find(m => m.id === prev.activeMineId);
-  if (!activeMine) return { nextState: prev, notifications: [] };
+  const mineIndex = prev.mines.findIndex(m => m.id === prev.activeMineId);
+  if (mineIndex === -1) return { nextState: prev, notifications: [] };
+  const activeMine = getRunMine(prev.mines[mineIndex]);
+  const hasSafetyKit = prev.upgrades.includes(MINE_SAFETY_KIT_UPGRADE);
+
+  if (action === 'SECURE_LOAD') {
+    const carriedOre = getCarriedOre(activeMine);
+    if (carriedOre <= 0) {
+      return { nextState: prev, notifications: [{ title: 'No Load', msg: 'You are not carrying any ore to secure.' }] };
+    }
+
+    const newMines = patchActiveMine(prev, mineIndex, {
+      carriedOre: 0,
+      shaftStability: Math.min(100, getShaftStability(activeMine) + 4),
+    });
+
+    return {
+      nextState: {
+        ...prev,
+        ore: prev.ore + carriedOre,
+        mines: newMines,
+      },
+      notifications: [{ title: 'Load Secured', msg: `${carriedOre} ore moved from your pack into the stockpile.` }]
+    };
+  }
 
   if (action === 'EXPORT_ORE') {
     const exported = applyOreExport(prev, prev.ore);
@@ -271,12 +371,8 @@ export const applyMineSceneAction = (
       };
     }
 
-    const newMines = [...prev.mines];
-    const mineIndex = newMines.findIndex(m => m.id === prev.activeMineId);
-    const mine = newMines[mineIndex];
-
     const newTiles: Tile[] = [];
-    for (let i = 0; i < mine.gridWidth; i++) {
+    for (let i = 0; i < activeMine.gridWidth; i++) {
       const nextType = Math.random() > 0.7 ? 'ORE' : 'DIRT';
       newTiles.push({
         id: `new-${Date.now()}-${i}`,
@@ -287,16 +383,19 @@ export const applyMineSceneAction = (
         mined: false,
         revealed: false,
         x: i,
-        y: mine.gridHeight,
+        y: activeMine.gridHeight,
         z: 0
       });
     }
 
-    newMines[mineIndex] = {
-      ...mine,
-      grid: [...mine.grid, ...newTiles],
-      gridHeight: mine.gridHeight + 1
-    };
+    const newMines = patchActiveMine(prev, mineIndex, {
+      grid: [...activeMine.grid, ...newTiles],
+      gridHeight: activeMine.gridHeight + 1,
+      carryLimit: getCarryLimit(activeMine),
+      carriedOre: getCarriedOre(activeMine),
+      shaftStability: getShaftStability(activeMine),
+      braceCharges: getBraceCharges(activeMine, hasSafetyKit),
+    });
 
     return {
       nextState: { ...prev, mines: newMines },
@@ -318,13 +417,18 @@ export const applyMineSceneAction = (
         notifications: [{ title: 'Insufficient Funds', msg: `Safety kit requires $${cost}.` }]
       };
     }
+    const newMines = patchActiveMine(prev, mineIndex, {
+      braceCharges: SAFETY_KIT_BRACE_CHARGES,
+      shaftStability: Math.min(100, getShaftStability(activeMine) + 8),
+    });
     return {
       nextState: {
         ...prev,
+        mines: newMines,
         money: prev.money - cost,
         upgrades: [...prev.upgrades, MINE_SAFETY_KIT_UPGRADE]
       },
-      notifications: [{ title: 'Safety Kit Installed', msg: 'Hazard impact reduced and base mining strain lowered.' }]
+      notifications: [{ title: 'Safety Kit Installed', msg: 'Two brace charges added and hazard impact reduced.' }]
     };
   }
 
