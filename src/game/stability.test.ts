@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
 import { GameState } from '../types';
+import { applyMineSceneAction, applyMineTileInteraction } from './actions/mineActions';
 import { applyPermitOverlayAction } from './actions/permitActions';
 import { applyOreExport } from './economy';
 import { normalizeFtueFormState } from './machines/ftueMachine';
@@ -11,6 +12,41 @@ import { buildInitialGameState } from './session';
 import { closeMiniGame } from './uiTransitions';
 
 const cloneState = (state: GameState): GameState => structuredClone(state);
+
+const buildOperationalMineState = (): GameState => {
+  const state = buildInitialGameState();
+  const mineIndex = state.mines.findIndex((mine) => mine.id === 'iron-vein');
+  const mine = state.mines[mineIndex];
+  const firstTile = mine.grid[0];
+
+  return {
+    ...state,
+    activeMineId: 'iron-vein',
+    currentScene: 'MINE',
+    energy: 100,
+    permits: {
+      ...state.permits,
+      [mine.permits.miningId]: {
+        ...state.permits[mine.permits.miningId],
+        status: 'APPROVED',
+      },
+    },
+    mines: state.mines.map((entry, index) => index === mineIndex
+      ? {
+          ...entry,
+          status: 'OPERATIONAL',
+          carriedOre: 0,
+          carryLimit: 80,
+          shaftStability: 100,
+          grid: entry.grid.map((tile, tileIndex) => tileIndex === 0
+            ? { ...firstTile, type: 'ORE', stability: 95, revealed: true, mined: false }
+            : tile
+          ),
+        }
+      : entry
+    ),
+  };
+};
 
 describe('stability guardrails', () => {
   it('exports ore without creating invalid resource values', () => {
@@ -55,6 +91,35 @@ describe('stability guardrails', () => {
 
     expect(nextState.activeMiniGame).toBeNull();
     expect(nextState.pendingPermitAction).toBeNull();
+  });
+
+  it('loads extracted ore into carried mine load before stockpile', () => {
+    const state = buildOperationalMineState();
+    const tileId = state.mines.find((mine) => mine.id === 'iron-vein')?.grid[0].id;
+    expect(tileId).toBeTruthy();
+
+    const { nextState } = applyMineTileInteraction(state, tileId!);
+    const mine = nextState.mines.find((entry) => entry.id === 'iron-vein') as typeof nextState.mines[number] & { carriedOre?: number };
+
+    expect(nextState.ore).toBe(0);
+    expect(mine.carriedOre ?? 0).toBeGreaterThan(0);
+  });
+
+  it('secures carried ore into the stockpile', () => {
+    const state = buildOperationalMineState();
+    const loadedState = {
+      ...state,
+      mines: state.mines.map((mine) => mine.id === 'iron-vein'
+        ? { ...mine, carriedOre: 12 }
+        : mine
+      ),
+    };
+
+    const { nextState } = applyMineSceneAction(loadedState, 'SECURE_LOAD');
+    const mine = nextState.mines.find((entry) => entry.id === 'iron-vein') as typeof nextState.mines[number] & { carriedOre?: number };
+
+    expect(nextState.ore).toBe(12);
+    expect(mine.carriedOre ?? 0).toBe(0);
   });
 
   it('normalizes malformed ftue form state', () => {
