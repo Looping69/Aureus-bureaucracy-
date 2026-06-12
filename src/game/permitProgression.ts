@@ -1,4 +1,5 @@
 import { Mine, Permit } from '../types';
+import { transitionPermitStatus } from './machines/permitMachine';
 
 export const applyPermitApproval = (
   permitId: string,
@@ -11,8 +12,11 @@ export const applyPermitApproval = (
 
   const makePermitAvailable = (id: string) => {
     const permit = nextPermits[id];
-    if (permit && permit.status === 'LOCKED') {
-      nextPermits[id] = { ...permit, status: 'AVAILABLE' };
+    if (!permit) return;
+
+    const nextStatus = transitionPermitStatus(permit.status, 'MAKE_AVAILABLE');
+    if (nextStatus) {
+      nextPermits[id] = { ...permit, status: nextStatus };
     }
   };
 
@@ -58,7 +62,12 @@ export const approvePermit = (
   mines: Mine[],
 ): { permits: Record<string, Permit>; mines: Mine[]; notifications: string[] } => {
   const permit = permits[permitId];
-  if (!permit || permit.status === 'APPROVED') {
+  if (!permit) {
+    return { permits, mines, notifications: [] };
+  }
+
+  const approvedStatus = transitionPermitStatus(permit.status, 'APPROVE');
+  if (!approvedStatus) {
     return { permits, mines, notifications: [] };
   }
 
@@ -66,7 +75,7 @@ export const approvePermit = (
     ...permits,
     [permitId]: {
       ...permit,
-      status: 'APPROVED' as const,
+      status: approvedStatus,
       rejectionReason: undefined,
     },
   };
