@@ -9,6 +9,9 @@
     "preview": "vite preview",
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
     "lint": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
     "test:unit": "node --import tsx --test \"src/**/*.test.ts\"",
     "validate:city": "tsx scripts/validate-city-layout.ts",
     "check": "node scripts/check.mjs",
@@ -26,15 +29,21 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "three": "^0.183.2",
-    "vite": "^6.2.0"
+    "vite": "^6.2.0",
+    "xstate": "^5.24.0",
+    "zod": "^4.1.13",
+    "zustand": "^5.0.8"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
+    "@vitest/ui": "^4.0.15",
     "autoprefixer": "^10.4.21",
+    "fast-check": "^4.3.0",
     "playwright": "^1.56.1",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
-    "vite": "^6.2.0"
+    "vite": "^6.2.0",
+    "vitest": "^4.0.15"
   }
 }
