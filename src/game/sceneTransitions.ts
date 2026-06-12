@@ -1,10 +1,13 @@
 import { Building, GameState, GameWorldState } from '../types';
 import { CompiledAuthoringWorld } from '../editor/types';
 import { getBuildingAccessPosition } from '../utils/buildingAccess';
+import { canEnterMineScene, normalizeSceneState } from './machines/sceneMachine';
 
 const OFFICE_INTERACTION_TYPES = new Set<Building['type']>(['OFFICE', 'HOME', 'PUB', 'HOTLINE']);
 
-export const enterOfficeDirectory = (state: GameState): GameState => ({
+const normalize = (state: GameState) => normalizeSceneState(state, true);
+
+export const enterOfficeDirectory = (state: GameState): GameState => normalize({
   ...state,
   currentScene: 'OFFICE',
   activeBuildingId: null,
@@ -14,7 +17,7 @@ export const enterOfficeDirectory = (state: GameState): GameState => ({
 export const enterOfficeNpc = (
   state: GameState,
   npcId: string,
-): GameState => ({
+): GameState => normalize({
   ...state,
   activeNPCId: npcId,
   activeBuildingId: null,
@@ -31,14 +34,14 @@ export const enterOfficeBuilding = (
     return state;
   }
 
-  return {
+  return normalize({
     ...state,
     activeNPCId: null,
     activeBuildingId: buildingId,
     currentScene: 'OFFICE',
     playerPos: getBuildingAccessPosition(building),
     explorationActive: !!building.explorationItems?.length,
-  };
+  });
 };
 
 export const openOfficeExploration = (state: GameState): GameState => ({
@@ -59,10 +62,23 @@ export const returnOfficeToDirectory = (
   explorationActive: false,
 });
 
+export const enterMineScene = (
+  state: GameState,
+  mineId: string,
+): GameState => {
+  if (!canEnterMineScene(state, mineId)) return state;
+
+  return normalize({
+    ...state,
+    activeMineId: mineId,
+    currentScene: 'MINE',
+  });
+};
+
 export const enterMineWorldScene = (
   state: GameState,
   buildingId: string,
-): GameState => ({
+): GameState => normalize({
   ...state,
   activeBuildingId: buildingId,
   currentScene: 'MINE_WORLD',
@@ -70,7 +86,7 @@ export const enterMineWorldScene = (
 
 export const returnToWorldScene = (
   state: GameState,
-): GameState => ({
+): GameState => normalize({
   ...state,
   currentScene: 'WORLD',
   playerPos: state.activeBuildingId && state.buildings[state.activeBuildingId]
@@ -81,7 +97,7 @@ export const returnToWorldScene = (
 export const applyPlannerWorld = (
   state: GameState,
   world: CompiledAuthoringWorld,
-): GameState => ({
+): GameState => normalize({
   ...state,
   buildings: world.buildings,
   navigationZones: world.navigationZones,
