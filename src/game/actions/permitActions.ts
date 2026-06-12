@@ -33,6 +33,7 @@ export const applyPermitOverlayAction = (
       nextState: {
         ...prev,
         money: prev.money - cost,
+        activePermitId: id,
         activeMiniGame: 'FORM_PROCESSING',
         pendingPermitAction: action
       },
@@ -53,6 +54,7 @@ export const applyPermitOverlayAction = (
     nextState: {
       ...prev,
       money: prev.money - standardCost,
+      activePermitId: id,
       permits: {
         ...prev.permits,
         [id]: { ...permit, status: nextStatus }
