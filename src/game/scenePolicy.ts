@@ -1,6 +1,6 @@
 import { GameScene } from '../types';
 
-export type SceneNavTarget = 'MINE' | 'MINE_WORLD' | 'WORLD' | 'OFFICE';
+export type SceneNavTarget = 'MINE' | 'WORLD' | 'OFFICE';
 
 export interface SceneNavItem {
   key: string;
@@ -15,12 +15,6 @@ export const SCENE_NAV_ITEMS: readonly SceneNavItem[] = [
     key: 'mine',
     label: 'Mine',
     scene: 'MINE',
-  },
-  {
-    key: 'mine_world',
-    label: 'Shaft',
-    scene: 'MINE_WORLD',
-    title: 'Enter the 3-D mine shaft.',
   },
   {
     key: 'world',
@@ -44,20 +38,16 @@ export const getVisibleSceneNavItems = (currentScene: GameScene) =>
 export const getRenderableScene = (
   currentScene: GameScene,
   plannerEnabled: boolean,
-): Exclude<GameScene, 'CITY_PLANNER'> | 'CITY_PLANNER' => {
+): Exclude<GameScene, 'CITY_PLANNER' | 'MINE_WORLD'> | 'CITY_PLANNER' => {
   if (currentScene === 'CITY_PLANNER' && plannerEnabled) {
     return 'CITY_PLANNER';
-  }
-
-  if (currentScene === 'MINE_WORLD') {
-    return 'MINE_WORLD';
   }
 
   if (currentScene === 'MINE') {
     return 'MINE';
   }
 
-  if (currentScene === 'WORLD') {
+  if (currentScene === 'WORLD' || currentScene === 'MINE_WORLD') {
     return 'WORLD';
   }
 
