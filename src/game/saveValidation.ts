@@ -6,7 +6,7 @@ export type SaveValidationResult =
   | { valid: false; reasons: string[] };
 
 const permitStatusSchema = z.enum(['LOCKED', 'AVAILABLE', 'PENDING', 'APPROVED', 'REJECTED']);
-const gameSceneSchema = z.enum(['MINE', 'MINE_WORLD', 'OFFICE', 'WORLD', 'CITY_PLANNER']) satisfies z.ZodType<GameScene>;
+const gameSceneSchema = z.enum(['MINE', 'MINE_WORLD', 'UNDERGROUND', 'OFFICE', 'WORLD', 'CITY_PLANNER']) satisfies z.ZodType<GameScene>;
 const activeMiniGameSchema = z.union([z.literal('FORM_PROCESSING'), z.null()]);
 const pendingPermitActionSchema = z.union([
   z.literal('SUBMIT'),
@@ -80,58 +80,33 @@ export const gameStateCandidateSchema = z.object({
   navigationZones: z.array(z.unknown()).optional(),
   day: finiteNumber,
   time: finiteNumber,
-  weather: z.record(z.string(), z.unknown()).optional(),
+  weather: z.unknown().optional(),
   playerPos: worldPositionSchema,
-  targetPos: z.union([worldPositionSchema, z.null()]).optional(),
+  targetPos: z.union([worldPositionSchema, z.null()]),
   path: z.array(worldPositionSchema),
   streetPickups: z.array(z.unknown()).optional(),
-  feedbacks: z.array(z.unknown()).optional(),
+  feedbacks: z.array(z.unknown()),
   playerFeedbacks: z.array(z.unknown()).optional(),
-  dialogueCooldowns: z.record(z.string(), z.unknown()).optional(),
-  worldEffects: z.record(z.string(), z.unknown()).optional(),
+  dialogueCooldowns: z.record(z.string(), finiteNumber).optional(),
+  worldEffects: z.record(z.string(), finiteNumber).optional(),
   storyFlags: z.array(z.string()).optional(),
   lastCityEventHour: finiteNumber.optional(),
-  activeCityIncident: z.union([z.record(z.string(), z.unknown()), z.null()]).optional(),
+  activeCityIncident: z.union([z.unknown(), z.null()]).optional(),
   unlockedEndings: z.array(z.string()).optional(),
   ftuePhase: z.string().optional(),
-  tutorialStep: finiteNumber.optional(),
+  tutorialStep: finiteNumber,
   tutorialMinimized: z.boolean().optional(),
-}).passthrough().superRefine((state, ctx) => {
-  if (state.currentScene === 'MINE' && state.activeMineId !== null) {
-    const activeMineExists = state.mines.some((mine) => mine.id === state.activeMineId);
-    if (!activeMineExists) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['activeMineId'],
-        message: 'activeMineId must reference a known mine when the mine scene is active',
-      });
-    }
-  }
+}).passthrough();
 
-  if (state.activeMiniGame === 'FORM_PROCESSING' && state.pendingPermitAction === null) {
-    ctx.addIssue({
-      code: 'custom',
-      path: ['pendingPermitAction'],
-      message: 'form processing requires a pending permit action',
-    });
-  }
-});
+export const validateSavedState = (candidate: unknown): SaveValidationResult => {
+  const parsed = gameStateCandidateSchema.safeParse(candidate);
 
-export const validateGameStateCandidate = (value: unknown): SaveValidationResult => {
-  const result = gameStateCandidateSchema.safeParse(value);
-
-  if (!result.success) {
+  if (!parsed.success) {
     return {
       valid: false,
-      reasons: result.error.issues.map((issue) => {
-        const path = issue.path.length > 0 ? `${issue.path.join('.')}: ` : '';
-        return `${path}${issue.message}`;
-      }),
+      reasons: parsed.error.issues.map((issue) => `${issue.path.join('.') || 'save'}: ${issue.message}`),
     };
   }
 
-  return { valid: true, state: result.data as GameState, reasons: [] };
+  return { valid: true, state: parsed.data as GameState, reasons: [] };
 };
-
-export const isValidGameStateCandidate = (value: unknown): value is GameState =>
-  validateGameStateCandidate(value).valid;
