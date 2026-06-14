@@ -5,6 +5,7 @@ export type SceneMachineEvent =
   | { type: 'GO_WORLD' }
   | { type: 'GO_OFFICE' }
   | { type: 'GO_MINE'; mineId?: string | null }
+  | { type: 'GO_UNDERGROUND'; buildingId?: string | null }
   | { type: 'GO_CITY_PLANNER'; plannerEnabled: boolean };
 
 export const sceneMachine = createMachine({
@@ -15,6 +16,7 @@ export const sceneMachine = createMachine({
       on: {
         GO_OFFICE: 'OFFICE',
         GO_MINE: 'MINE',
+        GO_UNDERGROUND: 'UNDERGROUND',
         GO_CITY_PLANNER: 'CITY_PLANNER',
       },
     },
@@ -22,12 +24,21 @@ export const sceneMachine = createMachine({
       on: {
         GO_WORLD: 'WORLD',
         GO_MINE: 'MINE',
+        GO_UNDERGROUND: 'UNDERGROUND',
         GO_CITY_PLANNER: 'CITY_PLANNER',
       },
     },
     MINE: {
       on: {
         GO_WORLD: 'WORLD',
+        GO_OFFICE: 'OFFICE',
+        GO_UNDERGROUND: 'UNDERGROUND',
+      },
+    },
+    UNDERGROUND: {
+      on: {
+        GO_WORLD: 'WORLD',
+        GO_MINE: 'MINE',
         GO_OFFICE: 'OFFICE',
       },
     },
@@ -39,7 +50,7 @@ export const sceneMachine = createMachine({
   },
 });
 
-const allScenes = new Set<GameScene>(['MINE', 'OFFICE', 'WORLD', 'CITY_PLANNER']);
+const allScenes = new Set<GameScene>(['MINE', 'UNDERGROUND', 'OFFICE', 'WORLD', 'CITY_PLANNER']);
 
 export const isKnownScene = (scene: string): scene is GameScene => allScenes.has(scene as GameScene);
 
