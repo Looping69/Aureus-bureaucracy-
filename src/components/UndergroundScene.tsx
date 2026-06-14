@@ -1,6 +1,6 @@
 import React from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { ArrowLeft, Gem, MapPin, Pickaxe } from 'lucide-react';
+import { ArrowLeft, Gem, Pickaxe } from 'lucide-react';
 import { GameState, WorldHoverInfo, WorldPosition } from '../types';
 import { WORLD_CAMERA_AZIMUTH } from '../VoxelEngine';
 import { VoxelWorldContainer } from './VoxelWorldContainer';
