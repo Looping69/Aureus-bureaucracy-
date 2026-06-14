@@ -3,7 +3,7 @@ import { VoxelEngine } from '../VoxelEngine';
 import { Building, NPC, AppState, NavigationZone, VoxelData, WeatherState, WorldHoverInfo } from '../types';
 import { useCameraControls } from '../hooks/useCameraControls';
 import { WORLD_HALF_SIZE } from '../utils/voxelConstants';
-import { buildWorldSurfaceMap, getWorldSurfaceHeight } from '../utils/worldSurface';
+import { buildWorldSurfaceMap, getWorldSurfaceHeight, WorldSurfaceMap } from '../utils/worldSurface';
 import { LoadingScreen } from './LoadingScreen';
 import { getBuildingFootprint } from '../utils/worldNavigation';
 import { getBuildingAccessPosition } from '../utils/buildingAccess';
@@ -40,6 +40,7 @@ interface VoxelWorldProps {
   showLoadingOverlay?: boolean;
   onReady?: () => void;
   onProgress?: (progress: number, phase: string) => void;
+  surfaceMapOverride?: WorldSurfaceMap;
   /** When true the player character plays the WORKING (pickaxe-swing) animation */
   playerWorking?: boolean;
   /** Number of ore blocks visually stacked on the player's back (0..MAX_CARRY) */
@@ -70,6 +71,7 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
   showLoadingOverlay = true,
   onReady,
   onProgress,
+  surfaceMapOverride,
   playerWorking,
   playerCarried
 }) => {
@@ -87,8 +89,8 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
   const onProgressRef = useRef(onProgress);
   const activeEntryTransitionRef = useRef<string | null>(null);
   const surfaceMap = React.useMemo(
-    () => buildWorldSurfaceMap(buildings, undefined, navigationZones),
-    [buildings, navigationZones]
+    () => surfaceMapOverride ?? buildWorldSurfaceMap(buildings, undefined, navigationZones),
+    [surfaceMapOverride, buildings, navigationZones]
   );
   const playerSurfaceY = React.useMemo(
     () => getWorldSurfaceHeight(playerPos, surfaceMap),
