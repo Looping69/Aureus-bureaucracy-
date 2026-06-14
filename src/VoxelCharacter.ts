@@ -26,10 +26,10 @@ export class VoxelCharacter {
   private carriedBlocks: THREE.Mesh[] = [];
   private _carriedCount = 0;
 
-  /** Maximum blocks this character can carry */
-  public static readonly MAX_CARRY = 6;
+  /** Maximum blocks this character can visibly carry in a tall backpack stack. */
+  public static readonly MAX_CARRY = 20;
   /** Vertical spacing between stacked blocks */
-  private static readonly CARRY_BLOCK_SPACING = 0.18;
+  private static readonly CARRY_BLOCK_SPACING = 0.3;
 
   constructor(palette?: { shirt: number; pants: number; hair: number; skin: number; shoes: number; belt: number }) {
     const colors = palette ?? {
@@ -66,9 +66,9 @@ export class VoxelCharacter {
     this.setupPivot(this.leftLeg, 0, 0.3, 0);
     this.setupPivot(this.rightLeg, 0, 0.3, 0);
 
-    // ── Carry-stack container on the character's back ──────────────────
+    // Carry-stack container on the character's back.
     this.carryStack = new THREE.Group();
-    this.carryStack.position.set(0, 0.9, 0.25); // centered on back of torso
+    this.carryStack.position.set(0, 0.82, 0.34);
     this.innerGroup.add(this.carryStack);
 
     this.innerGroup.add(this.body, this.head, this.leftArm, this.rightArm, this.leftLeg, this.rightLeg);
@@ -388,16 +388,21 @@ export class VoxelCharacter {
     }
 
     // Add missing blocks
-    const oreColors = [0xc87941, 0xe0a840, 0xb07030]; // amber/gold tones
+    const oreColors = [0xc87941, 0xe0a840, 0xb07030, 0x6f4e37];
     while (this.carriedBlocks.length < n) {
       const i = this.carriedBlocks.length;
       const color = oreColors[i % oreColors.length];
       const block = new THREE.Mesh(
-        new THREE.BoxGeometry(0.22, 0.15, 0.18),
-        new THREE.MeshStandardMaterial({ color, metalness: 0.3, roughness: 0.6 }),
+        new THREE.BoxGeometry(0.42, 0.25, 0.36),
+        new THREE.MeshStandardMaterial({ color, metalness: 0.32, roughness: 0.62 }),
       );
-      block.position.y = i * VoxelCharacter.CARRY_BLOCK_SPACING;
-      block.rotation.y = (i * 0.4); // slight rotation for visual variety
+      block.position.set(
+        (i % 2 === 0 ? -0.03 : 0.03),
+        i * VoxelCharacter.CARRY_BLOCK_SPACING,
+        0,
+      );
+      block.rotation.y = i * 0.36;
+      block.rotation.z = (i % 3 - 1) * 0.035;
       block.castShadow = true;
       this.carryStack.add(block);
       this.carriedBlocks.push(block);
