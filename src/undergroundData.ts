@@ -3,6 +3,8 @@ import { WORLD_SIZE } from './utils/voxelConstants';
 
 export type UndergroundResourceType = 'ore' | 'coal' | 'gem';
 
+type BuildingVoxel = NonNullable<Building['voxels']>[number];
+
 export interface UndergroundResourceNode {
   id: string;
   name: string;
@@ -40,7 +42,7 @@ const resourcePalette: Record<UndergroundResourceType, string[]> = {
 const makeResourceVoxels = (node: UndergroundResourceState) => {
   const colors = resourcePalette[node.type];
   const height = Math.max(1, Math.ceil(node.remaining / 2));
-  const voxels: Building['voxels'] = [];
+  const voxels: BuildingVoxel[] = [];
   let id = 1;
 
   for (let x = -1; x <= 1; x += 1) {
@@ -51,7 +53,7 @@ const makeResourceVoxels = (node: UndergroundResourceState) => {
       for (let z = 0; z < height; z += 1) {
         if (z > 0 && distance > 1) continue;
         voxels.push({
-          id: id++ ,
+          id: id++,
           x,
           y,
           z,
