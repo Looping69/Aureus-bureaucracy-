@@ -174,7 +174,7 @@ export const UndergroundScene = ({
 
       if (node.type === 'rubble' || node.yield <= 0) {
         setMiningResourceId(null);
-        setMessage(`${node.name} crumbles away.`);
+        setMessage(`${node.name} breaks down.`);
         return;
       }
 
@@ -334,7 +334,7 @@ export const UndergroundScene = ({
             </div>
             <div className="mt-1 text-[10px] uppercase tracking-[0.18em] opacity-70">
               {activeResource.type === 'rubble'
-                ? `${activeResource.remaining} wall layers left`
+                ? `${activeResource.remaining} wall frames left`
                 : `${activeResource.remaining} left · +${activeResource.yield} ore`}
             </div>
           </div>
