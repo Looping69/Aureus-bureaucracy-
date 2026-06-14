@@ -113,14 +113,19 @@ export const hydrateSavedState = ({
     saved.buildings?.player_home?.pos.x !== BUILDINGS.player_home.pos.x ||
     saved.buildings?.player_home?.pos.y !== BUILDINGS.player_home.pos.y ||
     Object.keys(saved.buildings ?? {}).some((id) => !(id in BUILDINGS));
-  const shouldResetWorldSpawn = saveUsesLegacyLayout || saved.currentScene === 'WORLD';
+  const shouldResetWorldSpawn = saveUsesLegacyLayout || saved.currentScene === 'WORLD' || saved.currentScene === 'MINE_WORLD';
   const nextFtuePhase = saved.ftuePhase ?? deriveFtuePhaseFromTutorialStep(saved.tutorialStep);
+  const hydratedScene =
+    saved.currentScene === 'MINE_WORLD' || (saved.currentScene === 'CITY_PLANNER' && !plannerEnabled)
+      ? 'WORLD'
+      : saved.currentScene;
 
   return {
     ...baseState,
     ...saved,
     worldProfileId: saved.worldProfileId ?? baseState.worldProfileId,
-    currentScene: saved.currentScene === 'CITY_PLANNER' && !plannerEnabled ? 'WORLD' : saved.currentScene,
+    currentScene: hydratedScene,
+    activeBuildingId: saved.currentScene === 'MINE_WORLD' ? null : saved.activeBuildingId,
     ftuePhase: nextFtuePhase,
     buildings: hydrateBuildings(saved.buildings),
     navigationZones: saved.navigationZones ?? baseState.navigationZones,
