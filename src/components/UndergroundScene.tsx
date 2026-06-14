@@ -13,6 +13,7 @@ import {
   UNDERGROUND_SIZE,
   UNDERGROUND_START_POS,
   UndergroundResourceState,
+  UndergroundResourceType,
 } from '../undergroundData';
 
 const EMPTY_NAVIGATION_ZONES: NavigationZone[] = [];
@@ -24,9 +25,22 @@ const MAX_CARRIED_CHUNKS = 20;
 const noopStateChange = (_state: AppState) => {};
 const noopCountChange = (_count: number) => {};
 
+type FlyingOre = {
+  id: string;
+  type: UndergroundResourceType;
+  fromX: number;
+  fromY: number;
+  stackIndex: number;
+};
+
 const clampUndergroundPosition = (pos: WorldPosition): WorldPosition => ({
   x: Math.max(0, Math.min(UNDERGROUND_SIZE - 1, Math.round(pos.x))),
   y: Math.max(0, Math.min(UNDERGROUND_SIZE - 1, Math.round(pos.y))),
+});
+
+const clampUndergroundPrecisePosition = (pos: WorldPosition): WorldPosition => ({
+  x: Math.max(0, Math.min(UNDERGROUND_SIZE - 1, pos.x)),
+  y: Math.max(0, Math.min(UNDERGROUND_SIZE - 1, pos.y)),
 });
 
 const distanceBetween = (from: WorldPosition, to: WorldPosition) =>
@@ -39,6 +53,22 @@ const getResourceTone = (type: UndergroundResourceState['type']) => {
   if (type === 'gem') return 'border-cyan-200/80 bg-cyan-50/95 text-cyan-800';
   if (type === 'coal') return 'border-zinc-300/80 bg-zinc-950/88 text-white';
   return 'border-amber-200/80 bg-amber-50/95 text-amber-800';
+};
+
+const getOreColorClassName = (type: UndergroundResourceType) => {
+  if (type === 'gem') return 'border-cyan-100 bg-cyan-300 shadow-cyan-200/70';
+  if (type === 'coal') return 'border-zinc-400 bg-zinc-900 shadow-zinc-900/70';
+  return 'border-amber-100 bg-amber-500 shadow-amber-300/70';
+};
+
+const getOreFlightStart = (node: UndergroundResourceState, player: WorldPosition) => {
+  const dx = node.pos.x - player.x;
+  const dy = node.pos.y - player.y;
+
+  return {
+    fromX: Math.max(-130, Math.min(130, (dx - dy) * 7)),
+    fromY: Math.max(-70, Math.min(120, (dx + dy) * 3 + 32)),
+  };
 };
 
 export const UndergroundScene = ({
@@ -56,9 +86,11 @@ export const UndergroundScene = ({
   const [analogInput, setAnalogInput] = React.useState<AnalogStickVector>({ x: 0, y: 0, magnitude: 0, active: false });
   const [cameraAzimuth, setCameraAzimuth] = React.useState(WORLD_CAMERA_AZIMUTH);
   const [carriedCount, setCarriedCount] = React.useState(0);
+  const [flyingOres, setFlyingOres] = React.useState<FlyingOre[]>([]);
   const [miningResourceId, setMiningResourceId] = React.useState<string | null>(null);
   const [message, setMessage] = React.useState('Move close to a deposit to mine automatically.');
   const mineTimeoutRef = React.useRef<number | null>(null);
+  const flightTimeoutRefs = React.useRef<number[]>([]);
 
   const resourceBuildings = React.useMemo(
     () => buildUndergroundResourceBuildings(resources),
@@ -73,6 +105,10 @@ export const UndergroundScene = ({
     setPlayerPos(clampUndergroundPosition(pos));
   }, []);
 
+  const handleMotionEnd = React.useCallback((roundedPos: WorldPosition, precisePos?: WorldPosition) => {
+    setPlayerPos(clampUndergroundPrecisePosition(precisePos ?? roundedPos));
+  }, []);
+
   const analogController = useContinuousAnalogMovement({
     input: analogInput,
     authoritativePosition: playerPos,
@@ -82,7 +118,7 @@ export const UndergroundScene = ({
     bounds: { min: 0, max: UNDERGROUND_SIZE - 1 },
     onInputStart: handleDirectMove,
     onRoundedPositionChange: handleDirectMove,
-    onMotionEnd: handleDirectMove,
+    onMotionEnd: handleMotionEnd,
   });
   const usingAnalogMovement = analogController.hasDirectionalInput || analogController.isMoving;
   const renderPlayerPos = usingAnalogMovement ? analogController.position : playerPos;
@@ -124,17 +160,35 @@ export const UndergroundScene = ({
     setMessage(`${options?.automatic ? 'Auto-mining' : 'Mining'} ${node.name}...`);
 
     mineTimeoutRef.current = window.setTimeout(() => {
+      const stackIndex = Math.min(carriedCount + 1, MAX_CARRIED_CHUNKS);
+      const flightStart = getOreFlightStart(node, roundedPlayerPos);
+      const flightId = `${node.id}-${Date.now()}`;
+
       setResources((current) => current.map((candidate) =>
         candidate.id === node.id
           ? { ...candidate, remaining: Math.max(0, candidate.remaining - 1) }
           : candidate
       ));
-      setCarriedCount((current) => Math.min(current + 1, MAX_CARRIED_CHUNKS));
       onCollectResource(node.yield);
-      setMiningResourceId(null);
-      setMessage(`${node.name} stacked on your back.`);
+      setFlyingOres((current) => [...current, {
+        id: flightId,
+        type: node.type,
+        fromX: flightStart.fromX,
+        fromY: flightStart.fromY,
+        stackIndex,
+      }]);
+      setMessage(`${node.name} jumping onto your back.`);
+
+      const landTimeout = window.setTimeout(() => {
+        setCarriedCount((current) => Math.min(current + 1, MAX_CARRIED_CHUNKS));
+        setMiningResourceId(null);
+      }, 420);
+      const removeTimeout = window.setTimeout(() => {
+        setFlyingOres((current) => current.filter((ore) => ore.id !== flightId));
+      }, 760);
+      flightTimeoutRefs.current.push(landTimeout, removeTimeout);
     }, 620);
-  }, [miningResourceId, onCollectResource, roundedPlayerPos]);
+  }, [carriedCount, miningResourceId, onCollectResource, roundedPlayerPos]);
 
   const handleSelect = React.useCallback((target: WorldHoverInfo) => {
     setHoverInfo(target);
@@ -163,6 +217,7 @@ export const UndergroundScene = ({
       if (mineTimeoutRef.current !== null) {
         window.clearTimeout(mineTimeoutRef.current);
       }
+      flightTimeoutRefs.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
     };
   }, []);
 
@@ -189,6 +244,28 @@ export const UndergroundScene = ({
         playerWorking={miningResourceId !== null}
         playerCarried={carriedCount}
       />
+
+      <div className="pointer-events-none absolute left-1/2 top-1/2 z-40">
+        <AnimatePresence>
+          {flyingOres.map((ore) => (
+            <motion.div
+              key={ore.id}
+              initial={{ x: ore.fromX, y: ore.fromY, scale: 1.35, opacity: 0.96, rotate: -18 }}
+              animate={{
+                x: 18,
+                y: -95 - Math.min(ore.stackIndex, MAX_CARRIED_CHUNKS) * 8,
+                scale: 0.92,
+                opacity: 1,
+                rotate: 18,
+              }}
+              exit={{ opacity: 0, scale: 0.65 }}
+              transition={{ duration: 0.52, ease: [0.2, 0.85, 0.22, 1] }}
+              className={`absolute h-6 w-7 rounded-md border-2 shadow-xl ${getOreColorClassName(ore.type)}`}
+              style={{ transformOrigin: 'center' }}
+            />
+          ))}
+        </AnimatePresence>
+      </div>
 
       <div className="pointer-events-none absolute inset-x-3 top-3 z-30 flex items-start justify-between gap-3">
         <button
