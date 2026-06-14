@@ -1,7 +1,7 @@
 import React from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { ArrowLeft, Gem, Pickaxe } from 'lucide-react';
-import { GameState, WorldHoverInfo, WorldPosition } from '../types';
+import { AppState, GameState, NPC, NavigationZone, WeatherState, WorldHoverInfo, WorldPosition } from '../types';
 import { WORLD_CAMERA_AZIMUTH } from '../VoxelEngine';
 import { VoxelWorldContainer } from './VoxelWorldContainer';
 import { AnalogStick, AnalogStickVector } from './AnalogStick';
@@ -14,6 +14,13 @@ import {
   UNDERGROUND_START_POS,
   UndergroundResourceState,
 } from '../undergroundData';
+
+const EMPTY_NAVIGATION_ZONES: NavigationZone[] = [];
+const EMPTY_NPCS: Record<string, NPC> = {};
+const EMPTY_PATH: WorldPosition[] = [];
+const UNDERGROUND_WEATHER: WeatherState = { current: 'CLEAR', timeLeft: 1, intensity: 0 };
+const noopStateChange = (_state: AppState) => {};
+const noopCountChange = (_count: number) => {};
 
 const clampUndergroundPosition = (pos: WorldPosition): WorldPosition => ({
   x: Math.max(0, Math.min(UNDERGROUND_SIZE - 1, Math.round(pos.x))),
@@ -53,7 +60,7 @@ export const UndergroundScene = ({
     [resources]
   );
   const terrainData = React.useMemo(
-    () => buildWorldTerrainVoxels(resourceBuildings, UNDERGROUND_SIZE, []),
+    () => buildWorldTerrainVoxels(resourceBuildings, UNDERGROUND_SIZE, EMPTY_NAVIGATION_ZONES),
     [resourceBuildings]
   );
 
@@ -136,20 +143,21 @@ export const UndergroundScene = ({
       <VoxelWorldContainer
         voxels={terrainData.voxels}
         buildings={resourceBuildings}
-        navigationZones={[]}
-        npcs={{}}
+        navigationZones={EMPTY_NAVIGATION_ZONES}
+        npcs={EMPTY_NPCS}
         time={22}
-        weather={{ current: 'CLEAR', timeLeft: 1, intensity: 0 }}
+        weather={UNDERGROUND_WEATHER}
         playerPos={renderPlayerPos}
         isMoving={usingAnalogMovement}
         targetPos={null}
-        path={[]}
-        onStateChange={() => {}}
-        onCountChange={() => {}}
+        path={EMPTY_PATH}
+        onStateChange={noopStateChange}
+        onCountChange={noopCountChange}
         onHoverPosition={setHoverInfo}
         onSelect={handleSelect}
         onCameraAzimuthChange={setCameraAzimuth}
         showLoadingOverlay={false}
+        surfaceMapOverride={terrainData.surfaceMap}
         playerWorking={miningResourceId !== null}
         playerCarried={carriedCount}
       />
