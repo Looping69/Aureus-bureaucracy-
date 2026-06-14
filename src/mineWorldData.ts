@@ -268,19 +268,19 @@ export const MINE_WORLD_BUILDINGS: Record<string, Building> = {
   path_se: { id: 'path_se', npcId: 'none', name: 'Smelter Spur', pos: pos(15, 30), type: 'ROAD', isDiscovered: true, voxels: SHAFT_FLOOR_EW_VOXELS },
   path_sc: { id: 'path_sc', npcId: 'none', name: 'Hoist Track', pos: pos(0, 35), type: 'ROAD', isDiscovered: true, voxels: SHAFT_FLOOR_NS_VOXELS },
 
-  rib_north: { id: 'rib_north', npcId: 'none', name: 'Timber Rib', pos: pos(0, -14), type: 'LANDMARK', isDiscovered: true, voxels: SUPPORT_RIB_VOXELS },
-  rib_west: { id: 'rib_west', npcId: 'none', name: 'Timber Rib', pos: pos(-24, 12), type: 'LANDMARK', isDiscovered: true, voxels: SUPPORT_RIB_VOXELS },
-  rib_east: { id: 'rib_east', npcId: 'none', name: 'Timber Rib', pos: pos(24, 12), type: 'LANDMARK', isDiscovered: true, voxels: SUPPORT_RIB_VOXELS },
-  rib_south: { id: 'rib_south', npcId: 'none', name: 'Timber Rib', pos: pos(0, 32), type: 'LANDMARK', isDiscovered: true, voxels: SUPPORT_RIB_VOXELS },
+  rib_north: { id: 'rib_north', npcId: 'none', name: 'Timber Rib', pos: pos(0, -14), type: 'PARK', isDiscovered: true, voxels: SUPPORT_RIB_VOXELS },
+  rib_west: { id: 'rib_west', npcId: 'none', name: 'Timber Rib', pos: pos(-24, 12), type: 'PARK', isDiscovered: true, voxels: SUPPORT_RIB_VOXELS },
+  rib_east: { id: 'rib_east', npcId: 'none', name: 'Timber Rib', pos: pos(24, 12), type: 'PARK', isDiscovered: true, voxels: SUPPORT_RIB_VOXELS },
+  rib_south: { id: 'rib_south', npcId: 'none', name: 'Timber Rib', pos: pos(0, 32), type: 'PARK', isDiscovered: true, voxels: SUPPORT_RIB_VOXELS },
 
-  lamp_north: { id: 'lamp_north', npcId: 'none', name: 'Shaft Lamp', pos: pos(-8, -30), type: 'LANDMARK', isDiscovered: true, voxels: MINE_LAMP_VOXELS },
-  lamp_west: { id: 'lamp_west', npcId: 'none', name: 'Shaft Lamp', pos: pos(-35, 2), type: 'LANDMARK', isDiscovered: true, voxels: MINE_LAMP_VOXELS },
-  lamp_east: { id: 'lamp_east', npcId: 'none', name: 'Shaft Lamp', pos: pos(35, 2), type: 'LANDMARK', isDiscovered: true, voxels: MINE_LAMP_VOXELS },
-  lamp_south: { id: 'lamp_south', npcId: 'none', name: 'Shaft Lamp', pos: pos(8, 34), type: 'LANDMARK', isDiscovered: true, voxels: MINE_LAMP_VOXELS },
+  lamp_north: { id: 'lamp_north', npcId: 'none', name: 'Shaft Lamp', pos: pos(-8, -30), type: 'PARK', isDiscovered: true, voxels: MINE_LAMP_VOXELS },
+  lamp_west: { id: 'lamp_west', npcId: 'none', name: 'Shaft Lamp', pos: pos(-35, 2), type: 'PARK', isDiscovered: true, voxels: MINE_LAMP_VOXELS },
+  lamp_east: { id: 'lamp_east', npcId: 'none', name: 'Shaft Lamp', pos: pos(35, 2), type: 'PARK', isDiscovered: true, voxels: MINE_LAMP_VOXELS },
+  lamp_south: { id: 'lamp_south', npcId: 'none', name: 'Shaft Lamp', pos: pos(8, 34), type: 'PARK', isDiscovered: true, voxels: MINE_LAMP_VOXELS },
 
-  cart_ore: { id: 'cart_ore', npcId: 'none', name: 'Ore Cart', pos: pos(-18, -8), type: 'LANDMARK', isDiscovered: true, voxels: ORE_CART_VOXELS },
-  cart_coal: { id: 'cart_coal', npcId: 'none', name: 'Coal Cart', pos: pos(18, -8), type: 'LANDMARK', isDiscovered: true, voxels: COAL_CART_VOXELS },
-  cart_gem: { id: 'cart_gem', npcId: 'none', name: 'Gem Cart', pos: pos(5, 12), type: 'LANDMARK', isDiscovered: true, voxels: GEM_CART_VOXELS },
+  cart_ore: { id: 'cart_ore', npcId: 'none', name: 'Ore Cart', pos: pos(-18, -8), type: 'PARK', isDiscovered: true, voxels: ORE_CART_VOXELS },
+  cart_coal: { id: 'cart_coal', npcId: 'none', name: 'Coal Cart', pos: pos(18, -8), type: 'PARK', isDiscovered: true, voxels: COAL_CART_VOXELS },
+  cart_gem: { id: 'cart_gem', npcId: 'none', name: 'Gem Cart', pos: pos(5, 12), type: 'PARK', isDiscovered: true, voxels: GEM_CART_VOXELS },
 };
 
 export const MINE_NODE_YIELDS: Record<string, number> = {
