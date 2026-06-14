@@ -1,6 +1,6 @@
 import { GameScene } from '../types';
 
-export type SceneNavTarget = 'MINE' | 'WORLD' | 'OFFICE';
+export type SceneNavTarget = 'MINE' | 'UNDERGROUND' | 'WORLD' | 'OFFICE';
 
 export interface SceneNavItem {
   key: string;
@@ -15,6 +15,12 @@ export const SCENE_NAV_ITEMS: readonly SceneNavItem[] = [
     key: 'mine',
     label: 'Mine',
     scene: 'MINE',
+  },
+  {
+    key: 'underground',
+    label: 'Underground',
+    scene: 'UNDERGROUND',
+    title: 'Enter the underground resource field.',
   },
   {
     key: 'world',
@@ -45,6 +51,10 @@ export const getRenderableScene = (
 
   if (currentScene === 'MINE') {
     return 'MINE';
+  }
+
+  if (currentScene === 'UNDERGROUND') {
+    return 'UNDERGROUND';
   }
 
   if (currentScene === 'WORLD' || currentScene === 'MINE_WORLD') {
