@@ -11,6 +11,9 @@ import { getRenderableScene } from '../game/scenePolicy';
 const WorldScene = React.lazy(() =>
   import('./WorldScene').then((module) => ({ default: module.WorldScene }))
 );
+const UndergroundScene = React.lazy(() =>
+  import('./UndergroundScene').then((module) => ({ default: module.UndergroundScene }))
+);
 const MineScene = React.lazy(() =>
   import('./MineScene').then((module) => ({ default: module.MineScene }))
 );
@@ -102,6 +105,7 @@ export const GameSceneRouter: React.FC<GameSceneRouterProps> = ({
   onApplyAuthoring,
   onClosePlanner,
   onReturnMineToWorld,
+  onCollectMineResource,
   onSelectNPC,
   onSelectPermit,
   onFoundItem,
@@ -125,7 +129,28 @@ export const GameSceneRouter: React.FC<GameSceneRouterProps> = ({
   return (
     <>
       <AnimatePresence mode="wait">
-        {renderableScene === 'MINE' ? (
+        {renderableScene === 'UNDERGROUND' ? (
+          <motion.div
+            key="underground"
+            initial={{ opacity: 0, scale: 1.06 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.96 }}
+            className="flex-1 flex flex-col overflow-hidden touch-none"
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onWheel={onWheel}
+          >
+            <React.Suspense fallback={sceneLoading}>
+              <SceneMountSignal scene="UNDERGROUND" onMounted={onInitialSceneMounted} />
+              <UndergroundScene
+                state={state}
+                onCollectResource={onCollectMineResource}
+                onExit={onReturnMineToWorld}
+              />
+            </React.Suspense>
+          </motion.div>
+        ) : renderableScene === 'MINE' ? (
           <motion.div
             key="mine"
             initial={{ opacity: 0, x: -20 }}
