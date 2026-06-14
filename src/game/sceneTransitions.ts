@@ -78,15 +78,11 @@ export const enterMineScene = (
 export const enterMineWorldScene = (
   state: GameState,
   buildingId: string,
-): GameState => {
-  void buildingId;
-
-  return normalize({
-    ...state,
-    activeBuildingId: null,
-    currentScene: 'WORLD',
-  });
-};
+): GameState => normalize({
+  ...state,
+  activeBuildingId: buildingId,
+  currentScene: 'UNDERGROUND',
+});
 
 export const returnToWorldScene = (
   state: GameState,
