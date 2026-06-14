@@ -5,7 +5,6 @@ export type SceneMachineEvent =
   | { type: 'GO_WORLD' }
   | { type: 'GO_OFFICE' }
   | { type: 'GO_MINE'; mineId?: string | null }
-  | { type: 'GO_MINE_WORLD'; buildingId?: string | null }
   | { type: 'GO_CITY_PLANNER'; plannerEnabled: boolean };
 
 export const sceneMachine = createMachine({
@@ -16,7 +15,6 @@ export const sceneMachine = createMachine({
       on: {
         GO_OFFICE: 'OFFICE',
         GO_MINE: 'MINE',
-        GO_MINE_WORLD: 'MINE_WORLD',
         GO_CITY_PLANNER: 'CITY_PLANNER',
       },
     },
@@ -31,14 +29,6 @@ export const sceneMachine = createMachine({
       on: {
         GO_WORLD: 'WORLD',
         GO_OFFICE: 'OFFICE',
-        GO_MINE_WORLD: 'MINE_WORLD',
-      },
-    },
-    MINE_WORLD: {
-      on: {
-        GO_WORLD: 'WORLD',
-        GO_MINE: 'MINE',
-        GO_OFFICE: 'OFFICE',
       },
     },
     CITY_PLANNER: {
@@ -49,7 +39,7 @@ export const sceneMachine = createMachine({
   },
 });
 
-const allScenes = new Set<GameScene>(['MINE', 'MINE_WORLD', 'OFFICE', 'WORLD', 'CITY_PLANNER']);
+const allScenes = new Set<GameScene>(['MINE', 'OFFICE', 'WORLD', 'CITY_PLANNER']);
 
 export const isKnownScene = (scene: string): scene is GameScene => allScenes.has(scene as GameScene);
 
@@ -62,6 +52,14 @@ export const normalizeSceneState = (
 ): GameState => {
   if (!plannerEnabled && state.currentScene === 'CITY_PLANNER') {
     return { ...state, currentScene: 'WORLD' };
+  }
+
+  if (state.currentScene === 'MINE_WORLD') {
+    return {
+      ...state,
+      currentScene: 'WORLD',
+      activeBuildingId: null,
+    };
   }
 
   if (state.currentScene === 'MINE' && !hasValidActiveMine(state)) {
