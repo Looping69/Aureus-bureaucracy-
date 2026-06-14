@@ -80,33 +80,58 @@ export const gameStateCandidateSchema = z.object({
   navigationZones: z.array(z.unknown()).optional(),
   day: finiteNumber,
   time: finiteNumber,
-  weather: z.unknown().optional(),
+  weather: z.record(z.string(), z.unknown()).optional(),
   playerPos: worldPositionSchema,
-  targetPos: z.union([worldPositionSchema, z.null()]),
+  targetPos: z.union([worldPositionSchema, z.null()]).optional(),
   path: z.array(worldPositionSchema),
   streetPickups: z.array(z.unknown()).optional(),
-  feedbacks: z.array(z.unknown()),
+  feedbacks: z.array(z.unknown()).optional(),
   playerFeedbacks: z.array(z.unknown()).optional(),
-  dialogueCooldowns: z.record(z.string(), finiteNumber).optional(),
-  worldEffects: z.record(z.string(), finiteNumber).optional(),
+  dialogueCooldowns: z.record(z.string(), z.unknown()).optional(),
+  worldEffects: z.record(z.string(), z.unknown()).optional(),
   storyFlags: z.array(z.string()).optional(),
   lastCityEventHour: finiteNumber.optional(),
-  activeCityIncident: z.union([z.unknown(), z.null()]).optional(),
+  activeCityIncident: z.union([z.record(z.string(), z.unknown()), z.null()]).optional(),
   unlockedEndings: z.array(z.string()).optional(),
   ftuePhase: z.string().optional(),
-  tutorialStep: finiteNumber,
+  tutorialStep: finiteNumber.optional(),
   tutorialMinimized: z.boolean().optional(),
-}).passthrough();
+}).passthrough().superRefine((state, ctx) => {
+  if (state.currentScene === 'MINE' && state.activeMineId !== null) {
+    const activeMineExists = state.mines.some((mine) => mine.id === state.activeMineId);
+    if (!activeMineExists) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['activeMineId'],
+        message: 'activeMineId must reference a known mine when the mine scene is active',
+      });
+    }
+  }
 
-export const validateSavedState = (candidate: unknown): SaveValidationResult => {
-  const parsed = gameStateCandidateSchema.safeParse(candidate);
+  if (state.activeMiniGame === 'FORM_PROCESSING' && state.pendingPermitAction === null) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['pendingPermitAction'],
+      message: 'form processing requires a pending permit action',
+    });
+  }
+});
 
-  if (!parsed.success) {
+export const validateGameStateCandidate = (value: unknown): SaveValidationResult => {
+  const result = gameStateCandidateSchema.safeParse(value);
+
+  if (!result.success) {
     return {
       valid: false,
-      reasons: parsed.error.issues.map((issue) => `${issue.path.join('.') || 'save'}: ${issue.message}`),
+      reasons: result.error.issues.map((issue) => {
+        const path = issue.path.length > 0 ? `${issue.path.join('.')}: ` : '';
+        return `${path}${issue.message}`;
+      }),
     };
   }
 
-  return { valid: true, state: parsed.data as GameState, reasons: [] };
+  return { valid: true, state: result.data as GameState, reasons: [] };
 };
+
+export const isValidGameStateCandidate = (value: unknown): value is GameState =>
+  validateGameStateCandidate(value).valid;
