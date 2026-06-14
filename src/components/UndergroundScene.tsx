@@ -52,12 +52,14 @@ const isNear = (from: WorldPosition, to: WorldPosition, distance: number) =>
 const getResourceTone = (type: UndergroundResourceState['type']) => {
   if (type === 'gem') return 'border-cyan-200/80 bg-cyan-50/95 text-cyan-800';
   if (type === 'coal') return 'border-zinc-300/80 bg-zinc-950/88 text-white';
+  if (type === 'rubble') return 'border-stone-300/70 bg-stone-900/92 text-stone-100';
   return 'border-amber-200/80 bg-amber-50/95 text-amber-800';
 };
 
 const getOreColorClassName = (type: UndergroundResourceType) => {
   if (type === 'gem') return 'border-cyan-100 bg-cyan-300 shadow-cyan-200/70';
   if (type === 'coal') return 'border-zinc-400 bg-zinc-900 shadow-zinc-900/70';
+  if (type === 'rubble') return 'border-stone-300 bg-stone-600 shadow-stone-950/70';
   return 'border-amber-100 bg-amber-500 shadow-amber-300/70';
 };
 
@@ -88,7 +90,7 @@ export const UndergroundScene = ({
   const [carriedCount, setCarriedCount] = React.useState(0);
   const [flyingOres, setFlyingOres] = React.useState<FlyingOre[]>([]);
   const [miningResourceId, setMiningResourceId] = React.useState<string | null>(null);
-  const [message, setMessage] = React.useState('Move close to a deposit to mine automatically.');
+  const [message, setMessage] = React.useState('Move close to ore or walls to mine automatically.');
   const mineTimeoutRef = React.useRef<number | null>(null);
   const flightTimeoutRefs = React.useRef<number[]>([]);
 
@@ -126,6 +128,10 @@ export const UndergroundScene = ({
     () => clampUndergroundPosition(renderPlayerPos),
     [renderPlayerPos]
   );
+  const lightAngle = React.useMemo(() => {
+    const headingAngle = Math.atan2(analogController.heading.y, analogController.heading.x);
+    return ((headingAngle - cameraAzimuth) * 180) / Math.PI;
+  }, [analogController.heading.x, analogController.heading.y, cameraAzimuth]);
 
   const nearestMineableResource = React.useMemo(() => {
     let nearest: { node: UndergroundResourceState; distance: number } | null = null;
@@ -146,7 +152,7 @@ export const UndergroundScene = ({
     () => nearestMineableResource ?? (hoverInfo?.id ? resources.find((node) => node.id === hoverInfo.id) ?? null : null),
     [hoverInfo?.id, nearestMineableResource, resources]
   );
-  const remainingChunks = resources.reduce((total, node) => total + node.remaining, 0);
+  const remainingDigTargets = resources.reduce((total, node) => total + node.remaining, 0);
 
   const startMining = React.useCallback((node: UndergroundResourceState, options?: { automatic?: boolean }) => {
     if (miningResourceId || node.remaining <= 0) return;
@@ -160,15 +166,22 @@ export const UndergroundScene = ({
     setMessage(`${options?.automatic ? 'Auto-mining' : 'Mining'} ${node.name}...`);
 
     mineTimeoutRef.current = window.setTimeout(() => {
-      const stackIndex = Math.min(carriedCount + 1, MAX_CARRIED_CHUNKS);
-      const flightStart = getOreFlightStart(node, roundedPlayerPos);
-      const flightId = `${node.id}-${Date.now()}`;
-
       setResources((current) => current.map((candidate) =>
         candidate.id === node.id
           ? { ...candidate, remaining: Math.max(0, candidate.remaining - 1) }
           : candidate
       ));
+
+      if (node.type === 'rubble' || node.yield <= 0) {
+        setMiningResourceId(null);
+        setMessage(`${node.name} crumbles away.`);
+        return;
+      }
+
+      const stackIndex = Math.min(carriedCount + 1, MAX_CARRIED_CHUNKS);
+      const flightStart = getOreFlightStart(node, roundedPlayerPos);
+      const flightId = `${node.id}-${Date.now()}`;
+
       onCollectResource(node.yield);
       setFlyingOres((current) => [...current, {
         id: flightId,
@@ -245,6 +258,18 @@ export const UndergroundScene = ({
         playerCarried={carriedCount}
       />
 
+      <div className="pointer-events-none absolute inset-0 z-20 bg-[radial-gradient(circle_at_50%_50%,rgba(0,0,0,0)_0%,rgba(0,0,0,0.25)_18%,rgba(0,0,0,0.74)_48%,rgba(0,0,0,0.92)_100%)]" />
+      <div
+        className="pointer-events-none absolute left-1/2 top-1/2 z-20 h-[360px] w-[360px] origin-center"
+        style={{
+          transform: `translate(-50%, -50%) rotate(${lightAngle}deg)`,
+          clipPath: 'polygon(50% 50%, 100% 12%, 100% 88%)',
+          background: 'linear-gradient(90deg, rgba(255,241,188,0.34), rgba(255,241,188,0.13) 58%, rgba(255,241,188,0))',
+          mixBlendMode: 'screen',
+        }}
+      />
+      <div className="pointer-events-none absolute left-1/2 top-1/2 z-20 h-28 w-28 -translate-x-1/2 -translate-y-1/2 rounded-full bg-amber-100/12 blur-xl" />
+
       <div className="pointer-events-none absolute left-1/2 top-1/2 z-40">
         <AnimatePresence>
           {flyingOres.map((ore) => (
@@ -281,7 +306,7 @@ export const UndergroundScene = ({
           <div className="text-[9px] font-black uppercase tracking-[0.22em] text-white/50">Underground</div>
           <div className="mt-1 flex items-center justify-end gap-2 text-xs font-black">
             <Pickaxe size={14} />
-            {remainingChunks} chunks left
+            {remainingDigTargets} blocks left
           </div>
         </div>
       </div>
@@ -308,7 +333,9 @@ export const UndergroundScene = ({
               {activeResource.name}
             </div>
             <div className="mt-1 text-[10px] uppercase tracking-[0.18em] opacity-70">
-              {activeResource.remaining} left · +{activeResource.yield} ore
+              {activeResource.type === 'rubble'
+                ? `${activeResource.remaining} wall layers left`
+                : `${activeResource.remaining} left · +${activeResource.yield} ore`}
             </div>
           </div>
         </div>
