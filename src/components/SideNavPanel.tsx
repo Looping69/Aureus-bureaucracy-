@@ -1,5 +1,5 @@
 import React from 'react';
-import { Briefcase, ChevronLeft, ChevronRight, Mountain, Pickaxe, Store, Users } from 'lucide-react';
+import { Briefcase, ChevronLeft, ChevronRight, Pickaxe, Store, Users } from 'lucide-react';
 import { motion } from 'motion/react';
 import { GameState } from '../types';
 import { getVisibleSceneNavItems, isSceneActive, SceneNavItem } from '../game/scenePolicy';
@@ -27,21 +27,18 @@ export const SideNavPanel: React.FC<SideNavPanelProps> = ({
   isOpen,
   onToggle,
   onOpenMine,
-  onOpenMineWorld,
   onOpenWorld,
   onOpenOffice,
   onExport
 }) => {
   const iconMap: Record<SceneNavItem['scene'], NavAction['icon']> = {
     MINE: Pickaxe,
-    MINE_WORLD: Mountain,
     WORLD: Users,
     OFFICE: Briefcase,
   };
 
   const clickMap: Record<SceneNavItem['scene'], () => void> = {
     MINE: onOpenMine,
-    MINE_WORLD: onOpenMineWorld,
     WORLD: onOpenWorld,
     OFFICE: onOpenOffice,
   };
