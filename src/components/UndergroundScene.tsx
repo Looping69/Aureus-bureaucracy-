@@ -19,6 +19,8 @@ const EMPTY_NAVIGATION_ZONES: NavigationZone[] = [];
 const EMPTY_NPCS: Record<string, NPC> = {};
 const EMPTY_PATH: WorldPosition[] = [];
 const UNDERGROUND_WEATHER: WeatherState = { current: 'CLEAR', timeLeft: 1, intensity: 0 };
+const AUTO_MINE_RANGE = 4;
+const MAX_CARRIED_CHUNKS = 20;
 const noopStateChange = (_state: AppState) => {};
 const noopCountChange = (_count: number) => {};
 
@@ -27,8 +29,11 @@ const clampUndergroundPosition = (pos: WorldPosition): WorldPosition => ({
   y: Math.max(0, Math.min(UNDERGROUND_SIZE - 1, Math.round(pos.y))),
 });
 
+const distanceBetween = (from: WorldPosition, to: WorldPosition) =>
+  Math.hypot(from.x - to.x, from.y - to.y);
+
 const isNear = (from: WorldPosition, to: WorldPosition, distance: number) =>
-  Math.hypot(from.x - to.x, from.y - to.y) <= distance;
+  distanceBetween(from, to) <= distance;
 
 const getResourceTone = (type: UndergroundResourceState['type']) => {
   if (type === 'gem') return 'border-cyan-200/80 bg-cyan-50/95 text-cyan-800';
@@ -52,7 +57,7 @@ export const UndergroundScene = ({
   const [cameraAzimuth, setCameraAzimuth] = React.useState(WORLD_CAMERA_AZIMUTH);
   const [carriedCount, setCarriedCount] = React.useState(0);
   const [miningResourceId, setMiningResourceId] = React.useState<string | null>(null);
-  const [message, setMessage] = React.useState('Tap a deposit when close enough to mine.');
+  const [message, setMessage] = React.useState('Move close to a deposit to mine automatically.');
   const mineTimeoutRef = React.useRef<number | null>(null);
 
   const resourceBuildings = React.useMemo(
@@ -81,24 +86,42 @@ export const UndergroundScene = ({
   });
   const usingAnalogMovement = analogController.hasDirectionalInput || analogController.isMoving;
   const renderPlayerPos = usingAnalogMovement ? analogController.position : playerPos;
+  const roundedPlayerPos = React.useMemo(
+    () => clampUndergroundPosition(renderPlayerPos),
+    [renderPlayerPos]
+  );
+
+  const nearestMineableResource = React.useMemo(() => {
+    let nearest: { node: UndergroundResourceState; distance: number } | null = null;
+
+    resources.forEach((node) => {
+      if (node.remaining <= 0) return;
+      const distance = distanceBetween(roundedPlayerPos, node.pos);
+      if (distance > AUTO_MINE_RANGE) return;
+      if (!nearest || distance < nearest.distance) {
+        nearest = { node, distance };
+      }
+    });
+
+    return nearest?.node ?? null;
+  }, [resources, roundedPlayerPos]);
 
   const activeResource = React.useMemo(
-    () => (hoverInfo?.id ? resources.find((node) => node.id === hoverInfo.id) ?? null : null),
-    [hoverInfo?.id, resources]
+    () => nearestMineableResource ?? (hoverInfo?.id ? resources.find((node) => node.id === hoverInfo.id) ?? null : null),
+    [hoverInfo?.id, nearestMineableResource, resources]
   );
   const remainingChunks = resources.reduce((total, node) => total + node.remaining, 0);
 
-  const startMining = React.useCallback((node: UndergroundResourceState) => {
+  const startMining = React.useCallback((node: UndergroundResourceState, options?: { automatic?: boolean }) => {
     if (miningResourceId || node.remaining <= 0) return;
 
-    const currentPlayerPos = clampUndergroundPosition(renderPlayerPos);
-    if (!isNear(currentPlayerPos, node.pos, 4)) {
+    if (!isNear(roundedPlayerPos, node.pos, AUTO_MINE_RANGE)) {
       setMessage(`Move closer to ${node.name}.`);
       return;
     }
 
     setMiningResourceId(node.id);
-    setMessage(`Mining ${node.name}...`);
+    setMessage(`${options?.automatic ? 'Auto-mining' : 'Mining'} ${node.name}...`);
 
     mineTimeoutRef.current = window.setTimeout(() => {
       setResources((current) => current.map((candidate) =>
@@ -106,12 +129,12 @@ export const UndergroundScene = ({
           ? { ...candidate, remaining: Math.max(0, candidate.remaining - 1) }
           : candidate
       ));
-      setCarriedCount((current) => Math.min(current + 1, 6));
+      setCarriedCount((current) => Math.min(current + 1, MAX_CARRIED_CHUNKS));
       onCollectResource(node.yield);
       setMiningResourceId(null);
-      setMessage(`${node.name} loaded onto your back.`);
+      setMessage(`${node.name} stacked on your back.`);
     }, 620);
-  }, [miningResourceId, onCollectResource, renderPlayerPos]);
+  }, [miningResourceId, onCollectResource, roundedPlayerPos]);
 
   const handleSelect = React.useCallback((target: WorldHoverInfo) => {
     setHoverInfo(target);
@@ -129,6 +152,11 @@ export const UndergroundScene = ({
       }
     }
   }, [resources, startMining]);
+
+  React.useEffect(() => {
+    if (!nearestMineableResource || miningResourceId) return;
+    startMining(nearestMineableResource, { automatic: true });
+  }, [miningResourceId, nearestMineableResource, startMining]);
 
   React.useEffect(() => {
     return () => {
@@ -210,7 +238,7 @@ export const UndergroundScene = ({
       )}
 
       <div className="pointer-events-none absolute bottom-4 right-4 z-30 rounded-full border border-white/15 bg-black/72 px-3 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-white shadow-lg backdrop-blur-sm">
-        Carry {carriedCount}/6
+        Carry {carriedCount}/{MAX_CARRIED_CHUNKS}
       </div>
 
       <AnalogStick onChange={setAnalogInput} isNight />
