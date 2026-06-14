@@ -210,7 +210,7 @@ export type FtuePhase =
   | 'submit_form_17b'
   | 'ftue_complete';
 
-export type GameScene = 'MINE' | 'MINE_WORLD' | 'OFFICE' | 'WORLD' | 'CITY_PLANNER';
+export type GameScene = 'MINE' | 'MINE_WORLD' | 'UNDERGROUND' | 'OFFICE' | 'WORLD' | 'CITY_PLANNER';
 export type ActiveMiniGame = 'FORM_PROCESSING' | null;
 export type PendingPermitAction = 'SUBMIT' | 'FAST_TRACK' | 'DIALOGUE' | null;
 
