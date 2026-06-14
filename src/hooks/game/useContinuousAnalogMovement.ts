@@ -40,7 +40,7 @@ interface UseContinuousAnalogMovementArgs {
   bounds: { min: number; max: number };
   onInputStart?: (roundedPos: WorldPosition) => void;
   onRoundedPositionChange?: (roundedPos: WorldPosition) => void;
-  onMotionEnd?: (roundedPos: WorldPosition) => void;
+  onMotionEnd?: (roundedPos: WorldPosition, precisePos?: WorldPosition) => void;
 }
 
 export interface ContinuousAnalogMovementState {
@@ -211,7 +211,7 @@ export const useContinuousAnalogMovement = ({
       }
 
       if (hadControlRef.current && !hasControl) {
-        callbacks.onMotionEnd?.(roundedPositionRef.current);
+        callbacks.onMotionEnd?.(roundedPositionRef.current, positionRef.current);
       }
 
       hadControlRef.current = hasControl;
