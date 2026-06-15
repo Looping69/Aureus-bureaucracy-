@@ -1,6 +1,6 @@
 import React from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { ArrowLeft, Gem, Pickaxe } from 'lucide-react';
+import { ArrowLeft, Flame, Gem, Pickaxe } from 'lucide-react';
 import { AppState, GameState, NPC, NavigationZone, WeatherState, WorldHoverInfo, WorldPosition } from '../types';
 import { WORLD_CAMERA_AZIMUTH } from '../VoxelEngine';
 import { VoxelWorldContainer } from './VoxelWorldContainer';
@@ -21,7 +21,9 @@ const EMPTY_NPCS: Record<string, NPC> = {};
 const EMPTY_PATH: WorldPosition[] = [];
 const UNDERGROUND_WEATHER: WeatherState = { current: 'CLEAR', timeLeft: 1, intensity: 0 };
 const AUTO_MINE_RANGE = 4;
+const RESOURCE_REVEAL_RANGE = 8;
 const MAX_CARRIED_CHUNKS = 20;
+const LANTERN_MAX = 100;
 const noopStateChange = (_state: AppState) => {};
 const noopCountChange = (_count: number) => {};
 
@@ -31,6 +33,12 @@ type FlyingOre = {
   fromX: number;
   fromY: number;
   stackIndex: number;
+};
+
+type WallHit = {
+  id: string;
+  fromX: number;
+  fromY: number;
 };
 
 const clampUndergroundPosition = (pos: WorldPosition): WorldPosition => ({
@@ -63,7 +71,7 @@ const getOreColorClassName = (type: UndergroundResourceType) => {
   return 'border-amber-100 bg-amber-500 shadow-amber-300/70';
 };
 
-const getOreFlightStart = (node: UndergroundResourceState, player: WorldPosition) => {
+const getScreenOffset = (node: UndergroundResourceState, player: WorldPosition) => {
   const dx = node.pos.x - player.x;
   const dy = node.pos.y - player.y;
 
@@ -71,6 +79,13 @@ const getOreFlightStart = (node: UndergroundResourceState, player: WorldPosition
     fromX: Math.max(-130, Math.min(130, (dx - dy) * 7)),
     fromY: Math.max(-70, Math.min(120, (dx + dy) * 3 + 32)),
   };
+};
+
+const getPickTier = (state: GameState) => {
+  const upgrades = state.upgrades ?? [];
+  if (upgrades.some((id) => ['hydraulic_pick', 'power_pick', 'mining_drill', 'deep_pick'].includes(id))) return 3;
+  if (upgrades.some((id) => ['reinforced_pick', 'iron_pick', 'mining_pick'].includes(id)) || (state.movementSpeed ?? 1) > 1.15) return 2;
+  return 1;
 };
 
 export const UndergroundScene = ({
@@ -89,10 +104,16 @@ export const UndergroundScene = ({
   const [cameraAzimuth, setCameraAzimuth] = React.useState(WORLD_CAMERA_AZIMUTH);
   const [carriedCount, setCarriedCount] = React.useState(0);
   const [flyingOres, setFlyingOres] = React.useState<FlyingOre[]>([]);
+  const [wallHits, setWallHits] = React.useState<WallHit[]>([]);
+  const [lanternFuel, setLanternFuel] = React.useState(LANTERN_MAX);
   const [miningResourceId, setMiningResourceId] = React.useState<string | null>(null);
-  const [message, setMessage] = React.useState('Move close to ore or walls to mine automatically.');
+  const [message, setMessage] = React.useState('Dig through walls and search the dark for hidden ore.');
   const mineTimeoutRef = React.useRef<number | null>(null);
   const flightTimeoutRefs = React.useRef<number[]>([]);
+  const pressureWarningShownRef = React.useRef(false);
+
+  const pickTier = React.useMemo(() => getPickTier(state), [state]);
+  const miningDuration = pickTier === 3 ? 340 : pickTier === 2 ? 470 : 620;
 
   const resourceBuildings = React.useMemo(
     () => buildUndergroundResourceBuildings(resources),
@@ -137,7 +158,7 @@ export const UndergroundScene = ({
     let nearest: { node: UndergroundResourceState; distance: number } | null = null;
 
     resources.forEach((node) => {
-      if (node.remaining <= 0) return;
+      if (node.remaining <= 0 || !node.discovered) return;
       const distance = distanceBetween(roundedPlayerPos, node.pos);
       if (distance > AUTO_MINE_RANGE) return;
       if (!nearest || distance < nearest.distance) {
@@ -149,13 +170,19 @@ export const UndergroundScene = ({
   }, [resources, roundedPlayerPos]);
 
   const activeResource = React.useMemo(
-    () => nearestMineableResource ?? (hoverInfo?.id ? resources.find((node) => node.id === hoverInfo.id) ?? null : null),
+    () => nearestMineableResource ?? (hoverInfo?.id ? resources.find((node) => node.id === hoverInfo.id && node.discovered) ?? null : null),
     [hoverInfo?.id, nearestMineableResource, resources]
   );
-  const remainingDigTargets = resources.reduce((total, node) => total + node.remaining, 0);
+  const visibleDigTargets = resources.reduce((total, node) => total + (node.discovered ? node.remaining : 0), 0);
+  const hiddenResourceCount = resources.filter((node) => !node.discovered && node.remaining > 0).length;
 
   const startMining = React.useCallback((node: UndergroundResourceState, options?: { automatic?: boolean }) => {
-    if (miningResourceId || node.remaining <= 0) return;
+    if (miningResourceId || node.remaining <= 0 || !node.discovered) return;
+
+    if (lanternFuel <= 0) {
+      setMessage('Your lantern is out. Leave the underground before digging deeper.');
+      return;
+    }
 
     if (!isNear(roundedPlayerPos, node.pos, AUTO_MINE_RANGE)) {
       setMessage(`Move closer to ${node.name}.`);
@@ -171,15 +198,24 @@ export const UndergroundScene = ({
           ? { ...candidate, remaining: Math.max(0, candidate.remaining - 1) }
           : candidate
       ));
+      setLanternFuel((current) => Math.max(0, current - (node.type === 'rubble' ? 2 : 1)));
 
       if (node.type === 'rubble' || node.yield <= 0) {
+        const hitStart = getScreenOffset(node, roundedPlayerPos);
+        const hitId = `${node.id}-hit-${Date.now()}`;
+        setWallHits((current) => [...current, { id: hitId, fromX: hitStart.fromX, fromY: hitStart.fromY }]);
         setMiningResourceId(null);
-        setMessage(`${node.name} breaks down.`);
+        setMessage(node.remaining <= 1 ? 'The wall gives way.' : `${node.name} breaks down.`);
+
+        const removeHitTimeout = window.setTimeout(() => {
+          setWallHits((current) => current.filter((hit) => hit.id !== hitId));
+        }, 520);
+        flightTimeoutRefs.current.push(removeHitTimeout);
         return;
       }
 
       const stackIndex = Math.min(carriedCount + 1, MAX_CARRIED_CHUNKS);
-      const flightStart = getOreFlightStart(node, roundedPlayerPos);
+      const flightStart = getScreenOffset(node, roundedPlayerPos);
       const flightId = `${node.id}-${Date.now()}`;
 
       onCollectResource(node.yield);
@@ -200,8 +236,8 @@ export const UndergroundScene = ({
         setFlyingOres((current) => current.filter((ore) => ore.id !== flightId));
       }, 760);
       flightTimeoutRefs.current.push(landTimeout, removeTimeout);
-    }, 620);
-  }, [carriedCount, miningResourceId, onCollectResource, roundedPlayerPos]);
+    }, miningDuration);
+  }, [carriedCount, lanternFuel, miningDuration, miningResourceId, onCollectResource, roundedPlayerPos]);
 
   const handleSelect = React.useCallback((target: WorldHoverInfo) => {
     setHoverInfo(target);
@@ -213,7 +249,7 @@ export const UndergroundScene = ({
     }
 
     if (target.kind === 'BUILDING' && target.id) {
-      const node = resources.find((candidate) => candidate.id === target.id);
+      const node = resources.find((candidate) => candidate.id === target.id && candidate.discovered);
       if (node) {
         startMining(node);
       }
@@ -221,9 +257,41 @@ export const UndergroundScene = ({
   }, [resources, startMining]);
 
   React.useEffect(() => {
+    const revealableResources = resources.filter((node) => (
+      !node.discovered &&
+      node.remaining > 0 &&
+      distanceBetween(roundedPlayerPos, node.pos) <= RESOURCE_REVEAL_RANGE
+    ));
+
+    if (revealableResources.length === 0) return;
+
+    setResources((current) => current.map((node) => (
+      revealableResources.some((candidate) => candidate.id === node.id)
+        ? { ...node, discovered: true }
+        : node
+    )));
+    setMessage(`${revealableResources[0].name} revealed in the dark.`);
+  }, [resources, roundedPlayerPos]);
+
+  React.useEffect(() => {
     if (!nearestMineableResource || miningResourceId) return;
     startMining(nearestMineableResource, { automatic: true });
   }, [miningResourceId, nearestMineableResource, startMining]);
+
+  React.useEffect(() => {
+    const pressureId = window.setInterval(() => {
+      setLanternFuel((current) => Math.max(0, current - 1));
+    }, 1400);
+
+    return () => window.clearInterval(pressureId);
+  }, []);
+
+  React.useEffect(() => {
+    if (lanternFuel <= 20 && !pressureWarningShownRef.current) {
+      pressureWarningShownRef.current = true;
+      setMessage('Lantern is running low. Find what you can and leave soon.');
+    }
+  }, [lanternFuel]);
 
   React.useEffect(() => {
     return () => {
@@ -272,6 +340,26 @@ export const UndergroundScene = ({
 
       <div className="pointer-events-none absolute left-1/2 top-1/2 z-40">
         <AnimatePresence>
+          {wallHits.map((hit) => (
+            <React.Fragment key={hit.id}>
+              {[0, 1, 2, 3, 4, 5].map((piece) => (
+                <motion.div
+                  key={`${hit.id}-${piece}`}
+                  initial={{ x: hit.fromX, y: hit.fromY, scale: 1, opacity: 0.8 }}
+                  animate={{
+                    x: hit.fromX + (piece - 2.5) * 12,
+                    y: hit.fromY - 16 - (piece % 3) * 8,
+                    scale: 0.3,
+                    opacity: 0,
+                  }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.46, ease: 'easeOut' }}
+                  className="absolute h-2 w-2 rounded-sm bg-stone-300 shadow-lg shadow-stone-900/70"
+                />
+              ))}
+            </React.Fragment>
+          ))}
+
           {flyingOres.map((ore) => (
             <motion.div
               key={ore.id}
@@ -306,7 +394,11 @@ export const UndergroundScene = ({
           <div className="text-[9px] font-black uppercase tracking-[0.22em] text-white/50">Underground</div>
           <div className="mt-1 flex items-center justify-end gap-2 text-xs font-black">
             <Pickaxe size={14} />
-            {remainingDigTargets} blocks left
+            Mk {pickTier} · {visibleDigTargets} visible
+          </div>
+          <div className="mt-1 flex items-center justify-end gap-2 text-[10px] font-black text-amber-100/90">
+            <Flame size={12} />
+            Lantern {lanternFuel}% · {hiddenResourceCount} hidden
           </div>
         </div>
       </div>
