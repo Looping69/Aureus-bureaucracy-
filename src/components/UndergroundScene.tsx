@@ -130,7 +130,7 @@ export const UndergroundScene = ({
   );
   const lightAngle = React.useMemo(() => {
     const headingAngle = Math.atan2(analogController.heading.y, analogController.heading.x);
-    return ((headingAngle - cameraAzimuth) * 180) / Math.PI;
+    return ((headingAngle - cameraAzimuth) * 180) / Math.PI + 180;
   }, [analogController.heading.x, analogController.heading.y, cameraAzimuth]);
 
   const nearestMineableResource = React.useMemo(() => {
