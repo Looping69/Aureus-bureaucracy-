@@ -111,9 +111,11 @@ export const UndergroundScene = ({
   const mineTimeoutRef = React.useRef<number | null>(null);
   const flightTimeoutRefs = React.useRef<number[]>([]);
   const pressureWarningShownRef = React.useRef(false);
+  const lanternFailedRef = React.useRef(false);
 
   const pickTier = React.useMemo(() => getPickTier(state), [state]);
   const miningDuration = pickTier === 3 ? 340 : pickTier === 2 ? 470 : 620;
+  const lanternStrength = Math.max(0.18, lanternFuel / LANTERN_MAX);
 
   const resourceBuildings = React.useMemo(
     () => buildUndergroundResourceBuildings(resources),
@@ -274,9 +276,9 @@ export const UndergroundScene = ({
   }, [resources, roundedPlayerPos]);
 
   React.useEffect(() => {
-    if (!nearestMineableResource || miningResourceId) return;
+    if (!nearestMineableResource || miningResourceId || lanternFuel <= 0) return;
     startMining(nearestMineableResource, { automatic: true });
-  }, [miningResourceId, nearestMineableResource, startMining]);
+  }, [lanternFuel, miningResourceId, nearestMineableResource, startMining]);
 
   React.useEffect(() => {
     const pressureId = window.setInterval(() => {
@@ -287,11 +289,26 @@ export const UndergroundScene = ({
   }, []);
 
   React.useEffect(() => {
-    if (lanternFuel <= 20 && !pressureWarningShownRef.current) {
+    if (lanternFuel <= 20 && lanternFuel > 0 && !pressureWarningShownRef.current) {
       pressureWarningShownRef.current = true;
       setMessage('Lantern is running low. Find what you can and leave soon.');
     }
   }, [lanternFuel]);
+
+  React.useEffect(() => {
+    if (lanternFuel > 0 || lanternFailedRef.current) return;
+
+    lanternFailedRef.current = true;
+    if (mineTimeoutRef.current !== null) {
+      window.clearTimeout(mineTimeoutRef.current);
+      mineTimeoutRef.current = null;
+    }
+    setMiningResourceId(null);
+    setMessage('The lantern goes out. You retreat to the surface.');
+
+    const exitTimeout = window.setTimeout(onExit, 1200);
+    flightTimeoutRefs.current.push(exitTimeout);
+  }, [lanternFuel, onExit]);
 
   React.useEffect(() => {
     return () => {
@@ -326,17 +343,24 @@ export const UndergroundScene = ({
         playerCarried={carriedCount}
       />
 
-      <div className="pointer-events-none absolute inset-0 z-20 bg-[radial-gradient(circle_at_50%_50%,rgba(0,0,0,0)_0%,rgba(0,0,0,0.25)_18%,rgba(0,0,0,0.74)_48%,rgba(0,0,0,0.92)_100%)]" />
+      <div
+        className="pointer-events-none absolute inset-0 z-20 bg-[radial-gradient(circle_at_50%_50%,rgba(0,0,0,0)_0%,rgba(0,0,0,0.25)_18%,rgba(0,0,0,0.74)_48%,rgba(0,0,0,0.92)_100%)]"
+        style={{ opacity: 0.82 + (1 - lanternStrength) * 0.18 }}
+      />
       <div
         className="pointer-events-none absolute left-1/2 top-1/2 z-20 h-[360px] w-[360px] origin-center"
         style={{
-          transform: `translate(-50%, -50%) rotate(${lightAngle}deg)`,
+          transform: `translate(-50%, -50%) rotate(${lightAngle}deg) scale(${0.72 + lanternStrength * 0.28})`,
+          opacity: lanternStrength,
           clipPath: 'polygon(50% 50%, 100% 12%, 100% 88%)',
           background: 'linear-gradient(90deg, rgba(255,241,188,0.34), rgba(255,241,188,0.13) 58%, rgba(255,241,188,0))',
           mixBlendMode: 'screen',
         }}
       />
-      <div className="pointer-events-none absolute left-1/2 top-1/2 z-20 h-28 w-28 -translate-x-1/2 -translate-y-1/2 rounded-full bg-amber-100/12 blur-xl" />
+      <div
+        className="pointer-events-none absolute left-1/2 top-1/2 z-20 h-28 w-28 -translate-x-1/2 -translate-y-1/2 rounded-full bg-amber-100/12 blur-xl"
+        style={{ opacity: lanternStrength }}
+      />
 
       <div className="pointer-events-none absolute left-1/2 top-1/2 z-40">
         <AnimatePresence>
