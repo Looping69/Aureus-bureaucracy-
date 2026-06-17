@@ -9,7 +9,11 @@ import { buildWorldTerrainVoxels } from '../utils/worldSurface';
 import { useContinuousAnalogMovement } from '../hooks/game/useContinuousAnalogMovement';
 import {
   buildUndergroundResourceBuildings,
+  buildUndergroundTerrainBuildings,
+  createInitialClearedUndergroundCells,
   createInitialUndergroundResources,
+  getUndergroundCellKey,
+  isUndergroundTerrainSolid,
   UNDERGROUND_SIZE,
   UNDERGROUND_START_POS,
   UndergroundResourceState,
@@ -57,6 +61,14 @@ const distanceBetween = (from: WorldPosition, to: WorldPosition) =>
 const isNear = (from: WorldPosition, to: WorldPosition, distance: number) =>
   distanceBetween(from, to) <= distance;
 
+const getHeadingStep = (heading: WorldPosition): WorldPosition => {
+  if (Math.abs(heading.x) > Math.abs(heading.y)) {
+    return { x: Math.sign(heading.x) || 1, y: 0 };
+  }
+
+  return { x: 0, y: Math.sign(heading.y) || 1 };
+};
+
 const getResourceTone = (type: UndergroundResourceState['type']) => {
   if (type === 'gem') return 'border-cyan-200/80 bg-cyan-50/95 text-cyan-800';
   if (type === 'coal') return 'border-zinc-300/80 bg-zinc-950/88 text-white';
@@ -71,15 +83,18 @@ const getOreColorClassName = (type: UndergroundResourceType) => {
   return 'border-amber-100 bg-amber-500 shadow-amber-300/70';
 };
 
-const getScreenOffset = (node: UndergroundResourceState, player: WorldPosition) => {
-  const dx = node.pos.x - player.x;
-  const dy = node.pos.y - player.y;
+const getPositionScreenOffset = (pos: WorldPosition, player: WorldPosition) => {
+  const dx = pos.x - player.x;
+  const dy = pos.y - player.y;
 
   return {
     fromX: Math.max(-130, Math.min(130, (dx - dy) * 7)),
     fromY: Math.max(-70, Math.min(120, (dx + dy) * 3 + 32)),
   };
 };
+
+const getScreenOffset = (node: UndergroundResourceState, player: WorldPosition) =>
+  getPositionScreenOffset(node.pos, player);
 
 const getPickTier = (state: GameState) => {
   const upgrades = state.upgrades ?? [];
@@ -98,6 +113,7 @@ export const UndergroundScene = ({
   onExit: () => void;
 }) => {
   const [resources, setResources] = React.useState(() => createInitialUndergroundResources());
+  const [clearedTerrainCells, setClearedTerrainCells] = React.useState(() => createInitialClearedUndergroundCells());
   const [playerPos, setPlayerPos] = React.useState<WorldPosition>(UNDERGROUND_START_POS);
   const [hoverInfo, setHoverInfo] = React.useState<WorldHoverInfo | null>(null);
   const [analogInput, setAnalogInput] = React.useState<AnalogStickVector>({ x: 0, y: 0, magnitude: 0, active: false });
@@ -106,6 +122,8 @@ export const UndergroundScene = ({
   const [flyingOres, setFlyingOres] = React.useState<FlyingOre[]>([]);
   const [wallHits, setWallHits] = React.useState<WallHit[]>([]);
   const [lanternFuel, setLanternFuel] = React.useState(LANTERN_MAX);
+  const [miningMode, setMiningMode] = React.useState(false);
+  const [terrainMiningCell, setTerrainMiningCell] = React.useState<WorldPosition | null>(null);
   const [miningResourceId, setMiningResourceId] = React.useState<string | null>(null);
   const [message, setMessage] = React.useState('Dig through walls and search the dark for hidden ore.');
   const mineTimeoutRef = React.useRef<number | null>(null);
@@ -121,10 +139,43 @@ export const UndergroundScene = ({
     () => buildUndergroundResourceBuildings(resources),
     [resources]
   );
+  const terrainBuildings = React.useMemo(
+    () => buildUndergroundTerrainBuildings(clearedTerrainCells),
+    [clearedTerrainCells]
+  );
+  const allBuildings = React.useMemo(
+    () => [...terrainBuildings, ...resourceBuildings],
+    [resourceBuildings, terrainBuildings]
+  );
   const terrainData = React.useMemo(
     () => buildWorldTerrainVoxels(resourceBuildings, UNDERGROUND_SIZE, EMPTY_NAVIGATION_ZONES),
     [resourceBuildings]
   );
+  const terrainSurfaceMap = React.useMemo(() => {
+    const tiles = new Map(terrainData.surfaceMap.tiles);
+
+    for (let x = 0; x < UNDERGROUND_SIZE; x += 1) {
+      for (let y = 0; y < UNDERGROUND_SIZE; y += 1) {
+        if (!isUndergroundTerrainSolid({ x, y }, clearedTerrainCells)) continue;
+        const tile = tiles.get(getUndergroundCellKey({ x, y }));
+        if (!tile) continue;
+
+        tiles.set(getUndergroundCellKey({ x, y }), {
+          ...tile,
+          kind: 'FOUNDATION',
+          walkable: false,
+          cost: Number.POSITIVE_INFINITY,
+          buildingId: 'underground_terrain',
+        });
+      }
+    }
+
+    return {
+      ...terrainData.surfaceMap,
+      tiles,
+    };
+  }, [clearedTerrainCells, terrainData.surfaceMap]);
+  const terrainBlockCount = Math.max(0, UNDERGROUND_SIZE * UNDERGROUND_SIZE - clearedTerrainCells.size);
 
   const handleDirectMove = React.useCallback((pos: WorldPosition) => {
     setPlayerPos(clampUndergroundPosition(pos));
@@ -138,7 +189,7 @@ export const UndergroundScene = ({
     input: analogInput,
     authoritativePosition: playerPos,
     movementSpeed: (state.movementSpeed ?? 1) * 1.08,
-    surfaceMap: terrainData.surfaceMap,
+    surfaceMap: terrainSurfaceMap,
     cameraAzimuth,
     bounds: { min: 0, max: UNDERGROUND_SIZE - 1 },
     onInputStart: handleDirectMove,
@@ -155,12 +206,29 @@ export const UndergroundScene = ({
     const headingAngle = Math.atan2(analogController.heading.y, analogController.heading.x);
     return (headingAngle * 180) / Math.PI + 180;
   }, [analogController.heading.x, analogController.heading.y]);
+  const targetTerrainCell = React.useMemo(() => {
+    const step = getHeadingStep(analogController.heading);
+
+    for (let distance = 1; distance <= AUTO_MINE_RANGE; distance += 1) {
+      const candidate = clampUndergroundPosition({
+        x: roundedPlayerPos.x + step.x * distance,
+        y: roundedPlayerPos.y + step.y * distance,
+      });
+
+      if (isUndergroundTerrainSolid(candidate, clearedTerrainCells)) {
+        return candidate;
+      }
+    }
+
+    return null;
+  }, [analogController.heading.x, analogController.heading.y, clearedTerrainCells, roundedPlayerPos]);
 
   const nearestMineableResource = React.useMemo(() => {
     let nearest: { node: UndergroundResourceState; distance: number } | null = null;
 
     resources.forEach((node) => {
       if (node.remaining <= 0 || !node.discovered) return;
+      if (isUndergroundTerrainSolid(node.pos, clearedTerrainCells)) return;
       const distance = distanceBetween(roundedPlayerPos, node.pos);
       if (distance > AUTO_MINE_RANGE) return;
       if (!nearest || distance < nearest.distance) {
@@ -169,7 +237,7 @@ export const UndergroundScene = ({
     });
 
     return nearest?.node ?? null;
-  }, [resources, roundedPlayerPos]);
+  }, [clearedTerrainCells, resources, roundedPlayerPos]);
 
   const activeResource = React.useMemo(
     () => nearestMineableResource ?? (hoverInfo?.id ? resources.find((node) => node.id === hoverInfo.id && node.discovered) ?? null : null),
@@ -178,11 +246,45 @@ export const UndergroundScene = ({
   const visibleDigTargets = resources.reduce((total, node) => total + (node.discovered ? node.remaining : 0), 0);
   const hiddenResourceCount = resources.filter((node) => !node.discovered && node.remaining > 0).length;
 
+  const startTerrainMining = React.useCallback((target: WorldPosition) => {
+    if (terrainMiningCell || miningResourceId || lanternFuel <= 0) return;
+    if (!isUndergroundTerrainSolid(target, clearedTerrainCells)) return;
+
+    const targetKey = getUndergroundCellKey(target);
+    setTerrainMiningCell(target);
+    setMessage('Mining into the stone face...');
+
+    mineTimeoutRef.current = window.setTimeout(() => {
+      setClearedTerrainCells((current) => {
+        const next = new Set(current);
+        next.add(targetKey);
+        return next;
+      });
+      setLanternFuel((current) => Math.max(0, current - 2));
+
+      const hitStart = getPositionScreenOffset(target, roundedPlayerPos);
+      const hitId = `terrain-${targetKey}-hit-${Date.now()}`;
+      setWallHits((current) => [...current, { id: hitId, fromX: hitStart.fromX, fromY: hitStart.fromY }]);
+      setTerrainMiningCell(null);
+      setMessage('Stone cleared. Move into the cut or keep carving.');
+
+      const removeHitTimeout = window.setTimeout(() => {
+        setWallHits((current) => current.filter((hit) => hit.id !== hitId));
+      }, 520);
+      flightTimeoutRefs.current.push(removeHitTimeout);
+    }, miningDuration);
+  }, [clearedTerrainCells, lanternFuel, miningDuration, miningResourceId, roundedPlayerPos, terrainMiningCell]);
+
   const startMining = React.useCallback((node: UndergroundResourceState, options?: { automatic?: boolean }) => {
-    if (miningResourceId || node.remaining <= 0 || !node.discovered) return;
+    if (miningResourceId || terrainMiningCell || node.remaining <= 0 || !node.discovered) return;
 
     if (lanternFuel <= 0) {
       setMessage('Your lantern is out. Leave the underground before digging deeper.');
+      return;
+    }
+
+    if (isUndergroundTerrainSolid(node.pos, clearedTerrainCells)) {
+      setMessage(`${node.name} is still embedded in the stone.`);
       return;
     }
 
@@ -239,10 +341,19 @@ export const UndergroundScene = ({
       }, 760);
       flightTimeoutRefs.current.push(landTimeout, removeTimeout);
     }, miningDuration);
-  }, [carriedCount, lanternFuel, miningDuration, miningResourceId, onCollectResource, roundedPlayerPos]);
+  }, [carriedCount, clearedTerrainCells, lanternFuel, miningDuration, miningResourceId, onCollectResource, roundedPlayerPos, terrainMiningCell]);
 
   const handleSelect = React.useCallback((target: WorldHoverInfo) => {
     setHoverInfo(target);
+
+    if (miningMode) {
+      if (targetTerrainCell) {
+        startTerrainMining(targetTerrainCell);
+      } else {
+        setMessage('No solid stone in mining range. Move up to the face.');
+      }
+      return;
+    }
 
     if (target.kind === 'GROUND') {
       setPlayerPos(clampUndergroundPosition({ x: target.x, y: target.y }));
@@ -256,7 +367,7 @@ export const UndergroundScene = ({
         startMining(node);
       }
     }
-  }, [resources, startMining]);
+  }, [miningMode, resources, startMining, startTerrainMining, targetTerrainCell]);
 
   React.useEffect(() => {
     const revealableResources = resources.filter((node) => (
@@ -276,9 +387,14 @@ export const UndergroundScene = ({
   }, [resources, roundedPlayerPos]);
 
   React.useEffect(() => {
-    if (!nearestMineableResource || miningResourceId || lanternFuel <= 0) return;
+    if (!nearestMineableResource || miningResourceId || terrainMiningCell || lanternFuel <= 0) return;
     startMining(nearestMineableResource, { automatic: true });
-  }, [lanternFuel, miningResourceId, nearestMineableResource, startMining]);
+  }, [lanternFuel, miningResourceId, nearestMineableResource, startMining, terrainMiningCell]);
+
+  React.useEffect(() => {
+    if (!miningMode || !targetTerrainCell || terrainMiningCell || miningResourceId || lanternFuel <= 0) return;
+    startTerrainMining(targetTerrainCell);
+  }, [lanternFuel, miningMode, miningResourceId, startTerrainMining, targetTerrainCell, terrainMiningCell]);
 
   React.useEffect(() => {
     const pressureId = window.setInterval(() => {
@@ -304,6 +420,7 @@ export const UndergroundScene = ({
       mineTimeoutRef.current = null;
     }
     setMiningResourceId(null);
+    setTerrainMiningCell(null);
     setMessage('The lantern goes out. You retreat to the surface.');
 
     const exitTimeout = window.setTimeout(onExit, 1200);
@@ -323,7 +440,7 @@ export const UndergroundScene = ({
     <div className="flex-1 relative overflow-hidden bg-stone-950">
       <VoxelWorldContainer
         voxels={terrainData.voxels}
-        buildings={resourceBuildings}
+        buildings={allBuildings}
         navigationZones={EMPTY_NAVIGATION_ZONES}
         npcs={EMPTY_NPCS}
         time={22}
@@ -338,8 +455,8 @@ export const UndergroundScene = ({
         onSelect={handleSelect}
         onCameraAzimuthChange={setCameraAzimuth}
         showLoadingOverlay={false}
-        surfaceMapOverride={terrainData.surfaceMap}
-        playerWorking={miningResourceId !== null}
+        surfaceMapOverride={terrainSurfaceMap}
+        playerWorking={miningResourceId !== null || terrainMiningCell !== null}
         playerCarried={carriedCount}
       />
 
@@ -405,20 +522,34 @@ export const UndergroundScene = ({
       </div>
 
       <div className="pointer-events-none absolute inset-x-3 top-3 z-30 flex items-start justify-between gap-3">
-        <button
-          type="button"
-          onClick={onExit}
-          className="pointer-events-auto flex items-center gap-2 rounded-full border border-white/15 bg-black/70 px-3 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-white shadow-lg backdrop-blur-sm active:scale-95"
-        >
-          <ArrowLeft size={14} />
-          Exit
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onExit}
+            className="pointer-events-auto flex items-center gap-2 rounded-full border border-white/15 bg-black/70 px-3 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-white shadow-lg backdrop-blur-sm active:scale-95"
+          >
+            <ArrowLeft size={14} />
+            Exit
+          </button>
+          <button
+            type="button"
+            onClick={() => setMiningMode((current) => !current)}
+            className={`pointer-events-auto flex items-center gap-2 rounded-full border px-3 py-2 text-[10px] font-black uppercase tracking-[0.18em] shadow-lg backdrop-blur-sm active:scale-95 ${
+              miningMode
+                ? 'border-lime-300/70 bg-lime-300 text-black'
+                : 'border-white/15 bg-black/70 text-white'
+            }`}
+          >
+            <Pickaxe size={14} />
+            Mine {miningMode ? 'On' : 'Off'}
+          </button>
+        </div>
 
         <div className="rounded-2xl border border-white/15 bg-black/70 px-3 py-2 text-right text-white shadow-lg backdrop-blur-sm">
           <div className="text-[9px] font-black uppercase tracking-[0.22em] text-white/50">Underground</div>
           <div className="mt-1 flex items-center justify-end gap-2 text-xs font-black">
             <Pickaxe size={14} />
-            Mk {pickTier} · {visibleDigTargets} visible
+            Mk {pickTier} · {terrainBlockCount} stone
           </div>
           <div className="mt-1 flex items-center justify-end gap-2 text-[10px] font-black text-amber-100/90">
             <Flame size={12} />
@@ -441,7 +572,21 @@ export const UndergroundScene = ({
         </AnimatePresence>
       </div>
 
-      {activeResource && (
+      {miningMode && targetTerrainCell && (
+        <div className="pointer-events-none absolute left-3 top-20 z-30 max-w-[210px]">
+          <div className="rounded-2xl border border-stone-300/70 bg-stone-900/92 px-3 py-2 text-xs font-black text-stone-100 shadow-lg backdrop-blur-sm">
+            <div className="flex items-center gap-2">
+              <Pickaxe size={14} />
+              Stone Face
+            </div>
+            <div className="mt-1 text-[10px] uppercase tracking-[0.18em] opacity-70">
+              {terrainMiningCell ? 'breaking voxel block' : 'ready to carve'}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeResource && !targetTerrainCell && (
         <div className="pointer-events-none absolute left-3 top-20 z-30 max-w-[210px]">
           <div className={`rounded-2xl border px-3 py-2 text-xs font-black shadow-lg backdrop-blur-sm ${getResourceTone(activeResource.type)}`}>
             <div className="flex items-center gap-2">
