@@ -1,4 +1,4 @@
-import { Building } from './types';
+import { Building, WorldPosition } from './types';
 import { WORLD_SIZE } from './utils/voxelConstants';
 
 export type UndergroundResourceType = 'ore' | 'coal' | 'gem' | 'rubble';
@@ -26,7 +26,92 @@ export const UNDERGROUND_START_POS = {
   y: Math.floor(UNDERGROUND_SIZE / 2),
 };
 
+export const UNDERGROUND_TERRAIN_CHUNK_SIZE = 8;
+export const UNDERGROUND_TERRAIN_HEIGHT = 3;
+const UNDERGROUND_START_CLEAR_RADIUS = 6;
 const WALL_FRAME_COUNT = 5;
+
+export const getUndergroundCellKey = (pos: WorldPosition) => `${Math.round(pos.x)},${Math.round(pos.y)}`;
+
+const isWithinUndergroundBounds = (x: number, y: number) =>
+  x >= 0 && x < UNDERGROUND_SIZE && y >= 0 && y < UNDERGROUND_SIZE;
+
+export const isUndergroundTerrainSolid = (
+  pos: WorldPosition,
+  clearedCells: ReadonlySet<string>,
+) => {
+  const x = Math.round(pos.x);
+  const y = Math.round(pos.y);
+
+  if (!isWithinUndergroundBounds(x, y)) return false;
+  return !clearedCells.has(getUndergroundCellKey({ x, y }));
+};
+
+export const createInitialClearedUndergroundCells = () => {
+  const clearedCells = new Set<string>();
+
+  for (let x = UNDERGROUND_START_POS.x - UNDERGROUND_START_CLEAR_RADIUS; x <= UNDERGROUND_START_POS.x + UNDERGROUND_START_CLEAR_RADIUS; x += 1) {
+    for (let y = UNDERGROUND_START_POS.y - UNDERGROUND_START_CLEAR_RADIUS; y <= UNDERGROUND_START_POS.y + UNDERGROUND_START_CLEAR_RADIUS; y += 1) {
+      if (!isWithinUndergroundBounds(x, y)) continue;
+      if (Math.hypot(x - UNDERGROUND_START_POS.x, y - UNDERGROUND_START_POS.y) > UNDERGROUND_START_CLEAR_RADIUS) continue;
+      clearedCells.add(getUndergroundCellKey({ x, y }));
+    }
+  }
+
+  return clearedCells;
+};
+
+const terrainPalette = ['#44484c', '#53575b', '#62666a', '#383c40'];
+
+const getTerrainVoxelColor = (x: number, y: number, z: number) => {
+  const colorIndex = Math.abs((x * 17 + y * 31 + z * 7) % terrainPalette.length);
+  return terrainPalette[colorIndex];
+};
+
+export const buildUndergroundTerrainBuildings = (
+  clearedCells: ReadonlySet<string>,
+): Building[] => {
+  const chunks = new Map<string, { originX: number; originY: number; voxels: BuildingVoxel[] }>();
+
+  for (let x = 0; x < UNDERGROUND_SIZE; x += 1) {
+    for (let y = 0; y < UNDERGROUND_SIZE; y += 1) {
+      if (!isUndergroundTerrainSolid({ x, y }, clearedCells)) continue;
+
+      const chunkX = Math.floor(x / UNDERGROUND_TERRAIN_CHUNK_SIZE);
+      const chunkY = Math.floor(y / UNDERGROUND_TERRAIN_CHUNK_SIZE);
+      const chunkKey = `${chunkX},${chunkY}`;
+      const originX = chunkX * UNDERGROUND_TERRAIN_CHUNK_SIZE;
+      const originY = chunkY * UNDERGROUND_TERRAIN_CHUNK_SIZE;
+      let chunk = chunks.get(chunkKey);
+
+      if (!chunk) {
+        chunk = { originX, originY, voxels: [] };
+        chunks.set(chunkKey, chunk);
+      }
+
+      for (let z = 0; z < UNDERGROUND_TERRAIN_HEIGHT; z += 1) {
+        chunk.voxels.push({
+          id: chunk.voxels.length + 1,
+          x: x - originX,
+          y: y - originY,
+          z,
+          c: getTerrainVoxelColor(x, y, z),
+        });
+      }
+    }
+  }
+
+  return Array.from(chunks.entries()).map(([chunkKey, chunk]) => ({
+    id: `underground_terrain_${chunkKey.replace(',', '_')}`,
+    npcId: 'none',
+    name: 'Dense Stone',
+    pos: { x: chunk.originX, y: chunk.originY },
+    type: 'INDUSTRIAL',
+    isDiscovered: true,
+    description: 'A meshed block of gray underground stone.',
+    voxels: chunk.voxels,
+  }));
+};
 
 export const UNDERGROUND_RESOURCES: UndergroundResourceNode[] = [
   { id: 'underground_wall_1', name: 'Stone Wall', type: 'rubble', pos: { x: 86, y: 88 }, capacity: WALL_FRAME_COUNT, yield: 0 },
