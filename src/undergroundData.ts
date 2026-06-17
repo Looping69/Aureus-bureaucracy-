@@ -29,7 +29,6 @@ export const UNDERGROUND_START_POS = {
 export const UNDERGROUND_TERRAIN_CHUNK_SIZE = 8;
 export const UNDERGROUND_TERRAIN_HEIGHT = 3;
 const UNDERGROUND_START_CLEAR_RADIUS = 6;
-const WALL_FRAME_COUNT = 5;
 
 export const getUndergroundCellKey = (pos: WorldPosition) => `${Math.round(pos.x)},${Math.round(pos.y)}`;
 
@@ -114,17 +113,6 @@ export const buildUndergroundTerrainBuildings = (
 };
 
 export const UNDERGROUND_RESOURCES: UndergroundResourceNode[] = [
-  { id: 'underground_wall_1', name: 'Stone Wall', type: 'rubble', pos: { x: 86, y: 88 }, capacity: WALL_FRAME_COUNT, yield: 0 },
-  { id: 'underground_wall_2', name: 'Stone Wall', type: 'rubble', pos: { x: 91, y: 88 }, capacity: WALL_FRAME_COUNT, yield: 0 },
-  { id: 'underground_wall_3', name: 'Stone Wall', type: 'rubble', pos: { x: 96, y: 88 }, capacity: WALL_FRAME_COUNT, yield: 0 },
-  { id: 'underground_wall_4', name: 'Stone Wall', type: 'rubble', pos: { x: 101, y: 88 }, capacity: WALL_FRAME_COUNT, yield: 0 },
-  { id: 'underground_wall_5', name: 'Stone Wall', type: 'rubble', pos: { x: 102, y: 94 }, capacity: WALL_FRAME_COUNT, yield: 0 },
-  { id: 'underground_wall_6', name: 'Stone Wall', type: 'rubble', pos: { x: 102, y: 100 }, capacity: WALL_FRAME_COUNT, yield: 0 },
-  { id: 'underground_wall_7', name: 'Stone Wall', type: 'rubble', pos: { x: 92, y: 104 }, capacity: WALL_FRAME_COUNT, yield: 0 },
-  { id: 'underground_wall_8', name: 'Stone Wall', type: 'rubble', pos: { x: 98, y: 108 }, capacity: WALL_FRAME_COUNT, yield: 0 },
-  { id: 'underground_wall_9', name: 'Stone Wall', type: 'rubble', pos: { x: 110, y: 102 }, capacity: WALL_FRAME_COUNT, yield: 0 },
-  { id: 'underground_wall_10', name: 'Stone Wall', type: 'rubble', pos: { x: 116, y: 102 }, capacity: WALL_FRAME_COUNT, yield: 0 },
-  { id: 'underground_wall_11', name: 'Stone Wall', type: 'rubble', pos: { x: 122, y: 102 }, capacity: WALL_FRAME_COUNT, yield: 0 },
   { id: 'underground_ore_1', name: 'Iron Seam', type: 'ore', pos: { x: 72, y: 78 }, capacity: 4, yield: 2 },
   { id: 'underground_ore_2', name: 'Copper Vein', type: 'ore', pos: { x: 106, y: 74 }, capacity: 5, yield: 2, hidden: true },
   { id: 'underground_ore_3', name: 'Buried Iron Pocket', type: 'ore', pos: { x: 108, y: 98 }, capacity: 4, yield: 2, hidden: true },
@@ -141,36 +129,7 @@ const resourcePalette: Record<UndergroundResourceType, string[]> = {
   rubble: ['#51483e', '#463e36', '#39332d', '#2d2925'],
 };
 
-const makeWallVoxels = (node: UndergroundResourceState) => {
-  const colors = resourcePalette.rubble;
-  const frame = Math.max(0, Math.min(WALL_FRAME_COUNT - 1, WALL_FRAME_COUNT - node.remaining));
-  const halfWidth = Math.max(1, 4 - frame);
-  const depth = Math.max(1, 3 - Math.floor(frame / 2));
-  const height = Math.max(1, 4 - frame);
-  const voxels: BuildingVoxel[] = [];
-  let id = 1;
-
-  for (let x = -halfWidth; x <= halfWidth; x += 1) {
-    for (let y = -Math.floor(depth / 2); y <= Math.floor(depth / 2); y += 1) {
-      for (let z = 0; z < height; z += 1) {
-        const edge = Math.abs(x) === halfWidth || z === height - 1;
-        voxels.push({
-          id: id++,
-          x,
-          y,
-          z,
-          c: edge ? colors[Math.min(frame + 1, colors.length - 1)] : colors[frame % colors.length],
-        });
-      }
-    }
-  }
-
-  return voxels;
-};
-
 const makeResourceVoxels = (node: UndergroundResourceState) => {
-  if (node.type === 'rubble') return makeWallVoxels(node);
-
   const colors = resourcePalette[node.type];
   const height = Math.max(1, Math.ceil(node.remaining / 2));
   const voxels: BuildingVoxel[] = [];
@@ -214,10 +173,8 @@ export const buildUndergroundResourceBuildings = (
       npcId: 'none',
       name: node.name,
       pos: node.pos,
-      type: node.type === 'rubble' ? 'INDUSTRIAL' : 'MINE_ENTRANCE',
+      type: 'MINE_ENTRANCE',
       isDiscovered: true,
-      description: node.type === 'rubble'
-        ? `${node.remaining} wall frames remain.`
-        : `${node.remaining} workable chunks remain.`,
+      description: `${node.remaining} workable chunks remain.`,
       voxels: makeResourceVoxels(node),
     }));
