@@ -140,8 +140,8 @@ export const UndergroundScene = ({
     [resources]
   );
   const terrainBuildings = React.useMemo(
-    () => buildUndergroundTerrainBuildings(clearedTerrainCells),
-    [clearedTerrainCells]
+    () => buildUndergroundTerrainBuildings(clearedTerrainCells, playerPos),
+    [clearedTerrainCells, playerPos]
   );
   const allBuildings = React.useMemo(
     () => [...terrainBuildings, ...resourceBuildings],
@@ -243,7 +243,6 @@ export const UndergroundScene = ({
     () => nearestMineableResource ?? (hoverInfo?.id ? resources.find((node) => node.id === hoverInfo.id && node.discovered) ?? null : null),
     [hoverInfo?.id, nearestMineableResource, resources]
   );
-  const visibleDigTargets = resources.reduce((total, node) => total + (node.discovered ? node.remaining : 0), 0);
   const hiddenResourceCount = resources.filter((node) => !node.discovered && node.remaining > 0).length;
 
   const startTerrainMining = React.useCallback((target: WorldPosition) => {
@@ -586,7 +585,7 @@ export const UndergroundScene = ({
         </div>
       )}
 
-      {activeResource && !targetTerrainCell && (
+      {activeResource && !(miningMode && targetTerrainCell) && (
         <div className="pointer-events-none absolute left-3 top-20 z-30 max-w-[210px]">
           <div className={`rounded-2xl border px-3 py-2 text-xs font-black shadow-lg backdrop-blur-sm ${getResourceTone(activeResource.type)}`}>
             <div className="flex items-center gap-2">
