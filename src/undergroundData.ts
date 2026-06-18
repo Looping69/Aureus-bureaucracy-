@@ -28,6 +28,7 @@ export const UNDERGROUND_START_POS = {
 
 export const UNDERGROUND_TERRAIN_CHUNK_SIZE = 8;
 export const UNDERGROUND_TERRAIN_HEIGHT = 3;
+export const UNDERGROUND_TERRAIN_RENDER_RADIUS = 42;
 const UNDERGROUND_START_CLEAR_RADIUS = 6;
 
 export const getUndergroundCellKey = (pos: WorldPosition) => `${Math.round(pos.x)},${Math.round(pos.y)}`;
@@ -69,11 +70,17 @@ const getTerrainVoxelColor = (x: number, y: number, z: number) => {
 
 export const buildUndergroundTerrainBuildings = (
   clearedCells: ReadonlySet<string>,
+  center: WorldPosition = UNDERGROUND_START_POS,
+  renderRadius: number = UNDERGROUND_TERRAIN_RENDER_RADIUS,
 ): Building[] => {
   const chunks = new Map<string, { originX: number; originY: number; voxels: BuildingVoxel[] }>();
+  const minX = Math.max(0, Math.floor(center.x - renderRadius));
+  const maxX = Math.min(UNDERGROUND_SIZE - 1, Math.ceil(center.x + renderRadius));
+  const minY = Math.max(0, Math.floor(center.y - renderRadius));
+  const maxY = Math.min(UNDERGROUND_SIZE - 1, Math.ceil(center.y + renderRadius));
 
-  for (let x = 0; x < UNDERGROUND_SIZE; x += 1) {
-    for (let y = 0; y < UNDERGROUND_SIZE; y += 1) {
+  for (let x = minX; x <= maxX; x += 1) {
+    for (let y = minY; y <= maxY; y += 1) {
       if (!isUndergroundTerrainSolid({ x, y }, clearedCells)) continue;
 
       const chunkX = Math.floor(x / UNDERGROUND_TERRAIN_CHUNK_SIZE);
