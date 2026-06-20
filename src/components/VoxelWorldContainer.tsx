@@ -226,7 +226,7 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
     if (!engineRef.current) return;
 
     const entitySyncKey = [
-      buildings.map((building) => `${building.id}:${building.pos.x}:${building.pos.y}:${building.npcId}:${building.type}`).join('|'),
+      buildings.map((building) => `${building.id}:${building.pos.x}:${building.pos.y}:${building.npcId}:${building.type}:${building.voxels?.length ?? 0}`).join('|'),
       navigationZones.map((zone) => `${zone.id}:${zone.kind}:${zone.minX}:${zone.minY}:${zone.maxX}:${zone.maxY}`).join('|'),
       Object.values(npcs)
         .map((npc) => `${npc.id}:${npc.homeBuildingId ?? ''}:${npc.workBuildingId ?? ''}:${npc.workHours.start}:${npc.workHours.end}`)
