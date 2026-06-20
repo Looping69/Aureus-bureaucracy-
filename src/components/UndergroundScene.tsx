@@ -29,6 +29,7 @@ const AUTO_MINE_RANGE = 4;
 const RESOURCE_REVEAL_RANGE = 8;
 const MAX_CARRIED_CHUNKS = 20;
 const LANTERN_MAX = 100;
+const TERRAIN_BASE_HITS = 4;
 const noopStateChange = (_state: AppState) => {};
 const noopCountChange = (_count: number) => {};
 
@@ -104,6 +105,8 @@ const getPickTier = (state: GameState) => {
   return 1;
 };
 
+const getTerrainHitsRequired = (pickTier: number) => Math.max(2, TERRAIN_BASE_HITS - (pickTier - 1));
+
 export const UndergroundScene = ({
   state,
   onCollectResource,
@@ -125,6 +128,7 @@ export const UndergroundScene = ({
   const [lanternFuel, setLanternFuel] = React.useState(LANTERN_MAX);
   const [miningMode, setMiningMode] = React.useState(false);
   const [terrainMiningCell, setTerrainMiningCell] = React.useState<WorldPosition | null>(null);
+  const [terrainHitProgress, setTerrainHitProgress] = React.useState<Record<string, number>>({});
   const [miningResourceId, setMiningResourceId] = React.useState<string | null>(null);
   const [message, setMessage] = React.useState('Dig through walls and search the dark for hidden ore.');
   const mineTimeoutRef = React.useRef<number | null>(null);
@@ -133,6 +137,7 @@ export const UndergroundScene = ({
   const lanternFailedRef = React.useRef(false);
 
   const pickTier = React.useMemo(() => getPickTier(state), [state]);
+  const terrainHitsRequired = getTerrainHitsRequired(pickTier);
   const miningDuration = pickTier === 3 ? 340 : pickTier === 2 ? 470 : 620;
   const lanternStrength = Math.max(0.18, lanternFuel / LANTERN_MAX);
   const terrainRenderChunkX = Math.floor(playerPos.x / UNDERGROUND_TERRAIN_CHUNK_SIZE);
@@ -230,6 +235,12 @@ export const UndergroundScene = ({
 
     return null;
   }, [analogController.heading.x, analogController.heading.y, clearedTerrainCells, roundedPlayerPos]);
+  const targetTerrainKey = targetTerrainCell ? getUndergroundCellKey(targetTerrainCell) : null;
+  const targetTerrainHits = targetTerrainKey ? terrainHitProgress[targetTerrainKey] ?? 0 : 0;
+  const targetBlockOffset = React.useMemo(
+    () => targetTerrainCell ? getPositionScreenOffset(targetTerrainCell, roundedPlayerPos) : null,
+    [roundedPlayerPos, targetTerrainCell]
+  );
 
   const nearestMineableResource = React.useMemo(() => {
     let nearest: { node: UndergroundResourceState; distance: number } | null = null;
@@ -258,29 +269,45 @@ export const UndergroundScene = ({
     if (!isUndergroundTerrainSolid(target, clearedTerrainCells)) return;
 
     const targetKey = getUndergroundCellKey(target);
+    const currentHits = terrainHitProgress[targetKey] ?? 0;
     setTerrainMiningCell(target);
-    setMessage('Mining into the stone face...');
+    setMessage(`Striking stone face (${currentHits}/${terrainHitsRequired})...`);
 
     mineTimeoutRef.current = window.setTimeout(() => {
-      setClearedTerrainCells((current) => {
-        const next = new Set(current);
-        next.add(targetKey);
-        return next;
-      });
-      setLanternFuel((current) => Math.max(0, current - 2));
-
+      const nextHits = currentHits + 1;
       const hitStart = getPositionScreenOffset(target, roundedPlayerPos);
       const hitId = `terrain-${targetKey}-hit-${Date.now()}`;
       setWallHits((current) => [...current, { id: hitId, fromX: hitStart.fromX, fromY: hitStart.fromY }]);
+      setLanternFuel((current) => Math.max(0, current - 1));
+
+      if (nextHits >= terrainHitsRequired) {
+        setClearedTerrainCells((current) => {
+          const next = new Set(current);
+          next.add(targetKey);
+          return next;
+        });
+        setTerrainHitProgress((current) => {
+          const { [targetKey]: _cleared, ...rest } = current;
+          return rest;
+        });
+        setLanternFuel((current) => Math.max(0, current - 1));
+        setMessage('Stone cleared. Move into the cut or keep carving.');
+      } else {
+        setTerrainHitProgress((current) => ({
+          ...current,
+          [targetKey]: Math.max(current[targetKey] ?? 0, nextHits),
+        }));
+        setMessage(`Stone cracked (${nextHits}/${terrainHitsRequired}). Keep swinging.`);
+      }
+
       setTerrainMiningCell(null);
-      setMessage('Stone cleared. Move into the cut or keep carving.');
 
       const removeHitTimeout = window.setTimeout(() => {
         setWallHits((current) => current.filter((hit) => hit.id !== hitId));
       }, 520);
       flightTimeoutRefs.current.push(removeHitTimeout);
     }, miningDuration);
-  }, [clearedTerrainCells, lanternFuel, miningDuration, miningResourceId, roundedPlayerPos, terrainMiningCell]);
+  }, [clearedTerrainCells, lanternFuel, miningDuration, miningResourceId, roundedPlayerPos, terrainHitProgress, terrainHitsRequired, terrainMiningCell]);
 
   const startMining = React.useCallback((node: UndergroundResourceState, options?: { automatic?: boolean }) => {
     if (miningResourceId || terrainMiningCell || node.remaining <= 0 || !node.discovered) return;
@@ -486,6 +513,30 @@ export const UndergroundScene = ({
         style={{ opacity: lanternStrength }}
       />
 
+      {miningMode && targetTerrainCell && targetBlockOffset && (
+        <div
+          className="pointer-events-none absolute left-1/2 top-1/2 z-30"
+          style={{ transform: `translate(calc(-50% + ${targetBlockOffset.fromX}px), calc(-50% + ${targetBlockOffset.fromY - 18}px))` }}
+        >
+          <motion.div
+            key={targetTerrainKey}
+            initial={{ opacity: 0, scale: 0.76 }}
+            animate={{ opacity: 1, scale: terrainMiningCell ? 1.08 : 1 }}
+            exit={{ opacity: 0, scale: 0.76 }}
+            transition={{ duration: 0.16 }}
+            className="relative h-14 w-14 rotate-45 border-2 border-lime-300 bg-lime-300/8 shadow-[0_0_18px_rgba(190,242,100,0.65)]"
+          >
+            <div className="absolute -left-1 -top-1 h-3 w-3 border-l-4 border-t-4 border-white" />
+            <div className="absolute -right-1 -top-1 h-3 w-3 border-r-4 border-t-4 border-white" />
+            <div className="absolute -bottom-1 -left-1 h-3 w-3 border-b-4 border-l-4 border-white" />
+            <div className="absolute -bottom-1 -right-1 h-3 w-3 border-b-4 border-r-4 border-white" />
+            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 -rotate-45 rounded-full border border-black/60 bg-lime-300 px-2 py-1 text-[9px] font-black text-black shadow-lg">
+              {Math.min(targetTerrainHits + (terrainMiningCell ? 1 : 0), terrainHitsRequired)}/{terrainHitsRequired}
+            </div>
+          </motion.div>
+        </div>
+      )}
+
       <div className="pointer-events-none absolute left-1/2 top-1/2 z-40">
         <AnimatePresence>
           {wallHits.map((hit) => (
@@ -587,7 +638,7 @@ export const UndergroundScene = ({
               Stone Face
             </div>
             <div className="mt-1 text-[10px] uppercase tracking-[0.18em] opacity-70">
-              {terrainMiningCell ? 'breaking voxel block' : 'ready to carve'}
+              {terrainMiningCell ? 'swinging pickaxe' : `${targetTerrainHits}/${terrainHitsRequired} cracks`}
             </div>
           </div>
         </div>
