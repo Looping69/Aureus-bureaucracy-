@@ -16,6 +16,7 @@ import {
   isUndergroundTerrainSolid,
   UNDERGROUND_SIZE,
   UNDERGROUND_START_POS,
+  UNDERGROUND_TERRAIN_CHUNK_SIZE,
   UndergroundResourceState,
   UndergroundResourceType,
 } from '../undergroundData';
@@ -134,14 +135,20 @@ export const UndergroundScene = ({
   const pickTier = React.useMemo(() => getPickTier(state), [state]);
   const miningDuration = pickTier === 3 ? 340 : pickTier === 2 ? 470 : 620;
   const lanternStrength = Math.max(0.18, lanternFuel / LANTERN_MAX);
+  const terrainRenderChunkX = Math.floor(playerPos.x / UNDERGROUND_TERRAIN_CHUNK_SIZE);
+  const terrainRenderChunkY = Math.floor(playerPos.y / UNDERGROUND_TERRAIN_CHUNK_SIZE);
+  const terrainRenderCenter = React.useMemo(() => ({
+    x: terrainRenderChunkX * UNDERGROUND_TERRAIN_CHUNK_SIZE + UNDERGROUND_TERRAIN_CHUNK_SIZE / 2,
+    y: terrainRenderChunkY * UNDERGROUND_TERRAIN_CHUNK_SIZE + UNDERGROUND_TERRAIN_CHUNK_SIZE / 2,
+  }), [terrainRenderChunkX, terrainRenderChunkY]);
 
   const resourceBuildings = React.useMemo(
     () => buildUndergroundResourceBuildings(resources),
     [resources]
   );
   const terrainBuildings = React.useMemo(
-    () => buildUndergroundTerrainBuildings(clearedTerrainCells, playerPos),
-    [clearedTerrainCells, playerPos]
+    () => buildUndergroundTerrainBuildings(clearedTerrainCells, terrainRenderCenter),
+    [clearedTerrainCells, terrainRenderCenter]
   );
   const allBuildings = React.useMemo(
     () => [...terrainBuildings, ...resourceBuildings],
