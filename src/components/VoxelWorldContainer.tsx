@@ -178,6 +178,9 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
         targetPos ? targetPos.y - WORLD_HALF_SIZE : undefined,
         path
       );
+      if (playerWorking) {
+        engineRef.current.entities.player.setWorking(true);
+      }
       reportProgress(97, 'Authorizing sector access...');
 
       requestAnimationFrame(() => {
@@ -284,8 +287,11 @@ export const VoxelWorldContainer: React.FC<VoxelWorldProps> = ({
         targetPos ? targetPos.y - WORLD_HALF_SIZE : undefined,
         path
       );
+      if (playerWorking) {
+        engineRef.current.entities.player.setWorking(true);
+      }
     }
-  }, [playerPos, playerSurfaceY, isMoving, targetPos, path]);
+  }, [playerPos, playerSurfaceY, isMoving, targetPos, path, playerWorking]);
 
   useEffect(() => {
     if (engineRef.current) {
