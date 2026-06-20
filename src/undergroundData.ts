@@ -62,18 +62,25 @@ export const createInitialClearedUndergroundCells = () => {
 };
 
 const terrainPalette = ['#44484c', '#53575b', '#62666a', '#383c40'];
+const terrainHighlightPalette = ['#d9f99d', '#bef264', '#84cc16', '#facc15'];
 
 const getTerrainVoxelColor = (x: number, y: number, z: number) => {
   const colorIndex = Math.abs((x * 17 + y * 31 + z * 7) % terrainPalette.length);
   return terrainPalette[colorIndex];
 };
 
+const getTerrainHighlightColor = (x: number, y: number, z: number, progress: number) => {
+  const colorIndex = Math.abs((x * 11 + y * 19 + z + progress) % terrainHighlightPalette.length);
+  return terrainHighlightPalette[colorIndex];
+};
+
 export const buildUndergroundTerrainBuildings = (
   clearedCells: ReadonlySet<string>,
   center: WorldPosition = UNDERGROUND_START_POS,
   renderRadius: number = UNDERGROUND_TERRAIN_RENDER_RADIUS,
+  highlightedCells: ReadonlyMap<string, number> = new Map(),
 ): Building[] => {
-  const chunks = new Map<string, { originX: number; originY: number; voxels: BuildingVoxel[] }>();
+  const chunks = new Map<string, { originX: number; originY: number; voxels: BuildingVoxel[]; highlightSignature?: string }>();
   const minX = Math.max(0, Math.floor(center.x - renderRadius));
   const maxX = Math.min(UNDERGROUND_SIZE - 1, Math.ceil(center.x + renderRadius));
   const minY = Math.max(0, Math.floor(center.y - renderRadius));
@@ -83,6 +90,8 @@ export const buildUndergroundTerrainBuildings = (
     for (let y = minY; y <= maxY; y += 1) {
       if (!isUndergroundTerrainSolid({ x, y }, clearedCells)) continue;
 
+      const cellKey = getUndergroundCellKey({ x, y });
+      const highlightProgress = highlightedCells.get(cellKey);
       const chunkX = Math.floor(x / UNDERGROUND_TERRAIN_CHUNK_SIZE);
       const chunkY = Math.floor(y / UNDERGROUND_TERRAIN_CHUNK_SIZE);
       const chunkKey = `${chunkX},${chunkY}`;
@@ -95,20 +104,26 @@ export const buildUndergroundTerrainBuildings = (
         chunks.set(chunkKey, chunk);
       }
 
+      if (highlightProgress !== undefined) {
+        chunk.highlightSignature = `${x}_${y}_${highlightProgress}`;
+      }
+
       for (let z = 0; z < UNDERGROUND_TERRAIN_HEIGHT; z += 1) {
         chunk.voxels.push({
           id: chunk.voxels.length + 1,
           x: x - originX,
           y: y - originY,
           z,
-          c: getTerrainVoxelColor(x, y, z),
+          c: highlightProgress !== undefined
+            ? getTerrainHighlightColor(x, y, z, highlightProgress)
+            : getTerrainVoxelColor(x, y, z),
         });
       }
     }
   }
 
   return Array.from(chunks.entries()).map(([chunkKey, chunk]) => ({
-    id: `underground_terrain_${chunkKey.replace(',', '_')}`,
+    id: `underground_terrain_${chunkKey.replace(',', '_')}${chunk.highlightSignature ? `_target_${chunk.highlightSignature}` : ''}`,
     npcId: 'none',
     name: 'Dense Stone',
     pos: { x: chunk.originX, y: chunk.originY },
