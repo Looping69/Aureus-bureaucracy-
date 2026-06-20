@@ -28,7 +28,7 @@ export const UNDERGROUND_START_POS = {
 
 export const UNDERGROUND_TERRAIN_CHUNK_SIZE = 8;
 export const UNDERGROUND_TERRAIN_HEIGHT = 3;
-export const UNDERGROUND_TERRAIN_RENDER_RADIUS = 42;
+export const UNDERGROUND_TERRAIN_RENDER_RADIUS = 30;
 const UNDERGROUND_START_CLEAR_RADIUS = 6;
 
 export const getUndergroundCellKey = (pos: WorldPosition) => `${Math.round(pos.x)},${Math.round(pos.y)}`;
