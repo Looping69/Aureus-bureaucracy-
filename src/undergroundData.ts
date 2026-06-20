@@ -61,7 +61,7 @@ export const createInitialClearedUndergroundCells = () => {
   return clearedCells;
 };
 
-const terrainPalette = ['#44484c', '#4b5055', '#52575c', '#3f4449'];
+const terrainPalette = ['#0b0d0f', '#15181b', '#24282c', '#34393e'];
 const terrainHighlightPalette = ['#d9f99d', '#bef264', '#84cc16', '#facc15'];
 
 const getTerrainVoxelColor = (x: number, y: number) => {
