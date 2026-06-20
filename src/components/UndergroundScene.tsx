@@ -146,14 +146,19 @@ export const UndergroundScene = ({
     x: terrainRenderChunkX * UNDERGROUND_TERRAIN_CHUNK_SIZE + UNDERGROUND_TERRAIN_CHUNK_SIZE / 2,
     y: terrainRenderChunkY * UNDERGROUND_TERRAIN_CHUNK_SIZE + UNDERGROUND_TERRAIN_CHUNK_SIZE / 2,
   }), [terrainRenderChunkX, terrainRenderChunkY]);
+  const highlightedTerrainCells = React.useMemo(() => {
+    if (!terrainMiningCell) return new Map<string, number>();
+    const key = getUndergroundCellKey(terrainMiningCell);
+    return new Map([[key, (terrainHitProgress[key] ?? 0) + 1]]);
+  }, [terrainHitProgress, terrainMiningCell]);
 
   const resourceBuildings = React.useMemo(
     () => buildUndergroundResourceBuildings(resources),
     [resources]
   );
   const terrainBuildings = React.useMemo(
-    () => buildUndergroundTerrainBuildings(clearedTerrainCells, terrainRenderCenter),
-    [clearedTerrainCells, terrainRenderCenter]
+    () => buildUndergroundTerrainBuildings(clearedTerrainCells, terrainRenderCenter, undefined, highlightedTerrainCells),
+    [clearedTerrainCells, highlightedTerrainCells, terrainRenderCenter]
   );
   const allBuildings = React.useMemo(
     () => [...terrainBuildings, ...resourceBuildings],
@@ -237,10 +242,6 @@ export const UndergroundScene = ({
   }, [analogController.heading.x, analogController.heading.y, clearedTerrainCells, roundedPlayerPos]);
   const targetTerrainKey = targetTerrainCell ? getUndergroundCellKey(targetTerrainCell) : null;
   const targetTerrainHits = targetTerrainKey ? terrainHitProgress[targetTerrainKey] ?? 0 : 0;
-  const targetBlockOffset = React.useMemo(
-    () => targetTerrainCell ? getPositionScreenOffset(targetTerrainCell, roundedPlayerPos) : null,
-    [roundedPlayerPos, targetTerrainCell]
-  );
 
   const nearestMineableResource = React.useMemo(() => {
     let nearest: { node: UndergroundResourceState; distance: number } | null = null;
@@ -490,7 +491,7 @@ export const UndergroundScene = ({
         onCameraAzimuthChange={setCameraAzimuth}
         showLoadingOverlay={false}
         surfaceMapOverride={terrainSurfaceMap}
-        playerWorking={miningResourceId !== null || terrainMiningCell !== null}
+        playerWorking={miningResourceId !== null || terrainMiningCell !== null || (miningMode && targetTerrainCell !== null)}
         playerCarried={carriedCount}
       />
 
@@ -512,30 +513,6 @@ export const UndergroundScene = ({
         className="pointer-events-none absolute left-1/2 top-1/2 z-20 h-28 w-28 -translate-x-1/2 -translate-y-1/2 rounded-full bg-amber-100/12 blur-xl"
         style={{ opacity: lanternStrength }}
       />
-
-      {miningMode && targetTerrainCell && targetBlockOffset && (
-        <div
-          className="pointer-events-none absolute left-1/2 top-1/2 z-30"
-          style={{ transform: `translate(calc(-50% + ${targetBlockOffset.fromX}px), calc(-50% + ${targetBlockOffset.fromY - 18}px))` }}
-        >
-          <motion.div
-            key={targetTerrainKey}
-            initial={{ opacity: 0, scale: 0.76 }}
-            animate={{ opacity: 1, scale: terrainMiningCell ? 1.08 : 1 }}
-            exit={{ opacity: 0, scale: 0.76 }}
-            transition={{ duration: 0.16 }}
-            className="relative h-14 w-14 rotate-45 border-2 border-lime-300 bg-lime-300/8 shadow-[0_0_18px_rgba(190,242,100,0.65)]"
-          >
-            <div className="absolute -left-1 -top-1 h-3 w-3 border-l-4 border-t-4 border-white" />
-            <div className="absolute -right-1 -top-1 h-3 w-3 border-r-4 border-t-4 border-white" />
-            <div className="absolute -bottom-1 -left-1 h-3 w-3 border-b-4 border-l-4 border-white" />
-            <div className="absolute -bottom-1 -right-1 h-3 w-3 border-b-4 border-r-4 border-white" />
-            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 -rotate-45 rounded-full border border-black/60 bg-lime-300 px-2 py-1 text-[9px] font-black text-black shadow-lg">
-              {Math.min(targetTerrainHits + (terrainMiningCell ? 1 : 0), terrainHitsRequired)}/{terrainHitsRequired}
-            </div>
-          </motion.div>
-        </div>
-      )}
 
       <div className="pointer-events-none absolute left-1/2 top-1/2 z-40">
         <AnimatePresence>
