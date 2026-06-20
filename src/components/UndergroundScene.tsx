@@ -210,8 +210,9 @@ export const UndergroundScene = ({
     [renderPlayerPos]
   );
   const lightAngle = React.useMemo(() => {
-    const headingAngle = Math.atan2(analogController.heading.y, analogController.heading.x);
-    return (headingAngle * 180) / Math.PI + 270;
+    const screenX = analogController.heading.x - analogController.heading.y;
+    const screenY = analogController.heading.x + analogController.heading.y;
+    return (Math.atan2(screenY, screenX) * 180) / Math.PI;
   }, [analogController.heading.x, analogController.heading.y]);
   const targetTerrainCell = React.useMemo(() => {
     const step = getHeadingStep(analogController.heading);
