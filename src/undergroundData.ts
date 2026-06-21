@@ -61,19 +61,14 @@ export const createInitialClearedUndergroundCells = () => {
   return clearedCells;
 };
 
-const terrainPalette = ['#0b0d0f', '#15181b', '#24282c', '#34393e'];
-const terrainHighlightPalette = ['#d9f99d', '#bef264', '#84cc16', '#facc15'];
+const TERRAIN_STONE_COLOR = '#202326';
+const terrainMiningPalette = ['#59616a', '#3a4046', '#15181b', '#050607'];
 
-const getTerrainVoxelColor = (x: number, y: number) => {
-  const chunkX = Math.floor(x / UNDERGROUND_TERRAIN_CHUNK_SIZE);
-  const chunkY = Math.floor(y / UNDERGROUND_TERRAIN_CHUNK_SIZE);
-  const colorIndex = Math.abs((chunkX * 17 + chunkY * 31) % terrainPalette.length);
-  return terrainPalette[colorIndex];
-};
+const getTerrainVoxelColor = (_x: number, _y: number) => TERRAIN_STONE_COLOR;
 
-const getTerrainHighlightColor = (x: number, y: number, z: number, progress: number) => {
-  const colorIndex = Math.abs((x * 11 + y * 19 + z + progress) % terrainHighlightPalette.length);
-  return terrainHighlightPalette[colorIndex];
+const getTerrainMiningVoxelColor = (x: number, y: number, z: number, progress: number) => {
+  const colorIndex = Math.abs((x * 13 + y * 7 + z * 5 + progress) % terrainMiningPalette.length);
+  return terrainMiningPalette[colorIndex];
 };
 
 export const buildUndergroundTerrainBuildings = (
@@ -117,7 +112,7 @@ export const buildUndergroundTerrainBuildings = (
           y: y - originY,
           z,
           c: highlightProgress !== undefined
-            ? getTerrainHighlightColor(x, y, z, highlightProgress)
+            ? getTerrainMiningVoxelColor(x, y, z, highlightProgress)
             : getTerrainVoxelColor(x, y),
         });
       }
