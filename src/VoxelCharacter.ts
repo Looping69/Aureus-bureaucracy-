@@ -67,10 +67,10 @@ export class VoxelCharacter {
     this.leftArm.position.set(-0.42, 1.42, 0);
     this.rightArm.position.set(0.42, 1.42, 0);
 
-    this.pickaxe.position.set(0.03, -0.58, -0.1);
-    this.pickaxe.rotation.z = -0.45;
+    this.pickaxe.position.set(-0.03, -0.58, -0.1);
+    this.pickaxe.rotation.z = 0.45;
     this.pickaxe.visible = false;
-    this.rightArm.add(this.pickaxe);
+    this.leftArm.add(this.pickaxe);
 
     this.carryStack = new THREE.Group();
     this.carryStack.position.set(0, 0.82, 0.34);
@@ -254,6 +254,8 @@ export class VoxelCharacter {
       this.rightLeg.rotation.x = 0;
       this.leftArm.rotation.x = 0;
       this.rightArm.rotation.x = 0;
+      this.leftArm.rotation.z = 0;
+      this.rightArm.rotation.z = 0;
       this.innerGroup.position.y = 0;
       this.innerGroup.rotation.x = 0;
     }
@@ -301,10 +303,10 @@ export class VoxelCharacter {
         const windUp = Math.abs(Math.sin(phase));
         const strike = Math.max(0, Math.sin(phase + Math.PI * 0.35));
 
-        this.rightArm.rotation.x = -1.95 + windUp * 1.25;
-        this.rightArm.rotation.z = -0.28 + strike * 0.18;
-        this.leftArm.rotation.x = -0.55 + Math.sin(phase * 0.5) * 0.18;
-        this.leftArm.rotation.z = 0.18;
+        this.leftArm.rotation.x = -1.95 + windUp * 1.25;
+        this.leftArm.rotation.z = 0.28 - strike * 0.18;
+        this.rightArm.rotation.x = -0.55 + Math.sin(phase * 0.5) * 0.18;
+        this.rightArm.rotation.z = -0.18;
         this.leftLeg.rotation.x = 0.08;
         this.rightLeg.rotation.x = -0.08;
         this.innerGroup.rotation.x = -0.08 - strike * 0.04;
