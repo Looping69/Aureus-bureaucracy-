@@ -124,7 +124,7 @@ export const buildUndergroundTerrainBuildings = (
     npcId: 'none',
     name: 'Dense Stone',
     pos: { x: chunk.originX, y: chunk.originY },
-    type: 'INDUSTRIAL',
+    type: 'MINE_ENTRANCE',
     isDiscovered: true,
     description: 'A meshed block of gray underground stone.',
     voxels: chunk.voxels,
