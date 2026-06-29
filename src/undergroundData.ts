@@ -61,10 +61,13 @@ export const createInitialClearedUndergroundCells = () => {
   return clearedCells;
 };
 
-const TERRAIN_STONE_COLOR = '#202326';
-const terrainMiningPalette = ['#59616a', '#3a4046', '#15181b', '#050607'];
+const terrainStonePalette = ['#4a3020', '#5b3a22', '#3a2619', '#6b4729', '#2a1b12'];
+const terrainMiningPalette = ['#7a5231', '#5d3a22', '#3a2619', '#1f140d'];
 
-const getTerrainVoxelColor = (_x: number, _y: number) => TERRAIN_STONE_COLOR;
+const getTerrainVoxelColor = (x: number, y: number, z: number) => {
+  const colorIndex = Math.abs((x * 11 + y * 17 + z * 5) % terrainStonePalette.length);
+  return terrainStonePalette[colorIndex];
+};
 
 const getTerrainMiningVoxelColor = (x: number, y: number, z: number, progress: number) => {
   const colorIndex = Math.abs((x * 13 + y * 7 + z * 5 + progress) % terrainMiningPalette.length);
@@ -113,7 +116,7 @@ export const buildUndergroundTerrainBuildings = (
           z,
           c: highlightProgress !== undefined
             ? getTerrainMiningVoxelColor(x, y, z, highlightProgress)
-            : getTerrainVoxelColor(x, y),
+            : getTerrainVoxelColor(x, y, z),
         });
       }
     }
@@ -122,11 +125,11 @@ export const buildUndergroundTerrainBuildings = (
   return Array.from(chunks.entries()).map(([chunkKey, chunk]) => ({
     id: `underground_terrain_${chunkKey.replace(',', '_')}${chunk.highlightSignature ? `_target_${chunk.highlightSignature}` : ''}`,
     npcId: 'none',
-    name: 'Dense Stone',
+    name: 'Packed Earth',
     pos: { x: chunk.originX, y: chunk.originY },
     type: 'MINE_ENTRANCE',
     isDiscovered: true,
-    description: 'A meshed block of gray underground stone.',
+    description: 'A meshed block of packed brown earth and stone.',
     voxels: chunk.voxels,
   }));
 };
