@@ -67,7 +67,7 @@ export class VoxelCharacter {
     this.leftArm.position.set(-0.42, 1.42, 0);
     this.rightArm.position.set(0.42, 1.42, 0);
 
-    this.pickaxe.position.set(-0.03, -0.58, -0.1);
+    this.pickaxe.position.set(-0.03, -0.58, -0.28);
     this.pickaxe.rotation.z = 0.45;
     this.pickaxe.visible = false;
     this.leftArm.add(this.pickaxe);
@@ -216,12 +216,12 @@ export class VoxelCharacter {
       (block.material as THREE.MeshStandardMaterial).dispose();
     }
 
-    const oreColors = [0xc87941, 0xe0a840, 0xb07030, 0x6f4e37];
+    const oreColors = [0xfacc15, 0xf59e0b, 0xfde68a, 0xd97706];
     while (this.carriedBlocks.length < n) {
       const i = this.carriedBlocks.length;
       const block = this.box(0.42, 0.25, 0.36, oreColors[i % oreColors.length], {
-        metalness: 0.32,
-        roughness: 0.62,
+        metalness: 0.5,
+        roughness: 0.42,
       });
       block.position.set(i % 2 === 0 ? -0.03 : 0.03, i * VoxelCharacter.CARRY_BLOCK_SPACING, 0);
       block.rotation.y = i * 0.36;
@@ -303,13 +303,13 @@ export class VoxelCharacter {
         const windUp = Math.abs(Math.sin(phase));
         const strike = Math.max(0, Math.sin(phase + Math.PI * 0.35));
 
-        this.leftArm.rotation.x = -1.95 + windUp * 1.25;
+        this.leftArm.rotation.x = 1.95 - windUp * 1.25;
         this.leftArm.rotation.z = 0.28 - strike * 0.18;
-        this.rightArm.rotation.x = -0.55 + Math.sin(phase * 0.5) * 0.18;
+        this.rightArm.rotation.x = 0.55 + Math.sin(phase * 0.5) * 0.18;
         this.rightArm.rotation.z = -0.18;
         this.leftLeg.rotation.x = 0.08;
         this.rightLeg.rotation.x = -0.08;
-        this.innerGroup.rotation.x = -0.08 - strike * 0.04;
+        this.innerGroup.rotation.x = 0.06 + strike * 0.035;
         this.innerGroup.position.y = -strike * 0.06;
         break;
       }
