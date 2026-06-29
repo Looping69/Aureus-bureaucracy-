@@ -38,6 +38,7 @@ const MIN_SURFACE_HEIGHT = -3;
 const TERRAIN_LAYERS = 4;
 const TERRAIN_HEIGHT_LIFT = 1;
 const LOT_EDGE_TARGET_DROP = 1;
+const UNDERGROUND_MAP_SIZE = Math.floor(WORLD_SIZE / 2);
 
 const CARDINAL_NEIGHBORS = [
   { x: 1, y: 0 },
@@ -68,6 +69,17 @@ const SURFACE_COLORS: Record<SurfaceKind, [number, number, number, number]> = {
   CLIFF: [COLORS.GRASS, 0x5a6d46, 0x466038, 0x314827],
 };
 
+const UNDERGROUND_SURFACE_COLORS: Record<SurfaceKind, [number, number, number, number]> = {
+  GROUND: [0x6b4324, 0x57341d, 0x422717, 0x2a190f],
+  LOT_EDGE: [0x7a4f2d, 0x633e22, 0x4d2f1b, 0x301d12],
+  ROAD: [0x5f3a20, 0x4a2d19, 0x392214, 0x24160d],
+  SIDEWALK: [0x6f4829, 0x58371f, 0x422819, 0x2a190f],
+  PARK: [0x6b4324, 0x57341d, 0x422717, 0x2a190f],
+  PLAZA: [0x70482a, 0x59381f, 0x432819, 0x2b1a10],
+  FOUNDATION: [0x4a3020, 0x3a2619, 0x2a1b12, 0x1c120c],
+  CLIFF: [0x604023, 0x4d321c, 0x3a2516, 0x25170e],
+};
+
 const keyFor = (x: number, y: number) => `${x},${y}`;
 
 const clamp = (value: number, min: number, max: number) =>
@@ -81,6 +93,20 @@ const quantizeHeight = (value: number) =>
 
 const NATURAL_SURFACE_KINDS = new Set<SurfaceKind>(['GROUND', 'PARK', 'CLIFF', 'LOT_EDGE']);
 const INFRASTRUCTURE_SURFACE_KINDS = new Set<SurfaceKind>(['ROAD', 'SIDEWALK', 'PLAZA']);
+
+const getSurfaceColor = (tile: SurfaceTile, layer: number, mapSize: number) => {
+  const underground = mapSize === UNDERGROUND_MAP_SIZE;
+  const palette = underground ? UNDERGROUND_SURFACE_COLORS[tile.kind] : SURFACE_COLORS[tile.kind];
+
+  if (!underground) {
+    return palette[Math.min(layer, palette.length - 1)];
+  }
+
+  const textureNoise = Math.abs((tile.x * 17 + tile.y * 31 + layer * 7) % 4);
+  const textureOffset = textureNoise === 0 ? 1 : textureNoise === 3 ? -1 : 0;
+  const colorIndex = clamp(layer + textureOffset, 0, palette.length - 1);
+  return palette[colorIndex];
+};
 
 const terrainHeightAt = (x: number, y: number, mapSize: number = WORLD_SIZE) => {
   const nx = x / (mapSize - 1);
@@ -181,8 +207,8 @@ const applyBlockedSurface = (
   tile.buildingId = buildingId;
 };
 
-// ── Surface-map reference-equality cache ─────────────────────────────────
-// buildWorldSurfaceMap iterates every cell in the grid (360×360 = 130K)
+// -- Surface-map reference-equality cache ---------------------------------
+// buildWorldSurfaceMap iterates every cell in the grid (360x360 = 130K)
 // and is called repeatedly during NPC pathfinding.  By caching the result
 // keyed on the *identity* of the buildings / zones references, we avoid
 // the expensive rebuild when nothing has changed.
@@ -268,7 +294,7 @@ export const buildWorldSurfaceMap = (
       building,
       footprint: deriveFootprint(building),
     }))
-    .filter((entry): entry is { building: Building; footprint: BuildingFootprint } => Boolean(entry.footprint));
+    .filter((entry): entry is { building; footprint: BuildingFootprint } => Boolean(entry.footprint));
 
   for (let x = 0; x < mapSize; x++) {
     for (let y = 0; y < mapSize; y++) {
@@ -405,11 +431,9 @@ export const buildWorldTerrainVoxels = (
   const voxels: VoxelData[] = [];
 
   for (const tile of surfaceMap.tiles.values()) {
-    const palette = SURFACE_COLORS[tile.kind];
-
     for (let layer = 0; layer < TERRAIN_LAYERS; layer++) {
       const layerHeight = tile.height - layer;
-      const color = palette[Math.min(layer, palette.length - 1)];
+      const color = getSurfaceColor(tile, layer, mapSize);
 
       voxels.push({
         x: tile.x - WORLD_HALF_SIZE,
@@ -425,4 +449,3 @@ export const buildWorldTerrainVoxels = (
     surfaceMap,
   };
 };
-
