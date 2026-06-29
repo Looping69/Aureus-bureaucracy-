@@ -1,6 +1,6 @@
 import React from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { ArrowLeft, Coins, Flame, Gem, Pickaxe } from 'lucide-react';
+import { ArrowLeft, Coins, Flame, Pickaxe } from 'lucide-react';
 import { AppState, GameState, NPC, NavigationZone, VoxelData, WeatherState, WorldHoverInfo, WorldPosition } from '../types';
 import { WORLD_CAMERA_AZIMUTH } from '../VoxelEngine';
 import { VoxelWorldContainer } from './VoxelWorldContainer';
@@ -41,7 +41,6 @@ const noopCountChange = (_count: number) => {};
 
 type FlyingOre = {
   id: string;
-  type: UndergroundResourceType;
   fromX: number;
   fromY: number;
   toX?: number;
@@ -86,22 +85,6 @@ const getHeadingStep = (heading: WorldPosition): WorldPosition => {
   return { x: 0, y: Math.sign(heading.y) || 1 };
 };
 
-const getResourceTone = (type: UndergroundResourceState['type']) => {
-  if (type === 'gold') return 'border-yellow-200/90 bg-yellow-100/95 text-yellow-900';
-  if (type === 'gem') return 'border-cyan-200/80 bg-cyan-50/95 text-cyan-800';
-  if (type === 'coal') return 'border-zinc-300/80 bg-zinc-950/88 text-white';
-  if (type === 'rubble') return 'border-stone-300/70 bg-stone-900/92 text-stone-100';
-  return 'border-amber-200/80 bg-amber-50/95 text-amber-800';
-};
-
-const getOreColorClassName = (type: UndergroundResourceType) => {
-  if (type === 'gold') return 'border-yellow-100 bg-yellow-400 shadow-yellow-200/70';
-  if (type === 'gem') return 'border-cyan-100 bg-cyan-300 shadow-cyan-200/70';
-  if (type === 'coal') return 'border-zinc-400 bg-zinc-900 shadow-zinc-900/70';
-  if (type === 'rubble') return 'border-stone-300 bg-stone-600 shadow-stone-950/70';
-  return 'border-amber-100 bg-amber-500 shadow-amber-300/70';
-};
-
 const getPositionScreenOffset = (pos: WorldPosition, player: WorldPosition) => {
   const dx = pos.x - player.x;
   const dy = pos.y - player.y;
@@ -112,9 +95,6 @@ const getPositionScreenOffset = (pos: WorldPosition, player: WorldPosition) => {
   };
 };
 
-const getScreenOffset = (node: UndergroundResourceState, player: WorldPosition) =>
-  getPositionScreenOffset(node.pos, player);
-
 const getPickTier = (state: GameState) => {
   const upgrades = state.upgrades ?? [];
   if (upgrades.some((id) => ['hydraulic_pick', 'power_pick', 'mining_drill', 'deep_pick'].includes(id))) return 3;
@@ -123,6 +103,8 @@ const getPickTier = (state: GameState) => {
 };
 
 const getTerrainHitsRequired = (pickTier: number) => Math.max(2, TERRAIN_BASE_HITS - (pickTier - 1));
+
+const getOreColorClassName = () => 'border-yellow-100 bg-yellow-400 shadow-yellow-200/70';
 
 const makeGoldPickupVoxels = (droppedGold: DroppedGold[], depositedGold: number): VoxelData[] => {
   const voxels: VoxelData[] = [];
@@ -160,7 +142,7 @@ export const UndergroundScene = ({
   onCollectResource: (amount: number) => void;
   onExit: () => void;
 }) => {
-  const [resources, setResources] = React.useState(() => createInitialUndergroundResources());
+  const [resources, setResources] = React.useState<UndergroundResourceState[]>(() => createInitialUndergroundResources());
   const [clearedTerrainCells, setClearedTerrainCells] = React.useState(() => createInitialClearedUndergroundCells());
   const [playerPos, setPlayerPos] = React.useState<WorldPosition>(UNDERGROUND_START_POS);
   const [hoverInfo, setHoverInfo] = React.useState<WorldHoverInfo | null>(null);
@@ -192,34 +174,9 @@ export const UndergroundScene = ({
   const baseMiningDuration = pickTier === 3 ? 340 : pickTier === 2 ? 470 : 620;
   const miningDuration = Math.round(baseMiningDuration * workLoadMultiplier);
   const lanternStrength = Math.max(0.18, lanternFuel / LANTERN_MAX);
-  const terrainRenderChunkX = Math.floor(playerPos.x / UNDERGROUND_TERRAIN_CHUNK_SIZE);
-  const terrainRenderChunkY = Math.floor(playerPos.y / UNDERGROUND_TERRAIN_CHUNK_SIZE);
-  const terrainRenderCenter = React.useMemo(() => ({
-    x: terrainRenderChunkX * UNDERGROUND_TERRAIN_CHUNK_SIZE + UNDERGROUND_TERRAIN_CHUNK_SIZE / 2,
-    y: terrainRenderChunkY * UNDERGROUND_TERRAIN_CHUNK_SIZE + UNDERGROUND_TERRAIN_CHUNK_SIZE / 2,
-  }), [terrainRenderChunkX, terrainRenderChunkY]);
-  const highlightedTerrainCells = React.useMemo(() => {
-    if (!targetTerrainCell) return new Map<string, number>();
-    const key = getUndergroundCellKey(targetTerrainCell);
-    const progress = terrainMiningCell ? (terrainHitProgress[key] ?? 0) + 1 : 0;
-    return new Map([[key, progress]]);
-  }, [terrainHitProgress, terrainMiningCell, targetTerrainCell]);
-
   const resourceBuildings = React.useMemo(
     () => buildUndergroundResourceBuildings(resources),
     [resources]
-  );
-  const elevatorBuilding = React.useMemo(
-    () => buildUndergroundElevatorBuilding(depositedGold),
-    [depositedGold]
-  );
-  const terrainBuildings = React.useMemo(
-    () => buildUndergroundTerrainBuildings(clearedTerrainCells, terrainRenderCenter, undefined, highlightedTerrainCells),
-    [clearedTerrainCells, highlightedTerrainCells, terrainRenderCenter]
-  );
-  const allBuildings = React.useMemo(
-    () => [...terrainBuildings, elevatorBuilding, ...resourceBuildings],
-    [elevatorBuilding, resourceBuildings, terrainBuildings]
   );
   const terrainData = React.useMemo(
     () => buildWorldTerrainVoxels(resourceBuildings, UNDERGROUND_SIZE, EMPTY_NAVIGATION_ZONES),
@@ -248,12 +205,8 @@ export const UndergroundScene = ({
       }
     }
 
-    return {
-      ...terrainData.surfaceMap,
-      tiles,
-    };
+    return { ...terrainData.surfaceMap, tiles };
   }, [clearedTerrainCells, terrainData.surfaceMap]);
-  const terrainBlockCount = Math.max(0, UNDERGROUND_SIZE * UNDERGROUND_SIZE - clearedTerrainCells.size);
 
   const handleDirectMove = React.useCallback((pos: WorldPosition) => {
     setPlayerPos(clampUndergroundPosition(pos));
@@ -281,11 +234,12 @@ export const UndergroundScene = ({
     [renderPlayerPos]
   );
   const nearDropoff = isNear(roundedPlayerPos, UNDERGROUND_DROPOFF_POS, DROPOFF_RANGE);
-  const lightAngle = React.useMemo(() => {
-    const screenX = analogController.heading.x - analogController.heading.y;
-    const screenY = analogController.heading.x + analogController.heading.y;
-    return (Math.atan2(screenY, screenX) * 180) / Math.PI;
-  }, [analogController.heading.x, analogController.heading.y]);
+  const terrainRenderChunkX = Math.floor(playerPos.x / UNDERGROUND_TERRAIN_CHUNK_SIZE);
+  const terrainRenderChunkY = Math.floor(playerPos.y / UNDERGROUND_TERRAIN_CHUNK_SIZE);
+  const terrainRenderCenter = React.useMemo(() => ({
+    x: terrainRenderChunkX * UNDERGROUND_TERRAIN_CHUNK_SIZE + UNDERGROUND_TERRAIN_CHUNK_SIZE / 2,
+    y: terrainRenderChunkY * UNDERGROUND_TERRAIN_CHUNK_SIZE + UNDERGROUND_TERRAIN_CHUNK_SIZE / 2,
+  }), [terrainRenderChunkX, terrainRenderChunkY]);
   const targetTerrainCell = React.useMemo(() => {
     const step = getHeadingStep(analogController.heading);
 
@@ -304,28 +258,31 @@ export const UndergroundScene = ({
   }, [analogController.heading.x, analogController.heading.y, clearedTerrainCells, roundedPlayerPos]);
   const targetTerrainKey = targetTerrainCell ? getUndergroundCellKey(targetTerrainCell) : null;
   const targetTerrainHits = targetTerrainKey ? terrainHitProgress[targetTerrainKey] ?? 0 : 0;
-
-  const nearestMineableResource = React.useMemo(() => {
-    let nearest: { node: UndergroundResourceState; distance: number } | null = null;
-
-    resources.forEach((node) => {
-      if (node.remaining <= 0 || !node.discovered) return;
-      if (isUndergroundTerrainSolid(node.pos, clearedTerrainCells)) return;
-      const distance = distanceBetween(roundedPlayerPos, node.pos);
-      if (distance > AUTO_MINE_RANGE) return;
-      if (!nearest || distance < nearest.distance) {
-        nearest = { node, distance };
-      }
-    });
-
-    return nearest?.node ?? null;
-  }, [clearedTerrainCells, resources, roundedPlayerPos]);
-
-  const activeResource = React.useMemo(
-    () => nearestMineableResource ?? (hoverInfo?.id ? resources.find((node) => node.id === hoverInfo.id && node.discovered) ?? null : null),
-    [hoverInfo?.id, nearestMineableResource, resources]
+  const highlightedTerrainCells = React.useMemo(() => {
+    if (!targetTerrainCell) return new Map<string, number>();
+    const key = getUndergroundCellKey(targetTerrainCell);
+    const progress = terrainMiningCell ? (terrainHitProgress[key] ?? 0) + 1 : 0;
+    return new Map([[key, progress]]);
+  }, [terrainHitProgress, terrainMiningCell, targetTerrainCell]);
+  const terrainBuildings = React.useMemo(
+    () => buildUndergroundTerrainBuildings(clearedTerrainCells, terrainRenderCenter, undefined, highlightedTerrainCells),
+    [clearedTerrainCells, highlightedTerrainCells, terrainRenderCenter]
   );
+  const elevatorBuilding = React.useMemo(
+    () => buildUndergroundElevatorBuilding(depositedGold),
+    [depositedGold]
+  );
+  const allBuildings = React.useMemo(
+    () => [...terrainBuildings, elevatorBuilding, ...resourceBuildings],
+    [elevatorBuilding, resourceBuildings, terrainBuildings]
+  );
+  const terrainBlockCount = Math.max(0, UNDERGROUND_SIZE * UNDERGROUND_SIZE - clearedTerrainCells.size);
   const hiddenResourceCount = resources.filter((node) => !node.discovered && node.remaining > 0).length;
+  const lightAngle = React.useMemo(() => {
+    const screenX = analogController.heading.x - analogController.heading.y;
+    const screenY = analogController.heading.x + analogController.heading.y;
+    return (Math.atan2(screenY, screenX) * 180) / Math.PI;
+  }, [analogController.heading.x, analogController.heading.y]);
 
   const addGoldDrop = React.useCallback((target: WorldPosition, amount: number) => {
     if (amount <= 0) return;
@@ -382,56 +339,26 @@ export const UndergroundScene = ({
       }, 520);
       flightTimeoutRefs.current.push(removeHitTimeout);
     }, miningDuration);
-  }, [addGoldDrop, carriedCount, clearedTerrainCells, lanternFuel, miningDuration, miningResourceId, pickTier, roundedPlayerPos, terrainHitProgress, terrainHitsRequired, terrainMiningCell, unloadingGold]);
+  }, [addGoldDrop, clearedTerrainCells, lanternFuel, miningDuration, miningResourceId, pickTier, roundedPlayerPos, terrainHitProgress, terrainHitsRequired, terrainMiningCell, unloadingGold]);
 
-  const startMining = React.useCallback((node: UndergroundResourceState, options?: { automatic?: boolean }) => {
+  const startResourceMining = React.useCallback((node: UndergroundResourceState) => {
     if (miningResourceId || terrainMiningCell || node.remaining <= 0 || !node.discovered || unloadingGold) return;
-
-    if (lanternFuel <= 0) {
-      setMessage('Your lantern is out. Leave the underground before digging deeper.');
-      return;
-    }
-
-    if (isUndergroundTerrainSolid(node.pos, clearedTerrainCells)) {
-      setMessage(`${node.name} is still embedded in the earth.`);
-      return;
-    }
-
-    if (!isNear(roundedPlayerPos, node.pos, AUTO_MINE_RANGE)) {
-      setMessage(`Move closer to ${node.name}.`);
-      return;
-    }
+    if (isUndergroundTerrainSolid(node.pos, clearedTerrainCells)) return;
+    if (!isNear(roundedPlayerPos, node.pos, AUTO_MINE_RANGE)) return;
 
     setMiningResourceId(node.id);
-    setMessage(`${options?.automatic ? 'Auto-mining' : 'Mining'} ${node.name}...`);
-
+    setMessage(`Mining ${node.name}...`);
     mineTimeoutRef.current = window.setTimeout(() => {
       setResources((current) => current.map((candidate) =>
         candidate.id === node.id
           ? { ...candidate, remaining: Math.max(0, candidate.remaining - 1) }
           : candidate
       ));
-      setLanternFuel((current) => Math.max(0, current - (node.type === 'rubble' ? 2 : 1)));
-
-      if (node.type === 'rubble' || node.yield <= 0) {
-        const hitStart = getScreenOffset(node, roundedPlayerPos);
-        const hitId = `${node.id}-hit-${Date.now()}`;
-        setWallHits((current) => [...current, { id: hitId, fromX: hitStart.fromX, fromY: hitStart.fromY }]);
-        setMiningResourceId(null);
-        setMessage(node.remaining <= 1 ? 'The wall gives way.' : `${node.name} breaks down.`);
-
-        const removeHitTimeout = window.setTimeout(() => {
-          setWallHits((current) => current.filter((hit) => hit.id !== hitId));
-        }, 520);
-        flightTimeoutRefs.current.push(removeHitTimeout);
-        return;
-      }
-
       addGoldDrop(node.pos, 1);
       setMiningResourceId(null);
       setMessage(`${node.name} dropped loose gold ore.`);
     }, miningDuration);
-  }, [addGoldDrop, clearedTerrainCells, lanternFuel, miningDuration, miningResourceId, roundedPlayerPos, terrainMiningCell, unloadingGold]);
+  }, [addGoldDrop, clearedTerrainCells, miningDuration, miningResourceId, roundedPlayerPos, terrainMiningCell, unloadingGold]);
 
   const handleSelect = React.useCallback((target: WorldHoverInfo) => {
     setHoverInfo(target);
@@ -458,11 +385,9 @@ export const UndergroundScene = ({
 
     if (target.kind === 'BUILDING' && target.id) {
       const node = resources.find((candidate) => candidate.id === target.id && candidate.discovered);
-      if (node) {
-        startMining(node);
-      }
+      if (node) startResourceMining(node);
     }
-  }, [carriedCount, miningMode, resources, startMining, startTerrainMining, targetTerrainCell]);
+  }, [carriedCount, miningMode, resources, startResourceMining, startTerrainMining, targetTerrainCell]);
 
   React.useEffect(() => {
     const introTimeout = window.setTimeout(() => setShowElevatorIntro(false), 1500);
@@ -477,10 +402,9 @@ export const UndergroundScene = ({
     if (!drop) return;
 
     const pickupAmount = Math.min(drop.amount, MAX_CARRIED_CHUNKS - carriedCount);
-    if (pickupAmount <= 0) return;
-
     const flightStart = getPositionScreenOffset(drop.pos, roundedPlayerPos);
     const flightId = `${drop.id}-pickup-${Date.now()}`;
+
     setDroppedGold((current) => current.flatMap((candidate) => {
       if (candidate.id !== drop.id) return [candidate];
       const remaining = candidate.amount - pickupAmount;
@@ -488,7 +412,6 @@ export const UndergroundScene = ({
     }));
     setFlyingOres((current) => [...current, {
       id: flightId,
-      type: 'gold',
       fromX: flightStart.fromX,
       fromY: flightStart.fromY,
       stackIndex: carriedCount + pickupAmount,
@@ -523,7 +446,6 @@ export const UndergroundScene = ({
         const flightId = `dropoff-${Date.now()}-${current}`;
         setFlyingOres((existing) => [...existing, {
           id: flightId,
-          type: 'gold',
           fromX: flightStart.fromX + 20,
           fromY: flightStart.fromY - 80 - current * 4,
           toX: flightEnd.fromX,
@@ -572,11 +494,6 @@ export const UndergroundScene = ({
   }, [resources, roundedPlayerPos]);
 
   React.useEffect(() => {
-    if (!nearestMineableResource || miningResourceId || terrainMiningCell || lanternFuel <= 0 || unloadingGold) return;
-    startMining(nearestMineableResource, { automatic: true });
-  }, [lanternFuel, miningResourceId, nearestMineableResource, startMining, terrainMiningCell, unloadingGold]);
-
-  React.useEffect(() => {
     if (!miningMode || !targetTerrainCell || terrainMiningCell || miningResourceId || lanternFuel <= 0 || unloadingGold) return;
     startTerrainMining(targetTerrainCell);
   }, [lanternFuel, miningMode, miningResourceId, startTerrainMining, targetTerrainCell, terrainMiningCell, unloadingGold]);
@@ -606,14 +523,8 @@ export const UndergroundScene = ({
     if (lanternFuel > 0 || lanternFailedRef.current) return;
 
     lanternFailedRef.current = true;
-    if (mineTimeoutRef.current !== null) {
-      window.clearTimeout(mineTimeoutRef.current);
-      mineTimeoutRef.current = null;
-    }
-    if (unloadTimeoutRef.current !== null) {
-      window.clearTimeout(unloadTimeoutRef.current);
-      unloadTimeoutRef.current = null;
-    }
+    if (mineTimeoutRef.current !== null) window.clearTimeout(mineTimeoutRef.current);
+    if (unloadTimeoutRef.current !== null) window.clearTimeout(unloadTimeoutRef.current);
     setMiningResourceId(null);
     setTerrainMiningCell(null);
     setUnloadingGold(false);
@@ -625,12 +536,8 @@ export const UndergroundScene = ({
 
   React.useEffect(() => {
     return () => {
-      if (mineTimeoutRef.current !== null) {
-        window.clearTimeout(mineTimeoutRef.current);
-      }
-      if (unloadTimeoutRef.current !== null) {
-        window.clearTimeout(unloadTimeoutRef.current);
-      }
+      if (mineTimeoutRef.current !== null) window.clearTimeout(mineTimeoutRef.current);
+      if (unloadTimeoutRef.current !== null) window.clearTimeout(unloadTimeoutRef.current);
       flightTimeoutRefs.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
     };
   }, []);
@@ -714,12 +621,7 @@ export const UndergroundScene = ({
                 <motion.div
                   key={`${hit.id}-${piece}`}
                   initial={{ x: hit.fromX, y: hit.fromY, scale: 1, opacity: 0.8 }}
-                  animate={{
-                    x: hit.fromX + (piece - 2.5) * 12,
-                    y: hit.fromY - 16 - (piece % 3) * 8,
-                    scale: 0.3,
-                    opacity: 0,
-                  }}
+                  animate={{ x: hit.fromX + (piece - 2.5) * 12, y: hit.fromY - 16 - (piece % 3) * 8, scale: 0.3, opacity: 0 }}
                   exit={{ opacity: 0 }}
                   transition={{ duration: 0.46, ease: 'easeOut' }}
                   className="absolute h-2 w-2 rounded-sm bg-stone-300 shadow-lg shadow-stone-900/70"
@@ -741,7 +643,7 @@ export const UndergroundScene = ({
               }}
               exit={{ opacity: 0, scale: 0.65 }}
               transition={{ duration: ore.mode === 'dropoff' ? 0.42 : 0.52, ease: [0.2, 0.85, 0.22, 1] }}
-              className={`absolute h-6 w-7 rounded-md border-2 shadow-xl ${getOreColorClassName(ore.type)}`}
+              className={`absolute h-6 w-7 rounded-md border-2 shadow-xl ${getOreColorClassName()}`}
               style={{ transformOrigin: 'center' }}
             />
           ))}
@@ -762,9 +664,7 @@ export const UndergroundScene = ({
             type="button"
             onClick={() => setMiningMode((current) => !current)}
             className={`pointer-events-auto flex items-center gap-2 rounded-full border px-3 py-2 text-[10px] font-black uppercase tracking-[0.18em] shadow-lg backdrop-blur-sm active:scale-95 ${
-              miningMode
-                ? 'border-lime-300/70 bg-lime-300 text-black'
-                : 'border-white/15 bg-black/70 text-white'
+              miningMode ? 'border-lime-300/70 bg-lime-300 text-black' : 'border-white/15 bg-black/70 text-white'
             }`}
           >
             <Pickaxe size={14} />
@@ -806,10 +706,7 @@ export const UndergroundScene = ({
       {nearDropoff && (
         <div className="pointer-events-none absolute left-3 top-20 z-30 max-w-[230px]">
           <div className="rounded-2xl border border-yellow-200/70 bg-yellow-950/88 px-3 py-2 text-xs font-black text-yellow-100 shadow-lg backdrop-blur-sm">
-            <div className="flex items-center gap-2">
-              <Coins size={14} />
-              Ore Elevator
-            </div>
+            <div className="flex items-center gap-2"><Coins size={14} />Ore Elevator</div>
             <div className="mt-1 text-[10px] uppercase tracking-[0.18em] opacity-75">
               {carriedCount > 0 ? 'unloading gold' : `${depositedGold} gold banked`}
             </div>
@@ -820,28 +717,9 @@ export const UndergroundScene = ({
       {miningMode && targetTerrainCell && !nearDropoff && (
         <div className="pointer-events-none absolute left-3 top-20 z-30 max-w-[210px]">
           <div className="rounded-2xl border border-lime-300/80 bg-lime-950/90 px-3 py-2 text-xs font-black text-lime-100 shadow-lg backdrop-blur-sm">
-            <div className="flex items-center gap-2">
-              <Pickaxe size={14} />
-              Selected Face
-            </div>
+            <div className="flex items-center gap-2"><Pickaxe size={14} />Selected Face</div>
             <div className="mt-1 text-[10px] uppercase tracking-[0.18em] opacity-70">
               {terrainMiningCell ? 'swinging pickaxe' : `${targetTerrainHits}/${terrainHitsRequired} cracks`}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {activeResource && !(miningMode && targetTerrainCell) && !nearDropoff && (
-        <div className="pointer-events-none absolute left-3 top-20 z-30 max-w-[210px]">
-          <div className={`rounded-2xl border px-3 py-2 text-xs font-black shadow-lg backdrop-blur-sm ${getResourceTone(activeResource.type)}`}>
-            <div className="flex items-center gap-2">
-              <Gem size={14} />
-              {activeResource.name}
-            </div>
-            <div className="mt-1 text-[10px] uppercase tracking-[0.18em] opacity-70">
-              {activeResource.type === 'rubble'
-                ? `${activeResource.remaining} wall frames left`
-                : `${activeResource.remaining} left · drops gold`}
             </div>
           </div>
         </div>
