@@ -1,24 +1,13 @@
-import { Building, WorldPosition } from './types';
+import {
+  Building,
+  UndergroundMineState,
+  UndergroundResourceNode,
+  UndergroundResourceState,
+  WorldPosition,
+} from './types';
 import { WORLD_SIZE } from './utils/voxelConstants';
 
-export type UndergroundResourceType = 'ore' | 'coal' | 'gem' | 'rubble' | 'gold';
-
 type BuildingVoxel = NonNullable<Building['voxels']>[number];
-
-export interface UndergroundResourceNode {
-  id: string;
-  name: string;
-  type: UndergroundResourceType;
-  pos: { x: number; y: number };
-  capacity: number;
-  yield: number;
-  hidden?: boolean;
-}
-
-export interface UndergroundResourceState extends UndergroundResourceNode {
-  remaining: number;
-  discovered: boolean;
-}
 
 export const UNDERGROUND_SIZE = Math.floor(WORLD_SIZE / 2);
 export const UNDERGROUND_START_POS = {
@@ -33,6 +22,7 @@ export const UNDERGROUND_DROPOFF_POS = {
 export const UNDERGROUND_TERRAIN_CHUNK_SIZE = 12;
 export const UNDERGROUND_TERRAIN_HEIGHT = 3;
 export const UNDERGROUND_TERRAIN_RENDER_RADIUS = 30;
+export const UNDERGROUND_LANTERN_MAX = 100;
 const UNDERGROUND_START_CLEAR_RADIUS = 6;
 
 export const getUndergroundCellKey = (pos: WorldPosition) => `${Math.round(pos.x)},${Math.round(pos.y)}`;
@@ -232,7 +222,7 @@ export const UNDERGROUND_RESOURCES: UndergroundResourceNode[] = [
   { id: 'underground_gem_2', name: 'Amber Cluster', type: 'gem', pos: { x: 138, y: 84 }, capacity: 2, yield: 5, hidden: true },
 ];
 
-const resourcePalette: Record<UndergroundResourceType, string[]> = {
+const resourcePalette: Record<string, string[]> = {
   ore: ['#8b5e3c', '#b87333', '#d19a66', '#5a3b2b'],
   coal: ['#1f2933', '#2d3748', '#4a5568', '#111827'],
   gem: ['#115e59', '#14b8a6', '#67e8f9', '#fef3c7'],
@@ -273,6 +263,17 @@ export const createInitialUndergroundResources = (): UndergroundResourceState[] 
     remaining: node.capacity,
     discovered: !node.hidden,
   }));
+
+export const createInitialUndergroundMineState = (): UndergroundMineState => ({
+  resources: createInitialUndergroundResources(),
+  clearedTerrainCells: Array.from(createInitialClearedUndergroundCells()),
+  playerPos: UNDERGROUND_START_POS,
+  carriedGold: 0,
+  depositedGold: 0,
+  droppedGold: [],
+  lanternFuel: UNDERGROUND_LANTERN_MAX,
+  terrainHitProgress: {},
+});
 
 export const buildUndergroundResourceBuildings = (
   resources: UndergroundResourceState[],
