@@ -1,7 +1,7 @@
 import { Building, WorldPosition } from './types';
 import { WORLD_SIZE } from './utils/voxelConstants';
 
-export type UndergroundResourceType = 'ore' | 'coal' | 'gem' | 'rubble';
+export type UndergroundResourceType = 'ore' | 'coal' | 'gem' | 'rubble' | 'gold';
 
 type BuildingVoxel = NonNullable<Building['voxels']>[number];
 
@@ -24,6 +24,10 @@ export const UNDERGROUND_SIZE = Math.floor(WORLD_SIZE / 2);
 export const UNDERGROUND_START_POS = {
   x: Math.floor(UNDERGROUND_SIZE / 2),
   y: Math.floor(UNDERGROUND_SIZE / 2),
+};
+export const UNDERGROUND_DROPOFF_POS = {
+  x: UNDERGROUND_START_POS.x - 4,
+  y: UNDERGROUND_START_POS.y - 2,
 };
 
 export const UNDERGROUND_TERRAIN_CHUNK_SIZE = 12;
@@ -63,6 +67,7 @@ export const createInitialClearedUndergroundCells = () => {
 
 const terrainStonePalette = ['#4a3020', '#5b3a22', '#3a2619', '#6b4729', '#2a1b12'];
 const terrainMiningPalette = ['#7a5231', '#5d3a22', '#3a2619', '#1f140d'];
+const terrainSelectionPalette = ['#22c55e', '#16a34a', '#84cc16', '#15803d'];
 
 const getTerrainVoxelColor = (x: number, y: number, z: number) => {
   const colorIndex = Math.abs((x * 11 + y * 17 + z * 5) % terrainStonePalette.length);
@@ -70,9 +75,92 @@ const getTerrainVoxelColor = (x: number, y: number, z: number) => {
 };
 
 const getTerrainMiningVoxelColor = (x: number, y: number, z: number, progress: number) => {
-  const colorIndex = Math.abs((x * 13 + y * 7 + z * 5 + progress) % terrainMiningPalette.length);
-  return terrainMiningPalette[colorIndex];
+  const palette = progress <= 0 ? terrainSelectionPalette : terrainMiningPalette;
+  const colorIndex = Math.abs((x * 13 + y * 7 + z * 5 + progress) % palette.length);
+  return palette[colorIndex];
 };
+
+const seededUnit = (x: number, y: number, salt: number) => {
+  const value = Math.sin(x * 127.1 + y * 311.7 + salt * 74.7) * 43758.5453;
+  return value - Math.floor(value);
+};
+
+const GOLD_VEIN_CENTERS = [
+  { x: UNDERGROUND_START_POS.x + 17, y: UNDERGROUND_START_POS.y - 9, radius: 15, richness: 0.92 },
+  { x: UNDERGROUND_START_POS.x + 27, y: UNDERGROUND_START_POS.y + 19, radius: 18, richness: 0.78 },
+  { x: UNDERGROUND_START_POS.x - 23, y: UNDERGROUND_START_POS.y + 25, radius: 16, richness: 0.72 },
+  { x: UNDERGROUND_START_POS.x - 31, y: UNDERGROUND_START_POS.y - 14, radius: 13, richness: 0.66 },
+];
+
+export const getGoldOreYieldForCell = (pos: WorldPosition, pickTier: number = 1) => {
+  const x = Math.round(pos.x);
+  const y = Math.round(pos.y);
+  if (!isWithinUndergroundBounds(x, y)) return 0;
+
+  const veinStrength = GOLD_VEIN_CENTERS.reduce((best, vein) => {
+    const distance = Math.hypot(x - vein.x, y - vein.y);
+    if (distance > vein.radius) return best;
+    const falloff = 1 - distance / vein.radius;
+    return Math.max(best, falloff * vein.richness);
+  }, 0);
+
+  if (veinStrength <= 0) return 0;
+
+  const chance = Math.min(0.82, 0.08 + veinStrength * 0.62 + (pickTier - 1) * 0.05);
+  if (seededUnit(x, y, 1) > chance) return 0;
+
+  const bonusChance = 0.12 + veinStrength * 0.28;
+  return seededUnit(x, y, 2) < bonusChance ? 2 : 1;
+};
+
+const makeElevatorVoxels = (depositedGold: number): BuildingVoxel[] => {
+  const voxels: BuildingVoxel[] = [];
+  let id = 1;
+  const add = (x: number, y: number, z: number, c: string) => {
+    voxels.push({ id: id++, x, y, z, c });
+  };
+
+  for (let x = -2; x <= 2; x += 1) {
+    for (let y = -1; y <= 1; y += 1) {
+      add(x, y, 0, (x + y) % 2 === 0 ? '#5a4232' : '#3b2a22');
+    }
+  }
+
+  [-2, 2].forEach((x) => {
+    [-1, 1].forEach((y) => {
+      for (let z = 1; z <= 5; z += 1) {
+        add(x, y, z, '#2f2a27');
+      }
+    });
+  });
+
+  for (let x = -2; x <= 2; x += 1) {
+    add(x, -1, 5, '#4b5563');
+    add(x, 1, 5, '#4b5563');
+  }
+  for (let y = -1; y <= 1; y += 1) {
+    add(-2, y, 5, '#4b5563');
+    add(2, y, 5, '#4b5563');
+  }
+
+  const visibleGold = Math.min(depositedGold, 18);
+  for (let i = 0; i < visibleGold; i += 1) {
+    add(-1 + (i % 3), 2 + Math.floor((i % 6) / 3), 1 + Math.floor(i / 6), i % 2 === 0 ? '#facc15' : '#d97706');
+  }
+
+  return voxels;
+};
+
+export const buildUndergroundElevatorBuilding = (depositedGold: number = 0): Building => ({
+  id: 'underground_elevator_dropoff',
+  npcId: 'none',
+  name: 'Ore Elevator',
+  pos: UNDERGROUND_DROPOFF_POS,
+  type: 'MINE_ENTRANCE',
+  isDiscovered: true,
+  description: 'A rattling lift cage for hauling gold ore back to the surface.',
+  voxels: makeElevatorVoxels(depositedGold),
+});
 
 export const buildUndergroundTerrainBuildings = (
   clearedCells: ReadonlySet<string>,
@@ -149,6 +237,7 @@ const resourcePalette: Record<UndergroundResourceType, string[]> = {
   coal: ['#1f2933', '#2d3748', '#4a5568', '#111827'],
   gem: ['#115e59', '#14b8a6', '#67e8f9', '#fef3c7'],
   rubble: ['#51483e', '#463e36', '#39332d', '#2d2925'],
+  gold: ['#facc15', '#f59e0b', '#fde68a', '#a16207'],
 };
 
 const makeResourceVoxels = (node: UndergroundResourceState) => {
