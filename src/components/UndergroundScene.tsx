@@ -1,7 +1,19 @@
 import React from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { ArrowLeft, Coins, Flame, Pickaxe } from 'lucide-react';
-import { AppState, GameState, NPC, NavigationZone, VoxelData, WeatherState, WorldHoverInfo, WorldPosition } from '../types';
+import {
+  AppState,
+  GameState,
+  NPC,
+  NavigationZone,
+  UndergroundGoldDrop,
+  UndergroundMineState,
+  UndergroundResourceState,
+  VoxelData,
+  WeatherState,
+  WorldHoverInfo,
+  WorldPosition,
+} from '../types';
 import { WORLD_CAMERA_AZIMUTH } from '../VoxelEngine';
 import { VoxelWorldContainer } from './VoxelWorldContainer';
 import { AnalogStick, AnalogStickVector } from './AnalogStick';
@@ -12,8 +24,7 @@ import {
   buildUndergroundElevatorBuilding,
   buildUndergroundResourceBuildings,
   buildUndergroundTerrainBuildings,
-  createInitialClearedUndergroundCells,
-  createInitialUndergroundResources,
+  createInitialUndergroundMineState,
   getGoldOreYieldForCell,
   getUndergroundCellKey,
   isUndergroundTerrainSolid,
@@ -21,8 +32,6 @@ import {
   UNDERGROUND_SIZE,
   UNDERGROUND_START_POS,
   UNDERGROUND_TERRAIN_CHUNK_SIZE,
-  UndergroundResourceState,
-  UndergroundResourceType,
 } from '../undergroundData';
 
 const EMPTY_NAVIGATION_ZONES: NavigationZone[] = [];
@@ -39,6 +48,8 @@ const DROPOFF_RANGE = 4.5;
 const noopStateChange = (_state: AppState) => {};
 const noopCountChange = (_count: number) => {};
 
+let savedUndergroundSnapshot: UndergroundMineState | null = null;
+
 type FlyingOre = {
   id: string;
   fromX: number;
@@ -53,12 +64,6 @@ type WallHit = {
   id: string;
   fromX: number;
   fromY: number;
-};
-
-type DroppedGold = {
-  id: string;
-  pos: WorldPosition;
-  amount: number;
 };
 
 const clampUndergroundPosition = (pos: WorldPosition): WorldPosition => ({
@@ -106,7 +111,7 @@ const getTerrainHitsRequired = (pickTier: number) => Math.max(2, TERRAIN_BASE_HI
 
 const getOreColorClassName = () => 'border-yellow-100 bg-yellow-400 shadow-yellow-200/70';
 
-const makeGoldPickupVoxels = (droppedGold: DroppedGold[], depositedGold: number): VoxelData[] => {
+const makeGoldPickupVoxels = (droppedGold: UndergroundGoldDrop[], depositedGold: number): VoxelData[] => {
   const voxels: VoxelData[] = [];
   const goldColors = [0xfacc15, 0xf59e0b, 0xfde68a, 0xd97706];
 
@@ -133,39 +138,59 @@ const makeGoldPickupVoxels = (droppedGold: DroppedGold[], depositedGold: number)
   return voxels;
 };
 
+const getInitialUndergroundSnapshot = (state: GameState) =>
+  savedUndergroundSnapshot ?? state.underground ?? createInitialUndergroundMineState();
+
 export const UndergroundScene = ({
   state,
   onCollectResource,
+  onUndergroundChange,
   onExit,
 }: {
   state: GameState;
   onCollectResource: (amount: number) => void;
+  onUndergroundChange?: (underground: UndergroundMineState) => void;
   onExit: () => void;
 }) => {
-  const [resources, setResources] = React.useState<UndergroundResourceState[]>(() => createInitialUndergroundResources());
-  const [clearedTerrainCells, setClearedTerrainCells] = React.useState(() => createInitialClearedUndergroundCells());
-  const [playerPos, setPlayerPos] = React.useState<WorldPosition>(UNDERGROUND_START_POS);
+  const initialUndergroundRef = React.useRef(getInitialUndergroundSnapshot(state));
+  const [resources, setResources] = React.useState<UndergroundResourceState[]>(() => initialUndergroundRef.current.resources);
+  const [clearedTerrainCells, setClearedTerrainCells] = React.useState(() => new Set(initialUndergroundRef.current.clearedTerrainCells));
+  const [playerPos, setPlayerPos] = React.useState<WorldPosition>(initialUndergroundRef.current.playerPos ?? UNDERGROUND_START_POS);
   const [hoverInfo, setHoverInfo] = React.useState<WorldHoverInfo | null>(null);
   const [analogInput, setAnalogInput] = React.useState<AnalogStickVector>({ x: 0, y: 0, magnitude: 0, active: false });
   const [cameraAzimuth, setCameraAzimuth] = React.useState(WORLD_CAMERA_AZIMUTH);
-  const [carriedCount, setCarriedCount] = React.useState(0);
-  const [depositedGold, setDepositedGold] = React.useState(0);
-  const [droppedGold, setDroppedGold] = React.useState<DroppedGold[]>([]);
+  const [carriedCount, setCarriedCount] = React.useState(initialUndergroundRef.current.carriedGold ?? 0);
+  const [depositedGold, setDepositedGold] = React.useState(initialUndergroundRef.current.depositedGold ?? 0);
+  const [droppedGold, setDroppedGold] = React.useState<UndergroundGoldDrop[]>(() => initialUndergroundRef.current.droppedGold ?? []);
   const [flyingOres, setFlyingOres] = React.useState<FlyingOre[]>([]);
   const [wallHits, setWallHits] = React.useState<WallHit[]>([]);
-  const [lanternFuel, setLanternFuel] = React.useState(LANTERN_MAX);
+  const [lanternFuel, setLanternFuel] = React.useState(initialUndergroundRef.current.lanternFuel ?? LANTERN_MAX);
   const [miningMode, setMiningMode] = React.useState(false);
   const [terrainMiningCell, setTerrainMiningCell] = React.useState<WorldPosition | null>(null);
-  const [terrainHitProgress, setTerrainHitProgress] = React.useState<Record<string, number>>({});
+  const [terrainHitProgress, setTerrainHitProgress] = React.useState<Record<string, number>>(() => initialUndergroundRef.current.terrainHitProgress ?? {});
   const [miningResourceId, setMiningResourceId] = React.useState<string | null>(null);
   const [unloadingGold, setUnloadingGold] = React.useState(false);
-  const [showElevatorIntro, setShowElevatorIntro] = React.useState(true);
-  const [message, setMessage] = React.useState('The lift lands. Dig through walls and haul gold back to the elevator.');
+  const [message, setMessage] = React.useState('Dig through walls and haul gold back to the elevator.');
   const mineTimeoutRef = React.useRef<number | null>(null);
   const unloadTimeoutRef = React.useRef<number | null>(null);
   const flightTimeoutRefs = React.useRef<number[]>([]);
   const pressureWarningShownRef = React.useRef(false);
   const lanternFailedRef = React.useRef(false);
+
+  React.useEffect(() => {
+    const nextUnderground: UndergroundMineState = {
+      resources,
+      clearedTerrainCells: Array.from(clearedTerrainCells),
+      playerPos: clampUndergroundPrecisePosition(playerPos),
+      carriedGold: carriedCount,
+      depositedGold,
+      droppedGold,
+      lanternFuel,
+      terrainHitProgress,
+    };
+    savedUndergroundSnapshot = nextUnderground;
+    onUndergroundChange?.(nextUnderground);
+  }, [carriedCount, clearedTerrainCells, depositedGold, droppedGold, lanternFuel, onUndergroundChange, playerPos, resources, terrainHitProgress]);
 
   const pickTier = React.useMemo(() => getPickTier(state), [state]);
   const terrainHitsRequired = getTerrainHitsRequired(pickTier);
@@ -308,7 +333,6 @@ export const UndergroundScene = ({
       const hitStart = getPositionScreenOffset(target, roundedPlayerPos);
       const hitId = `terrain-${targetKey}-hit-${Date.now()}`;
       setWallHits((current) => [...current, { id: hitId, fromX: hitStart.fromX, fromY: hitStart.fromY }]);
-      setLanternFuel((current) => Math.max(0, current - 1));
 
       if (nextHits >= terrainHitsRequired) {
         const goldYield = getGoldOreYieldForCell(target, pickTier);
@@ -322,7 +346,6 @@ export const UndergroundScene = ({
           return rest;
         });
         addGoldDrop(target, goldYield);
-        setLanternFuel((current) => Math.max(0, current - 1));
         setMessage(goldYield > 0 ? `${goldYield} gold ore dropped from the vein.` : 'Earth cleared. No gold in this cut.');
       } else {
         setTerrainHitProgress((current) => ({
@@ -388,11 +411,6 @@ export const UndergroundScene = ({
       if (node) startResourceMining(node);
     }
   }, [carriedCount, miningMode, resources, startResourceMining, startTerrainMining, targetTerrainCell]);
-
-  React.useEffect(() => {
-    const introTimeout = window.setTimeout(() => setShowElevatorIntro(false), 1500);
-    return () => window.clearTimeout(introTimeout);
-  }, []);
 
   React.useEffect(() => {
     if (droppedGold.length === 0 || carriedCount >= MAX_CARRIED_CHUNKS) return;
@@ -566,33 +584,6 @@ export const UndergroundScene = ({
         playerWorking={miningResourceId !== null || terrainMiningCell !== null || (miningMode && targetTerrainCell !== null)}
         playerCarried={carriedCount}
       />
-
-      <AnimatePresence>
-        {showElevatorIntro && (
-          <motion.div
-            className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center bg-black/45"
-            initial={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.28 }}
-          >
-            <div className="relative h-56 w-36 overflow-hidden rounded border border-yellow-200/30 bg-black/55 shadow-2xl">
-              <div className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-yellow-100/40" />
-              <motion.div
-                className="absolute left-1/2 h-16 w-28 -translate-x-1/2 rounded-sm border-2 border-zinc-400/80 bg-zinc-800/90 shadow-xl"
-                initial={{ y: -70 }}
-                animate={{ y: 126 }}
-                transition={{ duration: 1.05, ease: [0.22, 0.8, 0.2, 1] }}
-              >
-                <div className="absolute inset-x-3 top-3 h-1 bg-yellow-200/70" />
-                <div className="absolute bottom-2 left-3 right-3 h-2 bg-stone-500" />
-              </motion.div>
-              <div className="absolute inset-x-0 bottom-3 text-center text-[10px] font-black uppercase tracking-[0.22em] text-yellow-100">
-                Lower Level
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       <div
         className="pointer-events-none absolute inset-0 z-20 bg-[radial-gradient(circle_at_50%_50%,rgba(0,0,0,0)_0%,rgba(0,0,0,0.25)_18%,rgba(0,0,0,0.74)_48%,rgba(0,0,0,0.92)_100%)]"
