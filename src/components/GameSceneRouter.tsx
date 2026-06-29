@@ -1,6 +1,6 @@
 import React from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { GameScene, GameState, WorldPosition } from '../types';
+import { GameScene, GameState, UndergroundMineState, WorldPosition } from '../types';
 import { CompiledAuthoringWorld } from '../editor/types';
 import { MinePickerModal } from './MinePickerModal';
 import { MineSceneFallback } from './MineSceneFallback';
@@ -48,6 +48,7 @@ interface GameSceneRouterProps {
   onClosePlanner: () => void;
   onReturnMineToWorld: () => void;
   onCollectMineResource: (amount: number) => void;
+  onUndergroundChange: (underground: UndergroundMineState) => void;
   onSelectNPC: (id: string) => void;
   onSelectPermit: (id: string) => void;
   onFoundItem: (itemId: string) => void;
@@ -106,6 +107,7 @@ export const GameSceneRouter: React.FC<GameSceneRouterProps> = ({
   onClosePlanner,
   onReturnMineToWorld,
   onCollectMineResource,
+  onUndergroundChange,
   onSelectNPC,
   onSelectPermit,
   onFoundItem,
@@ -146,6 +148,7 @@ export const GameSceneRouter: React.FC<GameSceneRouterProps> = ({
               <UndergroundScene
                 state={state}
                 onCollectResource={onCollectMineResource}
+                onUndergroundChange={onUndergroundChange}
                 onExit={onReturnMineToWorld}
               />
             </React.Suspense>
