@@ -48,7 +48,7 @@ interface GameSceneRouterProps {
   onClosePlanner: () => void;
   onReturnMineToWorld: () => void;
   onCollectMineResource: (amount: number) => void;
-  onUndergroundChange: (underground: UndergroundMineState) => void;
+  onUndergroundChange?: (underground: UndergroundMineState) => void;
   onSelectNPC: (id: string) => void;
   onSelectPermit: (id: string) => void;
   onFoundItem: (itemId: string) => void;
