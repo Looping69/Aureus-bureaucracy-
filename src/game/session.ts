@@ -6,6 +6,7 @@ import { GameState, GameWorldState, WorldPosition, WorldProfileId } from '../typ
 import { createInitialStreetPickups } from './streetPickups';
 import { createInitialWeatherState } from './weatherSystem';
 import { applyWorldProfileToState } from './worldProfiles';
+import { createInitialUndergroundMineState } from '../undergroundData';
 
 const cloneSerializable = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
 
@@ -78,6 +79,7 @@ export const buildInitialGameState = (worldProfileId: WorldProfileId = 'world-1'
     targetPos: null,
     path: [],
     streetPickups: createInitialStreetPickups(buildings, [homePos]),
+    underground: createInitialUndergroundMineState(),
     feedbacks: [],
     playerFeedbacks: [],
     dialogueCooldowns: {},
@@ -134,6 +136,7 @@ export const hydrateSavedState = ({
     targetPos: shouldResetWorldSpawn ? null : (saved.targetPos ?? baseState.targetPos),
     path: shouldResetWorldSpawn ? [] : (saved.path ?? baseState.path),
     streetPickups: saved.streetPickups ?? baseState.streetPickups,
+    underground: saved.underground ?? baseState.underground,
     playerFeedbacks: saved.playerFeedbacks ?? baseState.playerFeedbacks,
     meters: { ...baseState.meters, ...(saved.meters ?? {}) },
     dialogueCooldowns: saved.dialogueCooldowns ?? {},
