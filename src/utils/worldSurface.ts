@@ -294,7 +294,7 @@ export const buildWorldSurfaceMap = (
       building,
       footprint: deriveFootprint(building),
     }))
-    .filter((entry): entry is { building; footprint: BuildingFootprint } => Boolean(entry.footprint));
+    .filter((entry): entry is { building: Building; footprint: BuildingFootprint } => Boolean(entry.footprint));
 
   for (let x = 0; x < mapSize; x++) {
     for (let y = 0; y < mapSize; y++) {
