@@ -91,6 +91,40 @@ export interface WorldPosition {
   y: number;
 }
 
+export type UndergroundResourceType = 'ore' | 'coal' | 'gem' | 'rubble' | 'gold';
+
+export interface UndergroundResourceNode {
+  id: string;
+  name: string;
+  type: UndergroundResourceType;
+  pos: WorldPosition;
+  capacity: number;
+  yield: number;
+  hidden?: boolean;
+}
+
+export interface UndergroundResourceState extends UndergroundResourceNode {
+  remaining: number;
+  discovered: boolean;
+}
+
+export interface UndergroundGoldDrop {
+  id: string;
+  pos: WorldPosition;
+  amount: number;
+}
+
+export interface UndergroundMineState {
+  resources: UndergroundResourceState[];
+  clearedTerrainCells: string[];
+  playerPos: WorldPosition;
+  carriedGold: number;
+  depositedGold: number;
+  droppedGold: UndergroundGoldDrop[];
+  lanternFuel: number;
+  terrainHitProgress: Record<string, number>;
+}
+
 export type NavigationZoneKind = 'BLOCKED';
 
 export interface NavigationZone {
@@ -307,6 +341,7 @@ export interface GameState extends
   GameWorldState,
   GameNarrativeState,
   GameFtueState {
+  underground: UndergroundMineState;
 }
 
 export interface VoxelData {
