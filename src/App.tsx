@@ -808,6 +808,7 @@ export default function App() {
                 <PermitOverlay
                   key="permit-overlay"
                   permit={activePermit}
+                  permits={state.permits}
                   onAction={handlePermitAction}
                   onClose={() => setState(closePermit)}
                   tutorialStep={state.tutorialStep}
