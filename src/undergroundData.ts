@@ -76,10 +76,11 @@ const seededUnit = (x: number, y: number, salt: number) => {
 };
 
 const GOLD_VEIN_CENTERS = [
-  { x: UNDERGROUND_START_POS.x + 17, y: UNDERGROUND_START_POS.y - 9, radius: 15, richness: 0.92 },
-  { x: UNDERGROUND_START_POS.x + 27, y: UNDERGROUND_START_POS.y + 19, radius: 18, richness: 0.78 },
-  { x: UNDERGROUND_START_POS.x - 23, y: UNDERGROUND_START_POS.y + 25, radius: 16, richness: 0.72 },
-  { x: UNDERGROUND_START_POS.x - 31, y: UNDERGROUND_START_POS.y - 14, radius: 13, richness: 0.66 },
+  { x: UNDERGROUND_START_POS.x + 9, y: UNDERGROUND_START_POS.y - 4, radius: 14, richness: 0.76 },
+  { x: UNDERGROUND_START_POS.x + 17, y: UNDERGROUND_START_POS.y - 9, radius: 22, richness: 1 },
+  { x: UNDERGROUND_START_POS.x + 27, y: UNDERGROUND_START_POS.y + 19, radius: 24, richness: 0.9 },
+  { x: UNDERGROUND_START_POS.x - 23, y: UNDERGROUND_START_POS.y + 25, radius: 23, richness: 0.86 },
+  { x: UNDERGROUND_START_POS.x - 31, y: UNDERGROUND_START_POS.y - 14, radius: 20, richness: 0.82 },
 ];
 
 export const getGoldOreYieldForCell = (pos: WorldPosition, pickTier: number = 1) => {
@@ -94,13 +95,19 @@ export const getGoldOreYieldForCell = (pos: WorldPosition, pickTier: number = 1)
     return Math.max(best, falloff * vein.richness);
   }, 0);
 
-  if (veinStrength <= 0) return 0;
+  if (veinStrength <= 0) {
+    const backgroundChance = 0.045 + (pickTier - 1) * 0.015;
+    return seededUnit(x, y, 3) < backgroundChance ? 1 : 0;
+  }
 
-  const chance = Math.min(0.82, 0.08 + veinStrength * 0.62 + (pickTier - 1) * 0.05);
+  const chance = Math.min(0.9, 0.16 + veinStrength * 0.72 + (pickTier - 1) * 0.07);
   if (seededUnit(x, y, 1) > chance) return 0;
 
-  const bonusChance = 0.12 + veinStrength * 0.28;
-  return seededUnit(x, y, 2) < bonusChance ? 2 : 1;
+  const bonusRoll = seededUnit(x, y, 2);
+  if (bonusRoll < 0.06 + veinStrength * 0.08) return 3;
+
+  const bonusChance = 0.18 + veinStrength * 0.34;
+  return bonusRoll < bonusChance ? 2 : 1;
 };
 
 const makeElevatorVoxels = (depositedGold: number): BuildingVoxel[] => {
