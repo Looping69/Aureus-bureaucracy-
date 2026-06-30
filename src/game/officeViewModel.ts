@@ -47,9 +47,7 @@ export const deriveOfficeViewModel = (state: OfficeSceneState): OfficeViewModel 
     (permit) => bureauFilingsUnlocked && permit.status !== 'LOCKED' && permit.status !== 'REJECTED'
   );
   const buildingPermits = building?.id === 'licensing_office'
-    ? (bureauFilingsUnlocked
-      ? Object.values(state.permits).filter((permit) => permit.status !== 'LOCKED')
-      : [])
+    ? (bureauFilingsUnlocked ? Object.values(state.permits) : [])
     : [];
 
   return {
