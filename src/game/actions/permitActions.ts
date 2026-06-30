@@ -2,6 +2,7 @@ import {
   GameState,
 } from '../../types';
 import { canTransitionPermit, transitionPermitStatus } from '../machines/permitMachine';
+import { getPermitMissingRequirements, getRequirementLabel } from '../permitBoard';
 import { approvePermit } from '../permitProgression';
 import { GameNotification } from './mineActions';
 
@@ -15,6 +16,17 @@ export const applyPermitOverlayAction = (
   const standardCost = permit.status === 'REJECTED' ? 100 : permit.cost;
 
   if (action === 'FAST_TRACK' || action === 'SUBMIT') {
+    const missingRequirements = getPermitMissingRequirements(id, prev.permits);
+    if (missingRequirements.length > 0) {
+      return {
+        nextState: prev,
+        notifications: [{
+          title: 'Requirements Missing',
+          msg: `${permit.name} needs ${missingRequirements.map((requirementId) => getRequirementLabel(requirementId, prev.permits)).join(', ')} approved first.`,
+        }]
+      };
+    }
+
     if (!canTransitionPermit(permit.status, 'SUBMIT')) {
       return {
         nextState: prev,
@@ -46,6 +58,17 @@ export const applyPermitOverlayAction = (
     return {
       nextState: prev,
       notifications: [{ title: 'Invalid Filing State', msg: `${permit.name} cannot be paid from ${permit.status}.` }]
+    };
+  }
+
+  const missingRequirements = getPermitMissingRequirements(id, prev.permits);
+  if (missingRequirements.length > 0) {
+    return {
+      nextState: prev,
+      notifications: [{
+        title: 'Requirements Missing',
+        msg: `${permit.name} needs ${missingRequirements.map((requirementId) => getRequirementLabel(requirementId, prev.permits)).join(', ')} approved first.`,
+      }]
     };
   }
 
