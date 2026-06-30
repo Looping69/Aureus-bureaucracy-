@@ -34,6 +34,8 @@ export const applyPermitApproval = (
   } else if (permitId === 'prospecting-license') {
     makePermitAvailable('mining-permit-iron');
   } else if (permitId === 'mining-permit-iron') {
+    makePermitAvailable('export-license');
+    makePermitAvailable('wash-plant-permit');
     makePermitAvailable('prospecting-permit-deep');
     patchMine('iron-vein', { status: 'OPERATIONAL' });
     const deep = patchMine('deep-hollow', { discovered: true, status: 'PROSPECTING' });
@@ -43,6 +45,7 @@ export const applyPermitApproval = (
   } else if (permitId === 'prospecting-permit-deep') {
     makePermitAvailable('mining-permit-deep');
   } else if (permitId === 'mining-permit-deep') {
+    makePermitAvailable('claim-expansion');
     makePermitAvailable('prospecting-permit-abyss');
     patchMine('deep-hollow', { status: 'OPERATIONAL' });
     const abyss = patchMine('abyssal-reach', { discovered: true, status: 'PROSPECTING' });
