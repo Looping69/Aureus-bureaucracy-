@@ -2,13 +2,26 @@ import { BUILDINGS, INITIAL_MINES, INITIAL_NPCS, INITIAL_PERMITS } from '../data
 import { EMPTY_WORLD_EFFECTS } from './dialogue/worldEffects';
 import { deriveFtuePhaseFromTutorialStep, getLegacyTutorialStepForFtuePhase } from './ftue';
 import { getBuildingAccessPosition } from '../utils/buildingAccess';
-import { GameState, GameWorldState, WorldPosition, WorldProfileId } from '../types';
+import { GameState, GameWorldState, Permit, WorldPosition, WorldProfileId } from '../types';
 import { createInitialStreetPickups } from './streetPickups';
 import { createInitialWeatherState } from './weatherSystem';
 import { applyWorldProfileToState } from './worldProfiles';
 import { createInitialUndergroundMineState } from '../undergroundData';
+import { getPermitMissingRequirements } from './permitBoard';
 
 const cloneSerializable = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
+
+const buildInitialPermitState = (): Record<string, Permit> => {
+  const permits = cloneSerializable(INITIAL_PERMITS);
+
+  Object.values(permits).forEach((permit) => {
+    if (permit.status !== 'AVAILABLE') return;
+    if (getPermitMissingRequirements(permit.id, permits).length === 0) return;
+    permit.status = 'LOCKED';
+  });
+
+  return permits;
+};
 
 export const buildHydratedBuildings = (
   savedBuildings?: GameWorldState['buildings'],
@@ -49,7 +62,7 @@ export const buildInitialGameState = (worldProfileId: WorldProfileId = 'world-1'
       influence: 10,
       exposure: 0,
     },
-    permits: cloneSerializable(INITIAL_PERMITS),
+    permits: buildInitialPermitState(),
     npcs: cloneSerializable(INITIAL_NPCS),
     knownNpcIds: ['journalist'],
     objectives: [
